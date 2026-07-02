@@ -1,6 +1,11 @@
 import nodemailer from 'nodemailer';
-import { format } from 'date-fns';
-import { he } from 'date-fns/locale';
+
+function formatDate(date: Date): string {
+  return date.toLocaleString('he-IL', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
 
 function createTransport() {
   return nodemailer.createTransport({
@@ -32,7 +37,7 @@ export async function sendClientWelcomeEmail(email: string, name: string) {
 export async function sendMeetingConfirmation(email: string, name: string, meeting: any) {
   if (!process.env.SMTP_USER) return;
   const transport = createTransport();
-  const dateStr = format(new Date(meeting.date), "EEEE, d בMMMM yyyy בשעה HH:mm", { locale: he });
+  const dateStr = formatDate(new Date(meeting.date));
 
   await transport.sendMail({
     from: `"${process.env.FROM_NAME}" <${process.env.FROM_EMAIL}>`,
@@ -57,7 +62,7 @@ export async function sendMeetingConfirmation(email: string, name: string, meeti
 export async function sendMeetingReminder(email: string, name: string, meeting: any) {
   if (!process.env.SMTP_USER) return;
   const transport = createTransport();
-  const dateStr = format(new Date(meeting.date), "EEEE, d בMMMM yyyy בשעה HH:mm", { locale: he });
+  const dateStr = formatDate(new Date(meeting.date));
 
   await transport.sendMail({
     from: `"${process.env.FROM_NAME}" <${process.env.FROM_EMAIL}>`,
