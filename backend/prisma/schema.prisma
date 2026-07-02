@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  COACH
+  CLIENT
+}
+
+enum ClientStatus {
+  ACTIVE
+  FROZEN
+  ENDED
+}
+
+enum SummaryType {
+  STRUCTURED
+  FREE
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(CLIENT)
+  clientId  String?  @unique
+  client    Client?  @relation(fields: [clientId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Client {
+  id            String       @id @default(cuid())
+  fullName      String
+  phone         String?
+  email         String       @unique
+  businessName  String?
+  businessField String?
+  startDate     DateTime     @default(now())
+  status        ClientStatus @default(ACTIVE)
+  notes         String?
+  user          User?
+  meetings      Meeting[]
+  tasks         Task[]
+  payments      Payment[]
+  documents     Document[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Meeting {
+  id            String          @id @default(cuid())
+  clientId      String
+  client        Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  date          DateTime
+  duration      Int
+  type          String
+  notes         String?
+  googleEventId String?
+  summary       MeetingSummary?
+  tasks         Task[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model MeetingSummary {
+  id          String      @id @default(cuid())
+  meetingId   String      @unique
+  meeting     Meeting     @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  type        SummaryType @default(STRUCTURED)
+  goal        String?
+  progress    String?
+  challenges  String?
+  decisions   String?
+  conclusions String?
+  freeText    String?
+  notes       String?
+  documents   Document[]
+  tags        Tag[]       @relation("SummaryTags")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  clientId    String
+  client      Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  meetingId   String?
+  meeting     Meeting?   @relation(fields: [meetingId], references: [id])
+  title       String
+  description String?
+  dueDate     DateTime?
+  status      TaskStatus @default(PENDING)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Payment {
+  id              String          @id @default(cuid())
+  clientId        String          @unique
+  client          Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  totalAmount     Float
+  paidAmount      Float           @default(0)
+  nextPaymentDate DateTime?
+  history         PaymentRecord[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model PaymentRecord {
+  id        String   @id @default(cuid())
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  amount    Float
+  date      DateTime @default(now())
+  note      String?
+}
+
+model Document {
+  id        String          @id @default(cuid())
+  clientId  String
+  client    Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  summaryId String?
+  summary   MeetingSummary? @relation(fields: [summaryId], references: [id])
+  name      String
+  mimeType  String
+  url       String
+  size      Int
+  createdAt DateTime        @default(now())
+}
+
+model Tag {
+  id        String           @id @default(cuid())
+  name      String           @unique
+  summaries MeetingSummary[] @relation("SummaryTags")
+}
