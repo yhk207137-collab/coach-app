@@ -14,7 +14,7 @@ export default function Verify() {
     const token = params.get('token');
     if (!token) { setError('קישור לא תקין'); return; }
 
-    api.get(`/auth/magic/verify?token=${encodeURIComponent(token)}`)
+    api.get(`/auth/magic/verify?token=${encodeURIComponent(token.startsWith('otp:') ? token : token)}`)
       .then(({ data }) => {
         setAuth(data.user, data.token);
         navigate(data.user.role === 'COACH' ? '/' : '/portal', { replace: true });

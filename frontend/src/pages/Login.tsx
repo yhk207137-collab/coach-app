@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, Eye, EyeOff, Loader2, Mail, CheckCircle } from 'lucide-react';
+import { Briefcase, Eye, EyeOff, Loader2, Mail, CheckCircle, KeyRound } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -14,6 +14,9 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpInput, setOtpInput] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
 
@@ -36,12 +39,28 @@ export default function Login() {
     if (!email) return toast.error('הכנס כתובת מייל');
     setLoading(true);
     try {
-      await api.post('/auth/magic', { email });
+      const { data } = await api.post('/auth/magic', { email });
+      setOtp(data.otp || '');
       setMagicSent(true);
     } catch {
-      toast.error('שגיאה בשליחת המייל');
+      toast.error('שגיאה בשליחת הקוד');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOtpLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpInput.trim()) return toast.error('הכנס את הקוד');
+    setOtpLoading(true);
+    try {
+      const { data } = await api.get(`/auth/magic/verify?token=${encodeURIComponent(`otp:${otpInput.trim()}`)}`);
+      setAuth(data.user, data.token);
+      navigate(data.user.role === 'COACH' ? '/' : '/portal', { replace: true });
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'קוד שגוי או פג תוקף');
+    } finally {
+      setOtpLoading(false);
     }
   };
 
@@ -63,10 +82,10 @@ export default function Login() {
 
           {/* Tabs */}
           <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-6">
-            <button onClick={() => { setTab('magic'); setMagicSent(false); }}
+            <button onClick={() => { setTab('magic'); setMagicSent(false); setOtp(''); setOtpInput(''); }}
               className={`flex-1 py-2 text-sm rounded-lg font-medium transition-all ${tab === 'magic' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>
               <Mail className="w-3.5 h-3.5 inline ml-1" />
-              קישור למייל
+              כניסה עם קוד
             </button>
             <button onClick={() => setTab('password')}
               className={`flex-1 py-2 text-sm rounded-lg font-medium transition-all ${tab === 'password' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>
@@ -74,19 +93,52 @@ export default function Login() {
             </button>
           </div>
 
-          {/* Magic Link */}
+          {/* Magic / OTP */}
           {tab === 'magic' && (
             magicSent ? (
-              <div className="text-center py-4">
-                <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-                <p className="font-semibold text-slate-900 mb-1">בדוק את המייל שלך</p>
-                <p className="text-sm text-slate-500 mb-5">
-                  שלחנו קישור כניסה ל-<strong>{email}</strong>.<br />
-                  הקישור תקף ל-15 דקות.
+              <div className="text-center py-2">
+                <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
+                <p className="font-semibold text-slate-900 mb-1">הקוד שלך לכניסה</p>
+                <p className="text-xs text-slate-500 mb-3">
+                  שלחנו גם למייל <strong>{email}</strong>
                 </p>
-                <button onClick={() => { setMagicSent(false); setLoading(false); }}
-                  className="text-sm text-primary-600 hover:underline">
-                  שלח קישור חדש
+
+                {/* Big OTP display */}
+                {otp && (
+                  <div className="bg-primary-50 border-2 border-primary-200 rounded-2xl p-4 mb-5">
+                    <p className="text-xs text-primary-600 font-medium mb-1">קוד הכניסה שלך:</p>
+                    <p className="text-4xl font-bold tracking-[0.3em] text-primary-700">{otp}</p>
+                    <p className="text-xs text-slate-400 mt-1">תקף ל-15 דקות</p>
+                  </div>
+                )}
+
+                {/* OTP entry form */}
+                <form onSubmit={handleOtpLogin} className="space-y-3 text-right">
+                  <div>
+                    <label className="label flex items-center gap-1">
+                      <KeyRound className="w-3.5 h-3.5" />
+                      הקלד את הקוד
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className="input text-center text-2xl tracking-[0.3em] font-bold"
+                      placeholder="000000"
+                      maxLength={6}
+                      value={otpInput}
+                      onChange={e => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                      dir="ltr"
+                      autoFocus
+                    />
+                  </div>
+                  <button type="submit" disabled={otpLoading || otpInput.length !== 6} className="btn-primary w-full justify-center py-3">
+                    {otpLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'כנסו למערכת'}
+                  </button>
+                </form>
+
+                <button onClick={() => { setMagicSent(false); setOtp(''); setOtpInput(''); }}
+                  className="text-xs text-primary-600 hover:underline mt-3 block mx-auto">
+                  שלח קוד חדש
                 </button>
               </div>
             ) : (
@@ -107,10 +159,10 @@ export default function Login() {
                   />
                 </div>
                 <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-3">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'שלח קישור כניסה'}
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'קבל קוד כניסה'}
                 </button>
                 <p className="text-xs text-slate-400 text-center">
-                  תקבל קישור חד-פעמי לכניסה ישירה ללא סיסמה
+                  תקבל קוד 6 ספרות לכניסה — ללא סיסמה
                 </p>
               </form>
             )
