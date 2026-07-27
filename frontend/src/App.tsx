@@ -13,6 +13,7 @@ import AIPage from './pages/AI';
 import CalendarPage from './pages/Calendar';
 import AccountingPage from './pages/Accounting';
 import ClientPortal from './pages/ClientPortal';
+import Verify from './pages/Verify';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore();
@@ -37,6 +38,7 @@ export default function App() {
           path="/login"
           element={user ? <Navigate to={user.role === 'COACH' ? '/' : '/portal'} replace /> : <Login />}
         />
+        <Route path="/verify" element={<Verify />} />
 
         <Route element={<RequireCoach><Layout /></RequireCoach>}>
           <Route path="/" element={<Dashboard />} />

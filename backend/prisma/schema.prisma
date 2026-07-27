@@ -148,3 +148,12 @@ model Tag {
   name      String           @unique
   summaries MeetingSummary[] @relation("SummaryTags")
 }
+
+model MagicToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
