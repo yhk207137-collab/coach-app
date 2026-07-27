@@ -100,6 +100,28 @@ router.put('/:id', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   }
 });
 
+// One-time fix: subtract 3 hours from all meetings created before the timezone fix was deployed
+router.post('/admin/fix-timezone', requireAuth, requireCoach, async (_req: AuthRequest, res) => {
+  try {
+    // Only fix meetings created before 2025-07-27 18:00 UTC (when the fix was deployed)
+    const cutoff = new Date('2025-07-27T18:00:00.000Z');
+    const meetings = await prisma.meeting.findMany({ where: { createdAt: { lt: cutoff } } });
+
+    let fixed = 0;
+    for (const m of meetings) {
+      const corrected = new Date(m.date.getTime() - 3 * 60 * 60 * 1000);
+      await prisma.meeting.update({ where: { id: m.id }, data: { date: corrected } });
+      fixed++;
+    }
+
+    console.log(`[TIMEZONE FIX] Corrected ${fixed} meetings`);
+    res.json({ ok: true, fixed });
+  } catch (err: any) {
+    console.error('[TIMEZONE FIX]', err?.message);
+    res.status(500).json({ error: 'שגיאה בתיקון השעות' });
+  }
+});
+
 router.delete('/:id', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   try {
     const meeting = await prisma.meeting.findUnique({ where: { id: req.params.id } });

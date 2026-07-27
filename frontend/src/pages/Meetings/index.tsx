@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Calendar, FileText, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Calendar, FileText, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 import api from '../../services/api';
 import { Meeting } from '../../types';
 import { format, isToday, isTomorrow, isPast } from 'date-fns';
@@ -49,6 +49,15 @@ export default function MeetingsPage() {
     return format(d, "EEEE, d בMMMM", { locale: he });
   }
 
+  const fixTimezone = useMutation({
+    mutationFn: () => api.post('/meetings/admin/fix-timezone'),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['meetings'] });
+      toast.success(`תוקנו ${res.data.fixed} פגישות — השעות מסונכרנות עכשיו`);
+    },
+    onError: () => toast.error('שגיאה בתיקון'),
+  });
+
   const saved = () => {
     qc.invalidateQueries({ queryKey: ['meetings'] });
     setShowModal(false);
@@ -64,6 +73,21 @@ export default function MeetingsPage() {
         </div>
         <button onClick={() => setShowModal(true)} className="btn-primary">
           <Plus className="w-4 h-4" /> פגישה חדשה
+        </button>
+      </div>
+
+      {/* One-time timezone fix banner */}
+      <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-amber-800 text-sm">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <span>אם השעות מוצגות לא נכון — לחץ לתיקון חד-פעמי</span>
+        </div>
+        <button
+          onClick={() => fixTimezone.mutate()}
+          disabled={fixTimezone.isPending}
+          className="btn-secondary text-xs px-3 py-1.5 flex-shrink-0 border-amber-300 text-amber-800 hover:bg-amber-100"
+        >
+          {fixTimezone.isPending ? 'מתקן...' : 'תקן שעות'}
         </button>
       </div>
 
