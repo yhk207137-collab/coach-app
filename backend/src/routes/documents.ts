@@ -79,7 +79,7 @@ router.get('/client/:clientId', requireAuth, async (req: AuthRequest, res) => {
 
 router.delete('/:id', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   try {
-    const doc = await prisma.document.findUnique({ where: { id: req.params.id } });
+    const doc = await prisma.document.findUnique({ where: { id: req.params.id }, include: { client: { select: { id: true } } } });
     if (!doc) return res.status(404).json({ error: 'Not found' });
 
     const filePath = path.join(uploadDir, path.basename(doc.url));

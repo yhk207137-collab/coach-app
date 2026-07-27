@@ -12,11 +12,12 @@ function createOAuth2Client() {
   );
 }
 
-export function getAuthUrl() {
+export function getAuthUrl(state?: string) {
   const client = createOAuth2Client();
   return client.generateAuthUrl({
     access_type: 'offline',
     scope: ['https://www.googleapis.com/auth/calendar'],
+    ...(state ? { state } : {}),
   });
 }
 

@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
+import rateLimit from 'express-rate-limit';
 
 import authRoutes from './routes/auth';
 import clientRoutes from './routes/clients';
@@ -15,6 +16,7 @@ import searchRoutes from './routes/search';
 import aiRoutes from './routes/ai';
 import calendarRoutes from './routes/calendar';
 import dashboardRoutes from './routes/dashboard';
+import backupRoutes from './routes/backup';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -23,6 +25,35 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Rate limiting
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  message: { error: 'יותר מדי ניסיונות התחברות, נסה שוב בעוד 15 דקות' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 200,
+  message: { error: 'יותר מדי בקשות, נסה שוב בעוד דקה' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: 'מגבלת AI הושגה, נסה שוב בעוד דקה' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/auth/login', authLimiter);
+app.use('/api/ai', aiLimiter);
+app.use('/api/', apiLimiter);
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
@@ -38,6 +69,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/backup', backupRoutes);
 
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 

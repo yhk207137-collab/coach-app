@@ -1,14 +1,16 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Calendar, CheckSquare, CreditCard,
-  AlertCircle, Clock, TrendingUp, ArrowLeft,
+  AlertCircle, Clock, TrendingUp, ArrowLeft, Sheet, ExternalLink,
 } from 'lucide-react';
 import api from '../services/api';
 import { DashboardData } from '../types';
 import { format, isToday, isTomorrow } from 'date-fns';
 import { he } from 'date-fns/locale';
 import clsx from 'clsx';
+import toast from 'react-hot-toast';
 
 function StatCard({ icon: Icon, label, value, color, onClick }: any) {
   return (
@@ -33,6 +35,22 @@ function formatDate(dateStr: string) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [backingUp, setBackingUp] = useState(false);
+  const [backupUrl, setBackupUrl] = useState<string | null>(null);
+
+  const runBackup = async () => {
+    setBackingUp(true);
+    try {
+      const { data } = await api.post('/backup/sheets');
+      setBackupUrl(data.url);
+      toast.success('גיבוי הושלם בהצלחה!');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'שגיאה בגיבוי');
+    } finally {
+      setBackingUp(false);
+    }
+  };
+
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: () => api.get('/dashboard').then(r => r.data),
@@ -53,9 +71,24 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="page-title">לוח בקרה</h1>
-        <p className="page-subtitle">{format(new Date(), "EEEE, d בMMMM yyyy", { locale: he })}</p>
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="page-title">לוח בקרה</h1>
+          <p className="page-subtitle">{format(new Date(), "EEEE, d בMMMM yyyy", { locale: he })}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {backupUrl && (
+            <a href={backupUrl} target="_blank" rel="noreferrer"
+              className="btn-secondary text-xs flex items-center gap-1">
+              <ExternalLink className="w-3.5 h-3.5" /> פתח גיליון
+            </a>
+          )}
+          <button onClick={runBackup} disabled={backingUp}
+            className="btn-secondary text-xs flex items-center gap-1.5">
+            <Sheet className="w-3.5 h-3.5 text-emerald-600" />
+            {backingUp ? 'מגבה...' : 'גיבוי ל-Google Sheets'}
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
