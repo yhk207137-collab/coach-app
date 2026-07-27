@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 type Tab = 'password' | 'magic';
 
 export default function Login() {
-  const [tab, setTab] = useState<Tab>('magic');
+  const [tab, setTab] = useState<Tab>('password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);

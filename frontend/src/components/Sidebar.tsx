@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare,
-  CreditCard, FolderOpen, Sparkles, LogOut, Briefcase, CalendarDays, BarChart2, X,
+  CreditCard, FolderOpen, Sparkles, LogOut, Briefcase, CalendarDays, BarChart2, X, Settings,
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import clsx from 'clsx';
@@ -16,6 +16,7 @@ const nav = [
   { to: '/accounting', icon: BarChart2, label: 'הנהלת חשבונות' },
   { to: '/documents', icon: FolderOpen, label: 'מסמכים' },
   { to: '/ai', icon: Sparkles, label: 'AI – תמלול' },
+  { to: '/settings', icon: Settings, label: 'הגדרות' },
 ];
 
 interface Props {

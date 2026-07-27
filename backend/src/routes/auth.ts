@@ -139,6 +139,33 @@ router.get('/magic/verify', async (req, res) => {
   }
 });
 
+// ── Change password ───────────────────────────────────────────────────────────
+router.post('/change-password', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!newPassword || newPassword.length < 4) {
+      return res.status(400).json({ error: 'הסיסמה חייבת להכיל לפחות 4 תווים' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user) return res.status(404).json({ error: 'משתמש לא נמצא' });
+
+    // If user already has a password, verify current one
+    if (user.password) {
+      if (!currentPassword) return res.status(400).json({ error: 'הכנס סיסמה נוכחית' });
+      const valid = await bcrypt.compare(currentPassword, user.password);
+      if (!valid) return res.status(401).json({ error: 'הסיסמה הנוכחית שגויה' });
+    }
+
+    const hash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({ where: { id: req.user!.id }, data: { password: hash } });
+
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ── Current user ──────────────────────────────────────────────────────────────
 router.get('/me', requireAuth, async (req: AuthRequest, res) => {
   try {
