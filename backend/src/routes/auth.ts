@@ -66,10 +66,11 @@ router.post('/magic', async (req, res) => {
 
     // Send email
     if (process.env.SMTP_USER) {
+      const smtpPort = parseInt(process.env.SMTP_PORT || '587');
       const transport = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: false,
+        port: smtpPort,
+        secure: smtpPort === 465,
         auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
       });
 
