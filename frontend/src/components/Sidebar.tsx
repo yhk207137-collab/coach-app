@@ -36,7 +36,7 @@ export default function Sidebar() {
             <Briefcase className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p className="font-bold text-slate-900 text-sm leading-tight">מאמן עסקי</p>
+            <p className="font-bold text-slate-900 text-sm leading-tight">ליוי שיווק ופרסום</p>
             <p className="text-xs text-slate-400">{user?.name}</p>
           </div>
         </div>

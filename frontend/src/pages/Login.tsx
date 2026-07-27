@@ -58,7 +58,7 @@ export default function Login() {
               <Briefcase className="w-7 h-7 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-slate-900">כניסה למערכת</h1>
-            <p className="text-sm text-slate-500 mt-1">מערכת ניהול אימון עסקי</p>
+            <p className="text-sm text-slate-500 mt-1">ליוי שיווק ופרסום</p>
           </div>
 
           {/* Tabs */}
@@ -161,7 +161,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-slate-400 text-xs mt-6">
-          © {new Date().getFullYear()} מערכת אימון עסקי
+          © {new Date().getFullYear()} ליוי שיווק ופרסום
         </p>
       </div>
     </div>
