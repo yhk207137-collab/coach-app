@@ -83,13 +83,20 @@ router.post('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
 router.put('/:id', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   try {
     const { date, duration, type, notes } = req.body;
+    const data: any = {};
+    if (date) data.date = new Date(date);
+    if (duration !== undefined && duration !== '') data.duration = parseInt(duration);
+    if (type !== undefined) data.type = type;
+    if (notes !== undefined) data.notes = notes;
+
     const meeting = await prisma.meeting.update({
       where: { id: req.params.id },
-      data: { ...(date ? { date: new Date(date) } : {}), ...(duration ? { duration: parseInt(duration) } : {}), type, notes },
+      data,
     });
     res.json(meeting);
-  } catch {
-    res.status(500).json({ error: 'Server error' });
+  } catch (err: any) {
+    console.error('[PUT /meetings/:id]', err?.message || err);
+    res.status(500).json({ error: 'שגיאה בעדכון הפגישה' });
   }
 });
 

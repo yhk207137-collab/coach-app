@@ -24,13 +24,16 @@ export default function MeetingModal({ clientId, meeting, onClose, onSaved }: Pr
     enabled: !clientId && !isEdit,
   });
 
-  const now = new Date();
-  const dateStr = now.toISOString().slice(0, 16);
+  // Convert a Date to local datetime-local input value (not UTC)
+  const toLocalISO = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
 
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm({
     defaultValues: {
       clientId: clientId ?? '',
-      date: dateStr,
+      date: toLocalISO(new Date()),
       duration: 60,
       type: 'אימון עסקי',
       notes: '',
@@ -41,7 +44,7 @@ export default function MeetingModal({ clientId, meeting, onClose, onSaved }: Pr
     if (meeting) {
       reset({
         clientId: meeting.clientId,
-        date: new Date(meeting.date).toISOString().slice(0, 16),
+        date: toLocalISO(new Date(meeting.date)),
         duration: meeting.duration,
         type: meeting.type,
         notes: meeting.notes ?? '',
@@ -51,11 +54,13 @@ export default function MeetingModal({ clientId, meeting, onClose, onSaved }: Pr
 
   const onSubmit = async (data: any) => {
     try {
+      // Convert local datetime string to UTC ISO before sending
+      const payload = { ...data, date: new Date(data.date).toISOString() };
       if (isEdit) {
-        await api.put(`/meetings/${meeting!.id}`, data);
+        await api.put(`/meetings/${meeting!.id}`, payload);
         toast.success('הפגישה עודכנה בהצלחה');
       } else {
-        await api.post('/meetings', data);
+        await api.post('/meetings', payload);
         toast.success('הפגישה נקבעה בהצלחה');
       }
       onSaved();
