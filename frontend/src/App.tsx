@@ -10,6 +10,8 @@ import TasksPage from './pages/Tasks';
 import PaymentsPage from './pages/Payments';
 import DocumentsPage from './pages/Documents';
 import AIPage from './pages/AI';
+import CalendarPage from './pages/Calendar';
+import AccountingPage from './pages/Accounting';
 import ClientPortal from './pages/ClientPortal';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -45,6 +47,8 @@ export default function App() {
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/documents" element={<DocumentsPage />} />
           <Route path="/ai" element={<AIPage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/accounting" element={<AccountingPage />} />
         </Route>
 
         <Route

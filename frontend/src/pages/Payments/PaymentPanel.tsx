@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, CheckCircle, Clock } from 'lucide-react';
 import api from '../../services/api';
 import { Payment } from '../../types';
 import { format } from 'date-fns';
@@ -13,6 +13,7 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
   const qc = useQueryClient();
   const [addRecord, setAddRecord] = useState(false);
   const [setupPlan, setSetupPlan] = useState(false);
+  const [recordType, setRecordType] = useState<'paid' | 'scheduled'>('paid');
 
   const { data: payment, isLoading } = useQuery<Payment | null>({
     queryKey: ['payment', clientId],
@@ -24,7 +25,7 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
   });
 
   const { register: regRecord, handleSubmit: submitRecord, reset, formState: { isSubmitting: recSub } } = useForm({
-    defaultValues: { amount: 0, note: '', date: new Date().toISOString().split('T')[0] },
+    defaultValues: { amount: 0, note: '', date: new Date().toISOString().split('T')[0], scheduledDate: '' },
   });
 
   const savePlan = async (data: any) => {
@@ -39,14 +40,27 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
 
   const saveRecord = async (data: any) => {
     try {
-      await api.post(`/payments/${clientId}/record`, data);
+      const isPaid = recordType === 'paid';
+      await api.post(`/payments/${clientId}/record`, {
+        amount: data.amount,
+        note: data.note,
+        date: isPaid ? data.date : undefined,
+        isPaid,
+        scheduledDate: !isPaid ? data.scheduledDate : undefined,
+      });
       qc.invalidateQueries({ queryKey: ['payment', clientId] });
       setAddRecord(false);
       reset();
-      toast.success('תשלום נרשם');
+      toast.success(isPaid ? 'תשלום נרשם' : 'תשלום מתוזמן נוסף');
       onUpdated?.();
     } catch { toast.error('שגיאה'); }
   };
+
+  const markPaid = useMutation({
+    mutationFn: (recordId: string) => api.post(`/payments/record/${recordId}/pay`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['payment', clientId] }); toast.success('תשלום סומן כשולם'); onUpdated?.(); },
+    onError: () => toast.error('שגיאה'),
+  });
 
   if (isLoading) return <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -107,7 +121,8 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
                 style={{ width: `${Math.min((payment.paidAmount / payment.totalAmount) * 100, 100)}%` }} />
             </div>
             {payment.nextPaymentDate && (
-              <p className="text-xs text-slate-500 mt-2">
+              <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
                 תאריך תשלום הבא: {format(new Date(payment.nextPaymentDate), 'd/M/yyyy')}
               </p>
             )}
@@ -124,15 +139,28 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
           {/* Add record form */}
           {addRecord && (
             <div className="card border border-primary-100">
-              <h3 className="font-semibold text-slate-900 mb-4">רישום תשלום חדש</h3>
+              <h3 className="font-semibold text-slate-900 mb-3">הוספת תשלום</h3>
+
+              {/* Type toggle */}
+              <div className="flex gap-2 mb-4">
+                <button type="button" onClick={() => setRecordType('paid')}
+                  className={`flex-1 py-2 text-sm rounded-xl font-medium transition-colors ${recordType === 'paid' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                  שולם
+                </button>
+                <button type="button" onClick={() => setRecordType('scheduled')}
+                  className={`flex-1 py-2 text-sm rounded-xl font-medium transition-colors ${recordType === 'scheduled' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                  מתוזמן לעתיד
+                </button>
+              </div>
+
               <form onSubmit={submitRecord(saveRecord)} className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="label">סכום (₪)</label>
                   <input {...regRecord('amount', { required: true, min: 1 })} type="number" className="input" />
                 </div>
                 <div>
-                  <label className="label">תאריך</label>
-                  <input {...regRecord('date')} type="date" className="input" />
+                  <label className="label">{recordType === 'paid' ? 'תאריך תשלום' : 'תאריך מתוכנן'}</label>
+                  <input {...regRecord(recordType === 'paid' ? 'date' : 'scheduledDate')} type="date" className="input" />
                 </div>
                 <div className="col-span-2">
                   <label className="label">הערה</label>
@@ -140,7 +168,7 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
                 </div>
                 <div className="col-span-2 flex gap-2">
                   <button type="submit" disabled={recSub} className="btn-primary">
-                    {recSub ? <Loader2 className="w-4 h-4 animate-spin" /> : 'רשום תשלום'}
+                    {recSub ? <Loader2 className="w-4 h-4 animate-spin" /> : recordType === 'paid' ? 'רשום תשלום' : 'הוסף תזכורת'}
                   </button>
                   <button type="button" onClick={() => setAddRecord(false)} className="btn-secondary">ביטול</button>
                 </div>
@@ -160,14 +188,35 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
                     <th className="table-header">תאריך</th>
                     <th className="table-header">סכום</th>
                     <th className="table-header">הערה</th>
+                    <th className="table-header">סטטוס</th>
                   </tr>
                 </thead>
                 <tbody>
                   {payment.history.map(r => (
                     <tr key={r.id} className="table-row">
-                      <td className="table-cell">{format(new Date(r.date), 'd/M/yyyy')}</td>
-                      <td className="table-cell font-medium text-emerald-700">₪{r.amount.toLocaleString()}</td>
+                      <td className="table-cell">
+                        {r.isPaid
+                          ? format(new Date(r.date), 'd/M/yyyy')
+                          : r.scheduledDate
+                            ? format(new Date(r.scheduledDate), 'd/M/yyyy')
+                            : '—'}
+                      </td>
+                      <td className={`table-cell font-medium ${r.isPaid ? 'text-emerald-700' : 'text-blue-600'}`}>
+                        ₪{r.amount.toLocaleString()}
+                      </td>
                       <td className="table-cell text-slate-500">{r.note || '—'}</td>
+                      <td className="table-cell">
+                        {r.isPaid ? (
+                          <span className="flex items-center gap-1 text-xs text-emerald-600">
+                            <CheckCircle className="w-3.5 h-3.5" /> שולם
+                          </span>
+                        ) : (
+                          <button onClick={() => markPaid.mutate(r.id)} disabled={markPaid.isPending}
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 transition-colors">
+                            <Clock className="w-3.5 h-3.5" /> מתוזמן — סמן כשולם
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

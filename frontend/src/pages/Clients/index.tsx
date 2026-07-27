@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Building2, Phone, Mail, ChevronLeft } from 'lucide-react';
+import { Plus, Search, Building2, Phone, Mail, ChevronLeft, Trash2 } from 'lucide-react';
 import api from '../../services/api';
 import { Client, ClientStatus } from '../../types';
 import toast from 'react-hot-toast';
@@ -20,9 +20,17 @@ export default function ClientsPage() {
   const [statusFilter, setStatusFilter] = useState<ClientStatus | ''>('ACTIVE');
   const [showModal, setShowModal] = useState(false);
 
+  const [confirmDelete, setConfirmDelete] = useState<Client | null>(null);
+
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ['clients', statusFilter],
     queryFn: () => api.get(`/clients${statusFilter ? `?status=${statusFilter}` : ''}`).then(r => r.data),
+  });
+
+  const deleteClient = useMutation({
+    mutationFn: (id: string) => api.delete(`/clients/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['clients'] }); toast.success('הלקוח נמחק'); setConfirmDelete(null); },
+    onError: () => toast.error('שגיאה במחיקה'),
   });
 
   const filtered = clients.filter(c =>
@@ -116,8 +124,10 @@ export default function ClientsPage() {
                   <td className="table-cell">
                     <span className={statusClass[client.status]}>{statusLabel[client.status]}</span>
                   </td>
-                  <td className="table-cell text-slate-400">
-                    <ChevronLeft className="w-4 h-4" />
+                  <td className="table-cell" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setConfirmDelete(client)} className="text-slate-300 hover:text-red-400 transition-colors p-1">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -127,6 +137,24 @@ export default function ClientsPage() {
       </div>
 
       {showModal && <ClientModal onClose={() => setShowModal(false)} onSaved={() => { qc.invalidateQueries({ queryKey: ['clients'] }); setShowModal(false); }} />}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full">
+            <h3 className="font-bold text-slate-900 text-lg mb-2">מחיקת לקוח</h3>
+            <p className="text-slate-600 text-sm mb-6">
+              האם למחוק את <strong>{confirmDelete.fullName}</strong>? פעולה זו תמחק גם את כל הפגישות, המשימות והתשלומים.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => deleteClient.mutate(confirmDelete.id)} disabled={deleteClient.isPending}
+                className="btn-primary bg-red-500 hover:bg-red-600 flex-1 justify-center">
+                {deleteClient.isPending ? 'מוחק...' : 'כן, מחק'}
+              </button>
+              <button onClick={() => setConfirmDelete(null)} className="btn-secondary flex-1 justify-center">ביטול</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

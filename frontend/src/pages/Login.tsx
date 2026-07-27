@@ -56,6 +56,9 @@ export default function Login() {
                 onChange={e => setEmail(e.target.value)}
                 required
                 dir="ltr"
+                autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
               />
             </div>
 
@@ -70,6 +73,7 @@ export default function Login() {
                   onChange={e => setPassword(e.target.value)}
                   required
                   dir="ltr"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"

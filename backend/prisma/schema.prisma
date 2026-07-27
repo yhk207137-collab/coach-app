@@ -120,12 +120,14 @@ model Payment {
 }
 
 model PaymentRecord {
-  id        String   @id @default(cuid())
-  paymentId String
-  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  amount    Float
-  date      DateTime @default(now())
-  note      String?
+  id            String    @id @default(cuid())
+  paymentId     String
+  payment       Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  amount        Float
+  date          DateTime  @default(now())
+  note          String?
+  isPaid        Boolean   @default(true)
+  scheduledDate DateTime?
 }
 
 model Document {

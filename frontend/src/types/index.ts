@@ -91,6 +91,8 @@ export interface PaymentRecord {
   amount: number;
   date: string;
   note?: string;
+  isPaid: boolean;
+  scheduledDate?: string;
 }
 
 export interface Document {

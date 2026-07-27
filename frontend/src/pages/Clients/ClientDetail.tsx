@@ -3,18 +3,20 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight, Phone, Mail, Building2, Calendar, CheckSquare,
-  CreditCard, FolderOpen, Edit, Plus, FileText, Clock,
+  CreditCard, FolderOpen, Edit, Plus, FileText, Clock, Trash2,
 } from 'lucide-react';
 import api from '../../services/api';
 import { Client, ClientStatus, TaskStatus } from '../../types';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import clsx from 'clsx';
+import toast from 'react-hot-toast';
 import ClientModal from './ClientModal';
 import MeetingModal from '../Meetings/MeetingModal';
 import SummaryModal from '../Meetings/SummaryModal';
 import TaskModal from '../Tasks/TaskModal';
 import PaymentPanel from '../Payments/PaymentPanel';
+import { useMutation } from '@tanstack/react-query';
 
 const statusLabel: Record<ClientStatus, string> = { ACTIVE: 'פעיל', FROZEN: 'מוקפא', ENDED: 'הסתיים' };
 const statusClass: Record<ClientStatus, string> = { ACTIVE: 'status-active', FROZEN: 'status-frozen', ENDED: 'status-ended' };
@@ -32,6 +34,19 @@ export default function ClientDetail() {
   const [newMeeting, setNewMeeting] = useState(false);
   const [summaryFor, setSummaryFor] = useState<string | null>(null);
   const [newTask, setNewTask] = useState(false);
+  const [confirmDeleteClient, setConfirmDeleteClient] = useState(false);
+
+  const deleteClient = useMutation({
+    mutationFn: () => api.delete(`/clients/${id}`),
+    onSuccess: () => { toast.success('הלקוח נמחק'); navigate('/clients'); },
+    onError: () => toast.error('שגיאה במחיקה'),
+  });
+
+  const deleteTask = useMutation({
+    mutationFn: (taskId: string) => api.delete(`/tasks/${taskId}`),
+    onSuccess: () => { invalidate(); toast.success('משימה נמחקה'); },
+    onError: () => toast.error('שגיאה במחיקה'),
+  });
 
   const { data: client, isLoading } = useQuery<Client>({
     queryKey: ['client', id],
@@ -92,6 +107,9 @@ export default function ClientDetail() {
             </button>
             <button onClick={() => setNewTask(true)} className="btn-secondary text-xs">
               <CheckSquare className="w-3.5 h-3.5" /> משימה חדשה
+            </button>
+            <button onClick={() => setConfirmDeleteClient(true)} className="text-xs px-3 py-1.5 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition-colors flex items-center gap-1">
+              <Trash2 className="w-3.5 h-3.5" /> מחק לקוח
             </button>
           </div>
         </div>
@@ -193,6 +211,7 @@ export default function ClientDetail() {
                   <th className="table-header">משימה</th>
                   <th className="table-header">תאריך יעד</th>
                   <th className="table-header">סטטוס</th>
+                  <th className="table-header w-8" />
                 </tr>
               </thead>
               <tbody>
@@ -207,6 +226,11 @@ export default function ClientDetail() {
                     </td>
                     <td className="table-cell">
                       <span className={taskClass[t.status]}>{taskLabel[t.status]}</span>
+                    </td>
+                    <td className="table-cell">
+                      <button onClick={() => deleteTask.mutate(t.id)} className="text-slate-300 hover:text-red-400 transition-colors p-1">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -245,6 +269,24 @@ export default function ClientDetail() {
       {newMeeting && <MeetingModal clientId={id!} onClose={() => setNewMeeting(false)} onSaved={() => { invalidate(); setNewMeeting(false); }} />}
       {summaryFor && <SummaryModal meetingId={summaryFor} onClose={() => setSummaryFor(null)} onSaved={() => { invalidate(); setSummaryFor(null); }} />}
       {newTask && <TaskModal clientId={id!} onClose={() => setNewTask(false)} onSaved={() => { invalidate(); setNewTask(false); }} />}
+
+      {confirmDeleteClient && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full">
+            <h3 className="font-bold text-slate-900 text-lg mb-2">מחיקת לקוח</h3>
+            <p className="text-slate-600 text-sm mb-6">
+              האם למחוק את <strong>{client.fullName}</strong>? כל הפגישות, המשימות, התשלומים והמסמכים יימחקו לצמיתות.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => deleteClient.mutate()} disabled={deleteClient.isPending}
+                className="flex-1 justify-center py-2 px-4 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors">
+                {deleteClient.isPending ? 'מוחק...' : 'כן, מחק'}
+              </button>
+              <button onClick={() => setConfirmDeleteClient(false)} className="btn-secondary flex-1 justify-center">ביטול</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

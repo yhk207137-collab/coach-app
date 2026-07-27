@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare,
-  CreditCard, FolderOpen, Sparkles, LogOut, Briefcase,
+  CreditCard, FolderOpen, Sparkles, LogOut, Briefcase, CalendarDays, BarChart2,
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import clsx from 'clsx';
@@ -9,9 +9,11 @@ import clsx from 'clsx';
 const nav = [
   { to: '/', icon: LayoutDashboard, label: 'לוח בקרה', exact: true },
   { to: '/clients', icon: Users, label: 'לקוחות' },
+  { to: '/calendar', icon: CalendarDays, label: 'יומן' },
   { to: '/meetings', icon: Calendar, label: 'פגישות' },
   { to: '/tasks', icon: CheckSquare, label: 'משימות' },
   { to: '/payments', icon: CreditCard, label: 'תשלומים' },
+  { to: '/accounting', icon: BarChart2, label: 'הנהלת חשבונות' },
   { to: '/documents', icon: FolderOpen, label: 'מסמכים' },
   { to: '/ai', icon: Sparkles, label: 'AI – תמלול' },
 ];
