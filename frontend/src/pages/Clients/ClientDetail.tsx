@@ -3,10 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight, Phone, Mail, Building2, Calendar, CheckSquare,
-  CreditCard, FolderOpen, Edit, Plus, FileText, Clock, Trash2,
+  CreditCard, FolderOpen, Edit, Plus, FileText, Clock, Trash2, Pencil,
 } from 'lucide-react';
 import api from '../../services/api';
-import { Client, ClientStatus, TaskStatus } from '../../types';
+import { Client, ClientStatus, Meeting, Task, TaskStatus } from '../../types';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -32,8 +32,10 @@ export default function ClientDetail() {
   const [tab, setTab] = useState<Tab>('timeline');
   const [editClient, setEditClient] = useState(false);
   const [newMeeting, setNewMeeting] = useState(false);
+  const [editMeeting, setEditMeeting] = useState<Meeting | null>(null);
   const [summaryFor, setSummaryFor] = useState<string | null>(null);
   const [newTask, setNewTask] = useState(false);
+  const [editTask, setEditTask] = useState<Task | null>(null);
   const [confirmDeleteClient, setConfirmDeleteClient] = useState(false);
 
   const deleteClient = useMutation({
@@ -47,6 +49,16 @@ export default function ClientDetail() {
     onSuccess: () => { invalidate(); toast.success('משימה נמחקה'); },
     onError: () => toast.error('שגיאה במחיקה'),
   });
+
+  const deleteMeeting = useMutation({
+    mutationFn: (meetingId: string) => api.delete(`/meetings/${meetingId}`),
+    onSuccess: () => { invalidate(); toast.success('הפגישה נמחקה'); },
+    onError: () => toast.error('שגיאה במחיקה'),
+  });
+
+  const handleDeleteMeeting = (m: Meeting) => {
+    if (confirm(`למחוק את הפגישה מ-${format(new Date(m.date), 'd/M/yyyy')}?`)) deleteMeeting.mutate(m.id);
+  };
 
   const { data: client, isLoading } = useQuery<Client>({
     queryKey: ['client', id],
@@ -151,11 +163,21 @@ export default function ClientDetail() {
                   <p className="text-xs text-slate-500 mt-0.5">{m.type} · {m.duration} דקות</p>
                   {m.notes && <p className="text-sm text-slate-600 mt-2">{m.notes}</p>}
                 </div>
-                {!m.summary && (
-                  <button onClick={() => setSummaryFor(m.id)} className="btn-secondary text-xs">
-                    <FileText className="w-3.5 h-3.5" /> הוסף סיכום
+                <div className="flex items-center gap-2">
+                  {!m.summary && (
+                    <button onClick={() => setSummaryFor(m.id)} className="btn-secondary text-xs">
+                      <FileText className="w-3.5 h-3.5" /> הוסף סיכום
+                    </button>
+                  )}
+                  <button onClick={() => setEditMeeting(m as any)}
+                    className="btn-ghost p-1.5 rounded-lg text-slate-400 hover:text-primary-600">
+                    <Pencil className="w-4 h-4" />
                   </button>
-                )}
+                  <button onClick={() => handleDeleteMeeting(m as any)}
+                    className="btn-ghost p-1.5 rounded-lg text-slate-400 hover:text-red-500">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               {m.summary && (
@@ -211,7 +233,7 @@ export default function ClientDetail() {
                   <th className="table-header">משימה</th>
                   <th className="table-header">תאריך יעד</th>
                   <th className="table-header">סטטוס</th>
-                  <th className="table-header w-8" />
+                  <th className="table-header w-20" />
                 </tr>
               </thead>
               <tbody>
@@ -228,9 +250,16 @@ export default function ClientDetail() {
                       <span className={taskClass[t.status]}>{taskLabel[t.status]}</span>
                     </td>
                     <td className="table-cell">
-                      <button onClick={() => deleteTask.mutate(t.id)} className="text-slate-300 hover:text-red-400 transition-colors p-1">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => setEditTask(t as any)}
+                          className="p-1.5 text-slate-400 hover:text-primary-600 rounded-lg hover:bg-slate-50 transition-colors">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => deleteTask.mutate(t.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-slate-50 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -267,8 +296,10 @@ export default function ClientDetail() {
 
       {editClient && <ClientModal client={client} onClose={() => setEditClient(false)} onSaved={() => { invalidate(); setEditClient(false); }} />}
       {newMeeting && <MeetingModal clientId={id!} onClose={() => setNewMeeting(false)} onSaved={() => { invalidate(); setNewMeeting(false); }} />}
+      {editMeeting && <MeetingModal meeting={editMeeting} onClose={() => setEditMeeting(null)} onSaved={() => { invalidate(); setEditMeeting(null); }} />}
       {summaryFor && <SummaryModal meetingId={summaryFor} onClose={() => setSummaryFor(null)} onSaved={() => { invalidate(); setSummaryFor(null); }} />}
       {newTask && <TaskModal clientId={id!} onClose={() => setNewTask(false)} onSaved={() => { invalidate(); setNewTask(false); }} />}
+      {editTask && <TaskModal clientId={id!} task={editTask} onClose={() => setEditTask(null)} onSaved={() => { invalidate(); setEditTask(null); }} />}
 
       {confirmDeleteClient && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
-import { Plus, Loader2, CheckCircle, Clock, CreditCard, Banknote, FileText } from 'lucide-react';
+import { Plus, Loader2, CheckCircle, Clock, CreditCard, Banknote, FileText, Pencil, Trash2, X } from 'lucide-react';
 import api from '../../services/api';
 import { Payment } from '../../types';
 import { format } from 'date-fns';
@@ -31,6 +31,7 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
   const [addRecord, setAddRecord] = useState(false);
   const [setupPlan, setSetupPlan] = useState(false);
   const [recordType, setRecordType] = useState<'paid' | 'scheduled'>('paid');
+  const [editRecord, setEditRecord] = useState<any | null>(null);
 
   const { data: payment, isLoading } = useQuery<Payment | null>({
     queryKey: ['payment', clientId],
@@ -74,6 +75,16 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'שגיאה ברישום תשלום');
     }
+  };
+
+  const deleteRecord = useMutation({
+    mutationFn: (recordId: string) => api.delete(`/payments/record/${recordId}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['payment', clientId] }); toast.success('רשומה נמחקה'); onUpdated?.(); },
+    onError: () => toast.error('שגיאה במחיקה'),
+  });
+
+  const handleDeleteRecord = (r: any) => {
+    if (confirm('למחוק רשומה זו?')) deleteRecord.mutate(r.id);
   };
 
   const markPaid = useMutation({
@@ -235,6 +246,7 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
                       <th className="table-header">אמצעי תשלום</th>
                       <th className="table-header">הערה</th>
                       <th className="table-header">סטטוס</th>
+                      <th className="table-header w-16" />
                     </tr>
                   </thead>
                   <tbody>
@@ -268,6 +280,18 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
                             </button>
                           )}
                         </td>
+                        <td className="table-cell">
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => setEditRecord(r)}
+                              className="p-1 text-slate-400 hover:text-primary-600 rounded transition-colors">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => handleDeleteRecord(r)}
+                              className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -277,6 +301,79 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+interface EditRecordModalProps { record: any; onClose: () => void; onSaved: () => void; }
+
+function EditRecordModal({ record, onClose, onSaved }: EditRecordModalProps) {
+  const { register, handleSubmit, formState: { isSubmitting } } = useForm({
+    defaultValues: {
+      amount: record.amount,
+      note: record.note ?? '',
+      date: record.isPaid ? record.date?.split('T')[0] : '',
+      paymentMethod: record.paymentMethod ?? '',
+    },
+  });
+
+  const onSubmit = async (data: any) => {
+    try {
+      await api.put(`/payments/record/${record.id}`, {
+        amount: parseFloat(data.amount),
+        note: data.note || undefined,
+        date: data.date || undefined,
+        paymentMethod: data.paymentMethod || undefined,
+      });
+      toast.success('רשומה עודכנה');
+      onSaved();
+    } catch {
+      toast.error('שגיאה בעדכון');
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal animate-fade-in">
+        <div className="modal-header">
+          <h2 className="font-semibold text-slate-900">עריכת רשומת תשלום</h2>
+          <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg"><X className="w-4 h-4" /></button>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">סכום (₪)</label>
+              <input {...register('amount', { required: true, min: 1 })} type="number" min="1" step="0.01" className="input" />
+            </div>
+            {record.isPaid && (
+              <div>
+                <label className="label">תאריך תשלום</label>
+                <input {...register('date')} type="date" className="input" />
+              </div>
+            )}
+          </div>
+          {record.isPaid && (
+            <div>
+              <label className="label">אמצעי תשלום</label>
+              <select {...register('paymentMethod')} className="input">
+                {PAYMENT_METHODS.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div>
+            <label className="label">הערה</label>
+            <input {...register('note')} className="input" placeholder="הערה..." />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="submit" disabled={isSubmitting} className="btn-primary flex-1 justify-center py-2.5">
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'שמור שינויים'}
+            </button>
+            <button type="button" onClick={onClose} className="btn-secondary px-6">ביטול</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

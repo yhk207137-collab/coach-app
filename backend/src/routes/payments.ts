@@ -121,6 +121,61 @@ router.post('/:clientId/record', requireAuth, requireCoach, async (req: AuthRequ
   }
 });
 
+// Edit a payment record
+router.put('/record/:recordId', requireAuth, requireCoach, async (req, res) => {
+  try {
+    const { recordId } = req.params;
+    const { amount, note, date, paymentMethod } = req.body;
+    const record = await prisma.paymentRecord.findUnique({ where: { id: recordId } });
+    if (!record) return res.status(404).json({ error: 'Record not found' });
+
+    const parsedAmount = amount !== undefined ? parseFloat(amount) : undefined;
+
+    // If amount changed and record is paid, update paidAmount delta
+    if (parsedAmount !== undefined && parsedAmount !== record.amount && record.isPaid) {
+      const delta = parsedAmount - record.amount;
+      await prisma.payment.update({
+        where: { id: record.paymentId },
+        data: { paidAmount: { increment: delta } },
+      });
+    }
+
+    const updated = await prisma.paymentRecord.update({
+      where: { id: recordId },
+      data: {
+        ...(parsedAmount !== undefined ? { amount: parsedAmount } : {}),
+        ...(note !== undefined ? { note } : {}),
+        ...(date ? { date: new Date(date) } : {}),
+        ...(paymentMethod !== undefined ? { paymentMethod } : {}),
+      },
+    });
+    res.json(updated);
+  } catch {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete a payment record
+router.delete('/record/:recordId', requireAuth, requireCoach, async (req, res) => {
+  try {
+    const { recordId } = req.params;
+    const record = await prisma.paymentRecord.findUnique({ where: { id: recordId } });
+    if (!record) return res.status(404).json({ error: 'Record not found' });
+
+    if (record.isPaid) {
+      await prisma.payment.update({
+        where: { id: record.paymentId },
+        data: { paidAmount: { decrement: record.amount } },
+      });
+    }
+
+    await prisma.paymentRecord.delete({ where: { id: recordId } });
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Mark a scheduled record as paid
 router.post('/record/:recordId/pay', requireAuth, requireCoach, async (_req, res) => {
   try {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Calendar, FileText } from 'lucide-react';
+import { Plus, Calendar, FileText, Pencil, Trash2 } from 'lucide-react';
 import api from '../../services/api';
 import { Meeting } from '../../types';
 import { format, isToday, isTomorrow, isPast } from 'date-fns';
@@ -9,17 +9,29 @@ import { he } from 'date-fns/locale';
 import clsx from 'clsx';
 import MeetingModal from './MeetingModal';
 import SummaryModal from './SummaryModal';
+import toast from 'react-hot-toast';
 
 export default function MeetingsPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [showModal, setShowModal] = useState(false);
+  const [editMeeting, setEditMeeting] = useState<Meeting | null>(null);
   const [summaryFor, setSummaryFor] = useState<string | null>(null);
 
   const { data: meetings = [], isLoading } = useQuery<Meeting[]>({
     queryKey: ['meetings'],
     queryFn: () => api.get('/meetings').then(r => r.data),
   });
+
+  const deleteMeeting = useMutation({
+    mutationFn: (id: string) => api.delete(`/meetings/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['meetings'] }); toast.success('הפגישה נמחקה'); },
+    onError: () => toast.error('שגיאה במחיקה'),
+  });
+
+  const handleDelete = (m: Meeting) => {
+    if (confirm(`למחוק את הפגישה עם ${m.client?.fullName}?`)) deleteMeeting.mutate(m.id);
+  };
 
   const grouped = meetings.reduce((acc: Record<string, Meeting[]>, m) => {
     const key = format(new Date(m.date), 'yyyy-MM-dd');
@@ -36,6 +48,12 @@ export default function MeetingsPage() {
     if (isTomorrow(d)) return 'מחר';
     return format(d, "EEEE, d בMMMM", { locale: he });
   }
+
+  const saved = () => {
+    qc.invalidateQueries({ queryKey: ['meetings'] });
+    setShowModal(false);
+    setEditMeeting(null);
+  };
 
   return (
     <div>
@@ -69,8 +87,7 @@ export default function MeetingsPage() {
                 {grouped[dateKey].map(m => {
                   const past = isPast(new Date(m.date));
                   return (
-                    <div key={m.id} className={clsx('card flex items-center gap-4 flex-wrap',
-                      past ? 'opacity-70' : '')}>
+                    <div key={m.id} className={clsx('card flex items-center gap-4 flex-wrap', past ? 'opacity-70' : '')}>
                       <div className="w-14 text-center flex-shrink-0">
                         <p className="text-lg font-bold text-slate-900">{format(new Date(m.date), 'HH:mm')}</p>
                         <p className="text-xs text-slate-400">{m.duration}ד׳</p>
@@ -90,6 +107,14 @@ export default function MeetingsPage() {
                         ) : (
                           <span className="badge bg-blue-50 text-blue-600 text-xs">מתוכנן</span>
                         )}
+                        <button onClick={() => setEditMeeting(m)}
+                          className="btn-ghost p-1.5 rounded-lg text-slate-400 hover:text-primary-600">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDelete(m)}
+                          className="btn-ghost p-1.5 rounded-lg text-slate-400 hover:text-red-500">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   );
@@ -101,10 +126,10 @@ export default function MeetingsPage() {
       )}
 
       {showModal && (
-        <MeetingModal
-          onClose={() => setShowModal(false)}
-          onSaved={() => { qc.invalidateQueries({ queryKey: ['meetings'] }); setShowModal(false); }}
-        />
+        <MeetingModal onClose={() => setShowModal(false)} onSaved={saved} />
+      )}
+      {editMeeting && (
+        <MeetingModal meeting={editMeeting} onClose={() => setEditMeeting(null)} onSaved={saved} />
       )}
       {summaryFor && (
         <SummaryModal

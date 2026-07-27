@@ -1,29 +1,33 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { X, Loader2 } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
-import { Client } from '../../types';
+import { Client, Meeting } from '../../types';
 
 const MEETING_TYPES = ['אימון עסקי', 'סקירת ביצועים', 'תכנון אסטרטגי', 'פגישת מעקב', 'פגישת היכרות', 'אחר'];
 
 interface Props {
   clientId?: string;
+  meeting?: Meeting;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export default function MeetingModal({ clientId, onClose, onSaved }: Props) {
+export default function MeetingModal({ clientId, meeting, onClose, onSaved }: Props) {
+  const isEdit = !!meeting;
+
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ['clients'],
     queryFn: () => api.get('/clients?status=ACTIVE').then(r => r.data),
-    enabled: !clientId,
+    enabled: !clientId && !isEdit,
   });
 
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 16);
 
-  const { register, handleSubmit, formState: { isSubmitting } } = useForm({
+  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm({
     defaultValues: {
       clientId: clientId ?? '',
       date: dateStr,
@@ -33,10 +37,27 @@ export default function MeetingModal({ clientId, onClose, onSaved }: Props) {
     },
   });
 
+  useEffect(() => {
+    if (meeting) {
+      reset({
+        clientId: meeting.clientId,
+        date: new Date(meeting.date).toISOString().slice(0, 16),
+        duration: meeting.duration,
+        type: meeting.type,
+        notes: meeting.notes ?? '',
+      });
+    }
+  }, [meeting]);
+
   const onSubmit = async (data: any) => {
     try {
-      await api.post('/meetings', data);
-      toast.success('הפגישה נקבעה בהצלחה');
+      if (isEdit) {
+        await api.put(`/meetings/${meeting!.id}`, data);
+        toast.success('הפגישה עודכנה בהצלחה');
+      } else {
+        await api.post('/meetings', data);
+        toast.success('הפגישה נקבעה בהצלחה');
+      }
       onSaved();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'שגיאה');
@@ -47,12 +68,12 @@ export default function MeetingModal({ clientId, onClose, onSaved }: Props) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal animate-fade-in">
         <div className="modal-header">
-          <h2 className="font-semibold text-slate-900">פגישה חדשה</h2>
+          <h2 className="font-semibold text-slate-900">{isEdit ? 'עריכת פגישה' : 'פגישה חדשה'}</h2>
           <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg"><X className="w-4 h-4" /></button>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
-          {!clientId && (
+          {!clientId && !isEdit && (
             <div>
               <label className="label">לקוח *</label>
               <select {...register('clientId', { required: true })} className="input">
@@ -85,7 +106,7 @@ export default function MeetingModal({ clientId, onClose, onSaved }: Props) {
 
           <div className="flex gap-3 pt-2">
             <button type="submit" disabled={isSubmitting} className="btn-primary flex-1 justify-center py-2.5">
-              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'קבע פגישה'}
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : isEdit ? 'שמור שינויים' : 'קבע פגישה'}
             </button>
             <button type="button" onClick={onClose} className="btn-secondary px-6">ביטול</button>
           </div>
