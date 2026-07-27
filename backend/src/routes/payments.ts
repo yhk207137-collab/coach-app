@@ -89,18 +89,22 @@ router.post('/:clientId', requireAuth, requireCoach, async (req: AuthRequest, re
 
 router.post('/:clientId/record', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   try {
-    const { amount, note, date, isPaid = true, scheduledDate } = req.body;
+    const { amount, note, date, isPaid = true, scheduledDate, paymentMethod } = req.body;
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) return res.status(400).json({ error: 'סכום לא תקין' });
+
     const payment = await prisma.payment.findUnique({ where: { clientId: req.params.clientId } });
     if (!payment) return res.status(404).json({ error: 'Payment plan not found' });
 
     const record = await prisma.paymentRecord.create({
       data: {
         paymentId: payment.id,
-        amount,
+        amount: parsedAmount,
         note,
         date: date ? new Date(date) : new Date(),
         isPaid,
         scheduledDate: scheduledDate ? new Date(scheduledDate) : undefined,
+        paymentMethod: paymentMethod || null,
       },
     });
 

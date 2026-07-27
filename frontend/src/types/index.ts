@@ -93,6 +93,7 @@ export interface PaymentRecord {
   note?: string;
   isPaid: boolean;
   scheduledDate?: string;
+  paymentMethod?: string;
 }
 
 export interface Document {

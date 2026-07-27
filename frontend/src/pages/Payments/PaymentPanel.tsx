@@ -1,13 +1,30 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
-import { Plus, Loader2, CheckCircle, Clock } from 'lucide-react';
+import { Plus, Loader2, CheckCircle, Clock, CreditCard, Banknote, FileText } from 'lucide-react';
 import api from '../../services/api';
 import { Payment } from '../../types';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
 interface Props { clientId: string; onUpdated?: () => void; }
+
+const PAYMENT_METHODS = [
+  { value: '', label: 'בחר אמצעי תשלום' },
+  { value: 'אשראי', label: 'אשראי' },
+  { value: 'מזומן', label: 'מזומן' },
+  { value: "צ'ק בנקאי", label: "צ'ק בנקאי" },
+  { value: 'העברה בנקאית', label: 'העברה בנקאית' },
+  { value: 'ביט', label: 'ביט' },
+  { value: 'פייבוקס', label: 'פייבוקס' },
+];
+
+const methodIcon = (m?: string) => {
+  if (!m) return null;
+  if (m === 'אשראי') return <CreditCard className="w-3.5 h-3.5 inline ml-1" />;
+  if (m === 'מזומן') return <Banknote className="w-3.5 h-3.5 inline ml-1" />;
+  return <FileText className="w-3.5 h-3.5 inline ml-1" />;
+};
 
 export default function PaymentPanel({ clientId, onUpdated }: Props) {
   const qc = useQueryClient();
@@ -24,36 +41,39 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
     defaultValues: { totalAmount: payment?.totalAmount ?? 0, nextPaymentDate: '' },
   });
 
-  const { register: regRecord, handleSubmit: submitRecord, reset, formState: { isSubmitting: recSub } } = useForm({
-    defaultValues: { amount: 0, note: '', date: new Date().toISOString().split('T')[0], scheduledDate: '' },
+  const { register: regRecord, handleSubmit: submitRecord, reset, formState: { errors: recErrors, isSubmitting: recSub } } = useForm({
+    defaultValues: { amount: '', note: '', date: new Date().toISOString().split('T')[0], scheduledDate: '', paymentMethod: '' },
   });
 
   const savePlan = async (data: any) => {
     try {
-      await api.post(`/payments/${clientId}`, data);
+      await api.post(`/payments/${clientId}`, { ...data, totalAmount: parseFloat(data.totalAmount) });
       qc.invalidateQueries({ queryKey: ['payment', clientId] });
       setSetupPlan(false);
       toast.success('תכנית תשלום עודכנה');
       onUpdated?.();
-    } catch { toast.error('שגיאה'); }
+    } catch { toast.error('שגיאה בשמירת תכנית'); }
   };
 
   const saveRecord = async (data: any) => {
     try {
       const isPaid = recordType === 'paid';
       await api.post(`/payments/${clientId}/record`, {
-        amount: data.amount,
-        note: data.note,
+        amount: parseFloat(data.amount),
+        note: data.note || undefined,
         date: isPaid ? data.date : undefined,
         isPaid,
         scheduledDate: !isPaid ? data.scheduledDate : undefined,
+        paymentMethod: isPaid ? (data.paymentMethod || undefined) : undefined,
       });
       qc.invalidateQueries({ queryKey: ['payment', clientId] });
       setAddRecord(false);
       reset();
-      toast.success(isPaid ? 'תשלום נרשם' : 'תשלום מתוזמן נוסף');
+      toast.success(isPaid ? 'תשלום נרשם בהצלחה' : 'תשלום מתוזמן נוסף');
       onUpdated?.();
-    } catch { toast.error('שגיאה'); }
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'שגיאה ברישום תשלום');
+    }
   };
 
   const markPaid = useMutation({
@@ -64,7 +84,10 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
 
   if (isLoading) return <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
 
-  const balance = payment ? payment.totalAmount - payment.paidAmount : 0;
+  const paidAmount = payment?.paidAmount ?? 0;
+  const totalAmount = payment?.totalAmount ?? 0;
+  const balance = totalAmount - paidAmount;
+  const pct = totalAmount > 0 ? Math.min((paidAmount / totalAmount) * 100, 100) : 0;
 
   return (
     <div className="space-y-4">
@@ -75,7 +98,7 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="label">סכום עסקה כולל (₪)</label>
-                <input {...regPlan('totalAmount', { required: true, min: 0 })} type="number" className="input" />
+                <input {...regPlan('totalAmount', { required: true, min: 0 })} type="number" min="0" step="0.01" className="input" />
               </div>
               <div>
                 <label className="label">תאריך תשלום הבא</label>
@@ -92,33 +115,32 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
         </div>
       ) : (
         <>
-          {/* Summary */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="card text-center">
-              <p className="text-2xl font-bold text-slate-900">₪{payment.totalAmount.toLocaleString()}</p>
+          {/* Summary cards */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="card text-center py-4">
+              <p className="text-2xl font-bold text-slate-900">₪{totalAmount.toLocaleString()}</p>
               <p className="text-xs text-slate-500 mt-1">סכום עסקה</p>
             </div>
-            <div className="card text-center">
-              <p className="text-2xl font-bold text-emerald-600">₪{payment.paidAmount.toLocaleString()}</p>
+            <div className="card text-center py-4">
+              <p className="text-2xl font-bold text-emerald-600">₪{paidAmount.toLocaleString()}</p>
               <p className="text-xs text-slate-500 mt-1">שולם</p>
             </div>
-            <div className="card text-center">
+            <div className="card text-center py-4">
               <p className={`text-2xl font-bold ${balance > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                ₪{balance.toLocaleString()}
+                ₪{Math.abs(balance).toLocaleString()}
               </p>
-              <p className="text-xs text-slate-500 mt-1">יתרה</p>
+              <p className="text-xs text-slate-500 mt-1">{balance > 0 ? 'יתרה לתשלום' : 'שולם במלואו'}</p>
             </div>
           </div>
 
-          {/* Progress bar */}
+          {/* Progress */}
           <div className="card">
             <div className="flex items-center justify-between mb-2 text-sm">
               <span className="text-slate-600">התקדמות גבייה</span>
-              <span className="font-medium">{Math.round((payment.paidAmount / payment.totalAmount) * 100)}%</span>
+              <span className="font-medium">{Math.round(pct)}%</span>
             </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-primary-500 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min((payment.paidAmount / payment.totalAmount) * 100, 100)}%` }} />
+            <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
             </div>
             {payment.nextPaymentDate && (
               <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
@@ -129,8 +151,8 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2">
-            <button onClick={() => setAddRecord(true)} className="btn-primary text-sm">
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={() => { setAddRecord(true); setRecordType('paid'); }} className="btn-primary text-sm">
               <Plus className="w-4 h-4" /> רישום תשלום
             </button>
             <button onClick={() => setSetupPlan(true)} className="btn-secondary text-sm">עריכת תכנית</button>
@@ -141,7 +163,6 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
             <div className="card border border-primary-100">
               <h3 className="font-semibold text-slate-900 mb-3">הוספת תשלום</h3>
 
-              {/* Type toggle */}
               <div className="flex gap-2 mb-4">
                 <button type="button" onClick={() => setRecordType('paid')}
                   className={`flex-1 py-2 text-sm rounded-xl font-medium transition-colors ${recordType === 'paid' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
@@ -153,24 +174,47 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
                 </button>
               </div>
 
-              <form onSubmit={submitRecord(saveRecord)} className="grid grid-cols-2 gap-4">
+              <form onSubmit={submitRecord(saveRecord)} className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">סכום (₪) *</label>
+                    <input
+                      {...regRecord('amount', { required: 'חובה', min: { value: 1, message: 'סכום חייב להיות חיובי' } })}
+                      type="number" min="1" step="0.01" className="input"
+                      placeholder="0"
+                    />
+                    {recErrors.amount && <p className="text-xs text-red-500 mt-1">{recErrors.amount.message as string}</p>}
+                  </div>
+                  <div>
+                    <label className="label">{recordType === 'paid' ? 'תאריך תשלום' : 'תאריך מתוכנן'}</label>
+                    <input
+                      {...regRecord(recordType === 'paid' ? 'date' : 'scheduledDate')}
+                      type="date" className="input"
+                    />
+                  </div>
+                </div>
+
+                {recordType === 'paid' && (
+                  <div>
+                    <label className="label">אמצעי תשלום</label>
+                    <select {...regRecord('paymentMethod')} className="input">
+                      {PAYMENT_METHODS.map(m => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div>
-                  <label className="label">סכום (₪)</label>
-                  <input {...regRecord('amount', { required: true, min: 1 })} type="number" className="input" />
+                  <label className="label">הערה / פרטים נוספים</label>
+                  <input {...regRecord('note')} className="input" placeholder="לדוגמה: תשלום ראשון, חשבונית 123..." />
                 </div>
-                <div>
-                  <label className="label">{recordType === 'paid' ? 'תאריך תשלום' : 'תאריך מתוכנן'}</label>
-                  <input {...regRecord(recordType === 'paid' ? 'date' : 'scheduledDate')} type="date" className="input" />
-                </div>
-                <div className="col-span-2">
-                  <label className="label">הערה</label>
-                  <input {...regRecord('note')} className="input" placeholder="הערה לתשלום..." />
-                </div>
-                <div className="col-span-2 flex gap-2">
+
+                <div className="flex gap-2">
                   <button type="submit" disabled={recSub} className="btn-primary">
                     {recSub ? <Loader2 className="w-4 h-4 animate-spin" /> : recordType === 'paid' ? 'רשום תשלום' : 'הוסף תזכורת'}
                   </button>
-                  <button type="button" onClick={() => setAddRecord(false)} className="btn-secondary">ביטול</button>
+                  <button type="button" onClick={() => { setAddRecord(false); reset(); }} className="btn-secondary">ביטול</button>
                 </div>
               </form>
             </div>
@@ -182,45 +226,53 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
               <div className="px-6 py-4 border-b border-slate-100">
                 <h3 className="font-semibold text-slate-900">היסטוריית תשלומים</h3>
               </div>
-              <table className="w-full">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="table-header">תאריך</th>
-                    <th className="table-header">סכום</th>
-                    <th className="table-header">הערה</th>
-                    <th className="table-header">סטטוס</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payment.history.map(r => (
-                    <tr key={r.id} className="table-row">
-                      <td className="table-cell">
-                        {r.isPaid
-                          ? format(new Date(r.date), 'd/M/yyyy')
-                          : r.scheduledDate
-                            ? format(new Date(r.scheduledDate), 'd/M/yyyy')
-                            : '—'}
-                      </td>
-                      <td className={`table-cell font-medium ${r.isPaid ? 'text-emerald-700' : 'text-blue-600'}`}>
-                        ₪{r.amount.toLocaleString()}
-                      </td>
-                      <td className="table-cell text-slate-500">{r.note || '—'}</td>
-                      <td className="table-cell">
-                        {r.isPaid ? (
-                          <span className="flex items-center gap-1 text-xs text-emerald-600">
-                            <CheckCircle className="w-3.5 h-3.5" /> שולם
-                          </span>
-                        ) : (
-                          <button onClick={() => markPaid.mutate(r.id)} disabled={markPaid.isPending}
-                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 transition-colors">
-                            <Clock className="w-3.5 h-3.5" /> מתוזמן — סמן כשולם
-                          </button>
-                        )}
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="table-header">תאריך</th>
+                      <th className="table-header">סכום</th>
+                      <th className="table-header">אמצעי תשלום</th>
+                      <th className="table-header">הערה</th>
+                      <th className="table-header">סטטוס</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {payment.history.map(r => (
+                      <tr key={r.id} className="table-row">
+                        <td className="table-cell text-sm">
+                          {r.isPaid
+                            ? format(new Date(r.date), 'd/M/yyyy')
+                            : r.scheduledDate
+                              ? format(new Date(r.scheduledDate), 'd/M/yyyy')
+                              : '—'}
+                        </td>
+                        <td className={`table-cell font-semibold ${r.isPaid ? 'text-emerald-700' : 'text-blue-600'}`}>
+                          ₪{r.amount.toLocaleString()}
+                        </td>
+                        <td className="table-cell text-sm text-slate-600">
+                          {r.paymentMethod ? (
+                            <span>{methodIcon(r.paymentMethod)}{r.paymentMethod}</span>
+                          ) : '—'}
+                        </td>
+                        <td className="table-cell text-slate-500 text-sm">{r.note || '—'}</td>
+                        <td className="table-cell">
+                          {r.isPaid ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                              <CheckCircle className="w-3.5 h-3.5" /> שולם
+                            </span>
+                          ) : (
+                            <button onClick={() => markPaid.mutate(r.id)} disabled={markPaid.isPending}
+                              className="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full hover:bg-blue-100 transition-colors">
+                              <Clock className="w-3.5 h-3.5" /> מתוזמן — סמן כשולם
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>
