@@ -65,30 +65,39 @@ router.post('/magic', async (req, res) => {
     const link = `${frontendUrl}/verify?token=${rawToken}`;
 
     // Send email
-    if (process.env.SMTP_USER) {
-      const smtpPort = parseInt(process.env.SMTP_PORT || '587');
-      const transport = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-      });
+    const emailHtml = `
+      <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+        <h2 style="color: #1e293b;">כניסה למערכת ליוי שיווק ופרסום</h2>
+        <p style="color: #475569;">לחץ על הכפתור להתחברות. הקישור תקף ל-15 דקות.</p>
+        <a href="${link}" style="display:inline-block; background:#6366f1; color:#fff; padding:12px 28px; border-radius:10px; text-decoration:none; font-weight:bold; margin:16px 0;">כנסו למערכת</a>
+        <p style="color:#94a3b8; font-size:13px;">אם לא ביקשת קישור זה, אפשר להתעלם ממייל זה.</p>
+        <hr style="border:none; border-top:1px solid #e2e8f0; margin:20px 0;" />
+        <p style="color:#94a3b8; font-size:12px;">או העתק את הקישור: <br/><span style="color:#6366f1;">${link}</span></p>
+      </div>
+    `;
 
-      await transport.sendMail({
-        from: `"${process.env.FROM_NAME || 'מערכת אימון עסקי'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
-        to: email,
-        subject: 'קישור כניסה למערכת האימון העסקי',
-        html: `
-          <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-            <h2 style="color: #1e293b;">כניסה למערכת</h2>
-            <p style="color: #475569;">לחץ על הכפתור להתחברות. הקישור תקף ל-15 דקות.</p>
-            <a href="${link}" style="display:inline-block; background:#6366f1; color:#fff; padding:12px 28px; border-radius:10px; text-decoration:none; font-weight:bold; margin:16px 0;">כנסו למערכת</a>
-            <p style="color:#94a3b8; font-size:13px;">אם לא ביקשת קישור זה, אפשר להתעלם ממייל זה.</p>
-            <hr style="border:none; border-top:1px solid #e2e8f0; margin:20px 0;" />
-            <p style="color:#94a3b8; font-size:12px;">או העתק את הקישור: <br/><span style="color:#6366f1;">${link}</span></p>
-          </div>
-        `,
-      });
+    if (process.env.SMTP_PASS) {
+      try {
+        const smtpPort = parseInt(process.env.SMTP_PORT || '587');
+        const transport = nodemailer.createTransport({
+          host: process.env.SMTP_HOST || 'smtp.resend.com',
+          port: smtpPort,
+          secure: smtpPort === 465,
+          auth: { user: process.env.SMTP_USER || 'resend', pass: process.env.SMTP_PASS },
+        });
+
+        await transport.sendMail({
+          from: `"${process.env.FROM_NAME || 'ליוי שיווק ופרסום'}" <${process.env.FROM_EMAIL || 'onboarding@resend.dev'}>`,
+          to: email,
+          subject: 'קישור כניסה למערכת',
+          html: emailHtml,
+        });
+        console.log('[MAGIC LINK] Email sent to', email);
+      } catch (emailErr: any) {
+        console.error('[MAGIC LINK] SMTP error:', emailErr?.message || emailErr);
+        // Still return ok so user sees success screen, link is also logged below
+        console.log('[MAGIC LINK] Fallback link:', link);
+      }
     } else {
       // Dev fallback: log the link
       console.log('[MAGIC LINK]', link);

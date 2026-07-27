@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare,
-  CreditCard, FolderOpen, Sparkles, LogOut, Briefcase, CalendarDays, BarChart2,
+  CreditCard, FolderOpen, Sparkles, LogOut, Briefcase, CalendarDays, BarChart2, X,
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import clsx from 'clsx';
@@ -18,7 +18,12 @@ const nav = [
   { to: '/ai', icon: Sparkles, label: 'AI – תמלול' },
 ];
 
-export default function Sidebar() {
+interface Props {
+  open: boolean;
+  onClose: () => void;
+}
+
+export default function Sidebar({ open, onClose }: Props) {
   const { user, clearAuth } = useAuthStore();
   const navigate = useNavigate();
 
@@ -27,45 +32,70 @@ export default function Sidebar() {
     navigate('/login');
   };
 
+  const handleNav = () => {
+    // Close sidebar on mobile after navigation
+    if (window.innerWidth < 1024) onClose();
+  };
+
   return (
-    <aside className="w-64 flex-shrink-0 bg-white border-l border-slate-100 flex flex-col h-full shadow-sm">
-      {/* Logo */}
-      <div className="px-6 py-6 border-b border-slate-100">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-primary-600 rounded-xl flex items-center justify-center">
-            <Briefcase className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <p className="font-bold text-slate-900 text-sm leading-tight">ליוי שיווק ופרסום</p>
-            <p className="text-xs text-slate-400">{user?.name}</p>
+    <>
+      {/* Mobile overlay */}
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      <aside className={clsx(
+        'fixed top-0 right-0 h-full z-40 w-72 bg-white border-l border-slate-100 flex flex-col shadow-xl transition-transform duration-300',
+        'lg:static lg:w-64 lg:z-auto lg:shadow-sm lg:translate-x-0 lg:flex-shrink-0',
+        open ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
+      )}>
+        {/* Logo */}
+        <div className="px-6 py-6 border-b border-slate-100">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-primary-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Briefcase className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="font-bold text-slate-900 text-sm leading-tight">ליוי שיווק ופרסום</p>
+                <p className="text-xs text-slate-400">{user?.name}</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {nav.map(({ to, icon: Icon, label, exact }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={exact}
-            className={({ isActive }) =>
-              clsx(isActive ? 'sidebar-link-active' : 'sidebar-link-inactive')
-            }
-          >
-            <Icon className="w-4.5 h-4.5 flex-shrink-0" size={18} />
-            <span>{label}</span>
-          </NavLink>
-        ))}
-      </nav>
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {nav.map(({ to, icon: Icon, label, exact }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={exact}
+              onClick={handleNav}
+              className={({ isActive }) =>
+                clsx(isActive ? 'sidebar-link-active' : 'sidebar-link-inactive')
+              }
+            >
+              <Icon className="w-4.5 h-4.5 flex-shrink-0" size={18} />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </nav>
 
-      {/* Logout */}
-      <div className="px-3 py-4 border-t border-slate-100">
-        <button onClick={handleLogout} className="sidebar-link-inactive w-full">
-          <LogOut size={18} />
-          <span>יציאה</span>
-        </button>
-      </div>
-    </aside>
+        {/* Logout */}
+        <div className="px-3 py-4 border-t border-slate-100">
+          <button onClick={handleLogout} className="sidebar-link-inactive w-full">
+            <LogOut size={18} />
+            <span>יציאה</span>
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }
