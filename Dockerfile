@@ -23,4 +23,4 @@ COPY --from=backend-builder /app/backend/dist ./dist
 COPY --from=backend-builder /app/backend/public ./public
 COPY backend/prisma ./prisma
 ENV NODE_ENV=production
-CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/index.js"]
+CMD ["node", "dist/index.js"]
