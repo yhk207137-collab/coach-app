@@ -58,6 +58,10 @@ app.use('/api/', apiLimiter);
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
+// Serve built frontend (production)
+const publicDir = path.join(__dirname, '..', 'public');
+app.use(express.static(publicDir));
+
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/clients', clientRoutes);
@@ -72,5 +76,13 @@ app.use('/api/calendar', calendarRoutes);
 app.use('/api/backup', backupRoutes);
 
 app.get('/api/health', (_, res) => res.json({ ok: true }));
+
+// SPA fallback — serve index.html for all non-API routes
+app.get('*', (_req, res) => {
+  const indexPath = path.join(publicDir, 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) res.status(200).json({ ok: true, note: 'Frontend not built yet' });
+  });
+});
 
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
