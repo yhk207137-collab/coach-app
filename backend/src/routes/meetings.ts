@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, requireCoach, AuthRequest } from '../middleware/auth';
-import { addToGoogleCalendar, deleteFromGoogleCalendar } from '../services/calendar';
+import { addToGoogleCalendar, updateGoogleCalendarEvent, deleteFromGoogleCalendar } from '../services/calendar';
 import { sendMeetingConfirmation } from '../services/email';
 
 const router = Router();
@@ -92,7 +92,16 @@ router.put('/:id', requireAuth, requireCoach, async (req: AuthRequest, res) => {
     const meeting = await prisma.meeting.update({
       where: { id: req.params.id },
       data,
+      include: { client: { select: { fullName: true, email: true } } },
     });
+
+    // Sync with Google Calendar if event was previously added
+    if (meeting.googleEventId) {
+      try {
+        await updateGoogleCalendarEvent(meeting.googleEventId, meeting, meeting.client);
+      } catch (e) { console.error('Google Calendar update failed:', e); }
+    }
+
     res.json(meeting);
   } catch (err: any) {
     console.error('[PUT /meetings/:id]', err?.message || err);
