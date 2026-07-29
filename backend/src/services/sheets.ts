@@ -2,19 +2,60 @@ import { google } from 'googleapis';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
+const TOKENS_KEY = 'google_calendar_tokens';
+const SHEET_ID_KEY = 'google_backup_sheet_id';
 
-function getSheetsClient() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const key = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n');
+function createOAuth2Client() {
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  );
+}
 
-  if (!email || !key) throw new Error('Google Service Account credentials not configured');
+async function getAuthorizedClient() {
+  const row = await prisma.setting.findUnique({ where: { key: TOKENS_KEY } });
+  if (!row) throw new Error('Google לא מחובר — חבר תחילה מדף ההגדרות');
 
-  const auth = new google.auth.GoogleAuth({
-    credentials: { client_email: email, private_key: key },
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  const client = createOAuth2Client();
+  const tokens = JSON.parse(row.value);
+  client.setCredentials(tokens);
+
+  client.on('tokens', async (newTokens) => {
+    const merged = { ...tokens, ...newTokens };
+    await prisma.setting.upsert({
+      where: { key: TOKENS_KEY },
+      create: { key: TOKENS_KEY, value: JSON.stringify(merged) },
+      update: { value: JSON.stringify(merged) },
+    });
   });
 
-  return google.sheets({ version: 'v4', auth });
+  return client;
+}
+
+async function getOrCreateSpreadsheet(auth: any): Promise<string> {
+  // Check if we already created a backup sheet
+  const stored = await prisma.setting.findUnique({ where: { key: SHEET_ID_KEY } });
+  if (stored) return stored.value;
+
+  // Create a new spreadsheet
+  const drive = google.drive({ version: 'v3', auth });
+  const file = await drive.files.create({
+    requestBody: {
+      name: 'גיבוי – מערכת אימון עסקי',
+      mimeType: 'application/vnd.google-apps.spreadsheet',
+    },
+    fields: 'id',
+  });
+
+  const id = file.data.id!;
+  await prisma.setting.upsert({
+    where: { key: SHEET_ID_KEY },
+    create: { key: SHEET_ID_KEY, value: id },
+    update: { value: id },
+  });
+
+  return id;
 }
 
 function now() {
@@ -22,9 +63,9 @@ function now() {
 }
 
 export async function backupToSheets(): Promise<string> {
-  const sheets = getSheetsClient();
-  const spreadsheetId = process.env.GOOGLE_SHEETS_BACKUP_ID;
-  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_BACKUP_ID not configured');
+  const auth = await getAuthorizedClient();
+  const spreadsheetId = await getOrCreateSpreadsheet(auth);
+  const sheets = google.sheets({ version: 'v4', auth });
 
   const [clients, meetings, payments] = await Promise.all([
     prisma.client.findMany({ include: { payments: true, _count: { select: { meetings: true, tasks: true } } }, orderBy: { createdAt: 'desc' } }),
@@ -34,7 +75,6 @@ export async function backupToSheets(): Promise<string> {
 
   const statusMap: Record<string, string> = { ACTIVE: 'פעיל', FROZEN: 'מוקפא', ENDED: 'הסתיים' };
 
-  // --- Clients sheet ---
   const clientRows: any[][] = [
     ['שם מלא', 'מייל', 'טלפון', 'עסק', 'תחום', 'סטטוס', 'תאריך התחלה', 'פגישות', 'משימות', 'סכום עסקה', 'שולם', 'יתרה'],
   ];
@@ -50,53 +90,45 @@ export async function backupToSheets(): Promise<string> {
     ]);
   }
 
-  // --- Meetings sheet ---
   const meetingRows: any[][] = [
     ['תאריך', 'לקוח', 'סוג', 'משך (דקות)', 'הערות'],
   ];
   for (const m of meetings) {
     meetingRows.push([
       new Date(m.date).toLocaleString('he-IL'),
-      m.client?.fullName ?? '',
-      m.type, m.duration, m.notes ?? '',
+      m.client?.fullName ?? '', m.type, m.duration, m.notes ?? '',
     ]);
   }
 
-  // --- Payments sheet ---
   const paymentRows: any[][] = [
-    ['לקוח', 'סכום עסקה', 'שולם', 'יתרה', 'תאריך תשלום הבא', 'רשומות תשלום'],
+    ['לקוח', 'סכום עסקה', 'שולם', 'יתרה', 'תאריך תשלום הבא'],
   ];
   for (const p of payments) {
-    const balance = p.totalAmount - p.paidAmount;
-    const historyStr = p.history
-      .map(r => `${r.isPaid ? '✓' : '⏳'} ₪${r.amount} (${new Date(r.isPaid ? r.date : (r.scheduledDate ?? r.date)).toLocaleDateString('he-IL')})`)
-      .join(' | ');
     paymentRows.push([
-      p.client?.fullName ?? '',
-      p.totalAmount, p.paidAmount, balance,
+      p.client?.fullName ?? '', p.totalAmount, p.paidAmount,
+      p.totalAmount - p.paidAmount,
       p.nextPaymentDate ? new Date(p.nextPaymentDate).toLocaleDateString('he-IL') : '',
-      historyStr,
     ]);
   }
 
-  // Helper: clear & write a named sheet tab
+  // Get existing sheet tabs
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const existingTabs = meta.data.sheets?.map(s => s.properties?.title) ?? [];
+
+  const tabsToCreate = ['לקוחות', 'פגישות', 'תשלומים', 'גיבוי'].filter(t => !existingTabs.includes(t));
+  if (tabsToCreate.length > 0) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: tabsToCreate.map(title => ({ addSheet: { properties: { title } } })),
+      },
+    });
+  }
+
   async function writeSheet(title: string, rows: any[][]) {
-    // Check if sheet tab exists, if not create it
-    const meta = await sheets.spreadsheets.get({ spreadsheetId });
-    const existing = meta.data.sheets?.find(s => s.properties?.title === title);
-
-    if (!existing) {
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId,
-        requestBody: { requests: [{ addSheet: { properties: { title } } }] },
-      });
-    }
-
-    // Clear and write
     await sheets.spreadsheets.values.clear({ spreadsheetId, range: `${title}!A:Z` });
     await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `${title}!A1`,
+      spreadsheetId, range: `${title}!A1`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: rows },
     });
@@ -105,8 +137,6 @@ export async function backupToSheets(): Promise<string> {
   await writeSheet('לקוחות', clientRows);
   await writeSheet('פגישות', meetingRows);
   await writeSheet('תשלומים', paymentRows);
-
-  // Write a summary/metadata row
   await writeSheet('גיבוי', [
     ['גיבוי אחרון', 'לקוחות', 'פגישות', 'תשלומים'],
     [now(), clients.length, meetings.length, payments.length],
