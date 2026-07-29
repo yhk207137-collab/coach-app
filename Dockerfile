@@ -17,6 +17,7 @@ COPY --from=frontend-builder /app/backend/public ./backend/public
 RUN cd backend && npx tsc
 
 FROM node:20-alpine
+RUN apk add --no-cache openssl libc6-compat
 WORKDIR /app
 COPY --from=backend-builder /app/backend/node_modules ./node_modules
 COPY --from=backend-builder /app/backend/dist ./dist
