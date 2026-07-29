@@ -8,8 +8,10 @@
   html { direction: rtl; }
 
   body {
-    @apply bg-slate-50 text-slate-800 antialiased;
+    @apply antialiased text-slate-800;
     font-family: 'Inter', system-ui, sans-serif;
+    background: linear-gradient(135deg, #f8f4ff 0%, #eff6ff 50%, #f0fdf4 100%);
+    min-height: 100vh;
   }
 
   h1, h2, h3, h4, h5 { @apply font-semibold tracking-tight; }
@@ -20,13 +22,13 @@
 
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { @apply bg-transparent; }
-  ::-webkit-scrollbar-thumb { @apply bg-slate-200 rounded-full; }
-  ::-webkit-scrollbar-thumb:hover { @apply bg-slate-300; }
+  ::-webkit-scrollbar-thumb { @apply bg-purple-200 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-purple-300; }
 }
 
 @layer components {
   .card {
-    @apply bg-white rounded-2xl shadow-card border border-slate-100 p-6;
+    @apply bg-white/80 backdrop-blur-sm rounded-2xl shadow-card border border-white p-6;
   }
 
   .btn {
@@ -35,7 +37,7 @@
   }
 
   .btn-primary {
-    @apply btn bg-primary-600 text-white hover:bg-primary-700 active:scale-95 shadow-sm;
+    @apply btn bg-gradient-to-l from-primary-600 to-primary-500 text-white hover:from-primary-700 hover:to-primary-600 active:scale-95 shadow-md shadow-primary-200;
   }
 
   .btn-secondary {
@@ -43,7 +45,7 @@
   }
 
   .btn-ghost {
-    @apply btn text-slate-600 hover:bg-slate-100 active:scale-95;
+    @apply btn text-slate-600 hover:bg-white/70 active:scale-95;
   }
 
   .btn-danger {
@@ -77,24 +79,25 @@
   }
 
   .stat-card {
-    @apply card flex items-start gap-4 hover:shadow-card-hover transition-shadow duration-200;
+    @apply card flex items-start gap-4 hover:shadow-card-hover transition-all duration-200 hover:-translate-y-0.5;
   }
 
   .stat-icon {
     @apply w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0;
   }
 
+  /* Sidebar */
   .sidebar-link {
     @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
            transition-all duration-150 cursor-pointer;
   }
 
   .sidebar-link-active {
-    @apply sidebar-link bg-primary-50 text-primary-700;
+    @apply sidebar-link bg-white/20 text-white shadow-sm backdrop-blur-sm;
   }
 
   .sidebar-link-inactive {
-    @apply sidebar-link text-slate-600 hover:bg-slate-100 hover:text-slate-900;
+    @apply sidebar-link text-white/65 hover:bg-white/10 hover:text-white;
   }
 
   .table-header {
@@ -106,19 +109,19 @@
   }
 
   .table-row {
-    @apply border-b border-slate-50 hover:bg-slate-50/70 transition-colors duration-100;
+    @apply border-b border-slate-50 hover:bg-purple-50/40 transition-colors duration-100;
   }
 
-  .status-active { @apply badge bg-emerald-50 text-emerald-700; }
-  .status-frozen { @apply badge bg-amber-50 text-amber-700; }
+  .status-active { @apply badge bg-emerald-100 text-emerald-700; }
+  .status-frozen { @apply badge bg-amber-100 text-amber-700; }
   .status-ended  { @apply badge bg-slate-100 text-slate-500; }
 
   .task-pending    { @apply badge bg-slate-100 text-slate-600; }
-  .task-progress   { @apply badge bg-blue-50 text-blue-600; }
-  .task-completed  { @apply badge bg-emerald-50 text-emerald-700; }
+  .task-progress   { @apply badge bg-blue-100 text-blue-700; }
+  .task-completed  { @apply badge bg-emerald-100 text-emerald-700; }
 
   .modal-overlay {
-    @apply fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+    @apply fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4;
   }
 
   .modal {

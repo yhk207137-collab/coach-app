@@ -49,23 +49,25 @@ export default function Sidebar({ open, onClose }: Props) {
       )}
 
       <aside className={clsx(
-        'fixed top-0 right-0 h-full z-40 w-72 bg-white border-l border-slate-100 flex flex-col shadow-xl transition-transform duration-300',
-        'lg:static lg:w-64 lg:z-auto lg:shadow-sm lg:translate-x-0 lg:flex-shrink-0',
+        'fixed top-0 right-0 h-full z-40 w-72 flex flex-col shadow-2xl transition-transform duration-300',
+        'lg:static lg:w-64 lg:z-auto lg:translate-x-0 lg:flex-shrink-0',
         open ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
-      )}>
+      )}
+        style={{ background: 'linear-gradient(160deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%)' }}
+      >
         {/* Logo */}
-        <div className="px-6 py-6 border-b border-slate-100">
+        <div className="px-6 py-6 border-b border-white/10">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-primary-600 rounded-xl flex items-center justify-center flex-shrink-0">
+              <div className="w-9 h-9 bg-gradient-to-br from-pink-400 to-purple-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
                 <Briefcase className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="font-bold text-slate-900 text-sm leading-tight">ליוי שיווק ופרסום</p>
-                <p className="text-xs text-slate-400">{user?.name}</p>
+                <p className="font-bold text-white text-sm leading-tight">ליוי שיווק ופרסום</p>
+                <p className="text-xs text-white/50">{user?.name}</p>
               </div>
             </div>
-            <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
+            <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg text-white/40 hover:text-white">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -90,7 +92,7 @@ export default function Sidebar({ open, onClose }: Props) {
         </nav>
 
         {/* Logout */}
-        <div className="px-3 py-4 border-t border-slate-100">
+        <div className="px-3 py-4 border-t border-white/10">
           <button onClick={handleLogout} className="sidebar-link-inactive w-full">
             <LogOut size={18} />
             <span>יציאה</span>

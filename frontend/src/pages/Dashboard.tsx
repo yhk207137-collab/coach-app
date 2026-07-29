@@ -95,22 +95,22 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={Users} label="לקוחות פעילים" value={d?.activeClients ?? 0}
-          color="bg-primary-50 text-primary-600"
+          color="bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-200"
           onClick={() => navigate('/clients')}
         />
         <StatCard
           icon={Calendar} label="פגישות היום" value={d?.todayMeetings?.length ?? 0}
-          color="bg-emerald-50 text-emerald-600"
+          color="bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-lg shadow-emerald-200"
           onClick={() => navigate('/meetings')}
         />
         <StatCard
           icon={CheckSquare} label="משימות פתוחות" value={d?.openTasks?.length ?? 0}
-          color="bg-amber-50 text-amber-600"
+          color="bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-amber-200"
           onClick={() => navigate('/tasks')}
         />
         <StatCard
           icon={CreditCard} label="ממתינים לגבייה" value={overduePayments.length}
-          color="bg-red-50 text-red-500"
+          color="bg-gradient-to-br from-red-400 to-rose-500 text-white shadow-lg shadow-red-200"
           onClick={() => navigate('/payments')}
         />
       </div>

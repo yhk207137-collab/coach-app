@@ -31,7 +31,7 @@ export default function Header({ onMenuClick }: Props) {
   const hasResults = data && (data.clients?.length || data.tasks?.length || data.summaries?.length);
 
   return (
-    <header className="h-16 bg-white border-b border-slate-100 flex items-center px-4 lg:px-8 gap-3 shadow-sm flex-shrink-0">
+    <header className="h-16 bg-white/70 backdrop-blur-md border-b border-white/60 flex items-center px-4 lg:px-8 gap-3 shadow-sm flex-shrink-0">
       {/* Hamburger — mobile only */}
       <button
         onClick={onMenuClick}
