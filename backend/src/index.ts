@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { execSync } from 'child_process';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -86,4 +87,40 @@ app.get('*', (_req, res) => {
   });
 });
 
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+async function bootstrap() {
+  try {
+    console.log('[STARTUP] Running prisma db push...');
+    execSync('npx prisma db push --skip-generate --accept-data-loss', { stdio: 'inherit' });
+    console.log('[STARTUP] DB schema synced');
+  } catch (e) {
+    console.error('[STARTUP] prisma db push failed:', e);
+  }
+
+  try {
+    const { PrismaClient } = await import('@prisma/client');
+    const bcrypt = await import('bcryptjs');
+    const prisma = new PrismaClient();
+    const email = process.env.COACH_EMAIL;
+    const password = process.env.COACH_PASSWORD;
+    if (email && password) {
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (!existing) {
+        const name = process.env.COACH_NAME || 'המאמן';
+        const hash = await bcrypt.hash(password, 12);
+        await prisma.user.create({ data: { email, password: hash, name, role: 'COACH' } });
+        console.log('[STARTUP] Coach user created:', email);
+      } else {
+        console.log('[STARTUP] Coach user already exists');
+      }
+    } else {
+      console.log('[STARTUP] COACH_EMAIL/COACH_PASSWORD not set, skipping seed');
+    }
+    await prisma.$disconnect();
+  } catch (e) {
+    console.error('[STARTUP] Seed failed:', e);
+  }
+
+  app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+}
+
+bootstrap();
