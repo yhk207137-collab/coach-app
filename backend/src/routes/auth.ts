@@ -201,11 +201,5 @@ router.post('/client/register', async (req, res) => {
   }
 });
 
-// TEMP RESET - REMOVE AFTER USE
-router.post('/temp-reset-9k2m', async (_req, res) => {
-  const hash = await bcrypt.hash('Admin1234!', 10);
-  await prisma.user.updateMany({ where: { email: 'yhk207137@gmail.com' }, data: { password: hash } });
-  res.json({ ok: true });
-});
 
 export default router;
