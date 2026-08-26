@@ -15,6 +15,7 @@ import AccountingPage from './pages/Accounting';
 import ClientPortal from './pages/ClientPortal';
 import Verify from './pages/Verify';
 import SettingsPage from './pages/Settings';
+import QuotesPage from './pages/Quotes';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore();
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/accounting" element={<AccountingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/quotes" element={<QuotesPage />} />
         </Route>
 
         <Route

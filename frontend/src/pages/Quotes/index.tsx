@@ -1,0 +1,172 @@
+import { useState, useEffect } from 'react';
+import { Plus, FileText, Printer, Trash2, Edit2, CheckCircle, Clock, XCircle, Send } from 'lucide-react';
+import api from '../../lib/api';
+import QuoteModal from './QuoteModal';
+import QuotePrint from './QuotePrint';
+
+export interface QuoteItem {
+  id?: string;
+  description: string;
+  duration?: string;
+  price: number;
+  quantity: number;
+  order: number;
+}
+
+export interface Quote {
+  id: string;
+  number: number;
+  title: string;
+  status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED';
+  notes?: string;
+  validUntil?: string;
+  createdAt: string;
+  client: { id: string; fullName: string; businessName?: string; email: string };
+  items: QuoteItem[];
+}
+
+const statusLabel: Record<Quote['status'], string> = {
+  DRAFT: 'טיוטה',
+  SENT: 'נשלח',
+  ACCEPTED: 'אושר',
+  REJECTED: 'נדחה',
+};
+
+const statusIcon: Record<Quote['status'], React.ReactNode> = {
+  DRAFT: <Clock className="w-4 h-4 text-gray-400" />,
+  SENT: <Send className="w-4 h-4 text-blue-500" />,
+  ACCEPTED: <CheckCircle className="w-4 h-4 text-green-500" />,
+  REJECTED: <XCircle className="w-4 h-4 text-red-500" />,
+};
+
+const statusColor: Record<Quote['status'], string> = {
+  DRAFT: 'bg-gray-100 text-gray-700',
+  SENT: 'bg-blue-100 text-blue-700',
+  ACCEPTED: 'bg-green-100 text-green-700',
+  REJECTED: 'bg-red-100 text-red-700',
+};
+
+export default function QuotesPage() {
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editQuote, setEditQuote] = useState<Quote | null>(null);
+  const [printQuote, setPrintQuote] = useState<Quote | null>(null);
+
+  const load = async () => {
+    try {
+      const res = await api.get('/quotes');
+      setQuotes(res.data);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('למחוק הצעת מחיר זו?')) return;
+    await api.delete(`/quotes/${id}`);
+    setQuotes(q => q.filter(x => x.id !== id));
+  };
+
+  const handleSave = (quote: Quote) => {
+    setQuotes(prev => {
+      const idx = prev.findIndex(q => q.id === quote.id);
+      if (idx >= 0) { const a = [...prev]; a[idx] = quote; return a; }
+      return [quote, ...prev];
+    });
+    setShowModal(false);
+    setEditQuote(null);
+  };
+
+  const total = (q: Quote) => q.items.reduce((s, i) => s + i.price * i.quantity, 0);
+
+  if (printQuote) {
+    return <QuotePrint quote={printQuote} onClose={() => setPrintQuote(null)} />;
+  }
+
+  return (
+    <div dir="rtl">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">הצעות מחיר</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{quotes.length} הצעות</p>
+        </div>
+        <button
+          onClick={() => { setEditQuote(null); setShowModal(true); }}
+          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-medium"
+        >
+          <Plus className="w-4 h-4" />
+          הצעת מחיר חדשה
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-20 text-gray-400">טוען...</div>
+      ) : quotes.length === 0 ? (
+        <div className="text-center py-20">
+          <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-400">אין הצעות מחיר עדיין</p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {quotes.map(q => (
+            <div key={q.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-mono text-gray-400">#{String(q.number).padStart(4, '0')}</span>
+                  <h3 className="font-semibold text-gray-900">{q.title}</h3>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusColor[q.status]}`}>
+                    {statusIcon[q.status]}
+                    {statusLabel[q.status]}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500 mt-1">{q.client.fullName}{q.client.businessName ? ` — ${q.client.businessName}` : ''}</p>
+                <div className="flex gap-3 mt-1 text-xs text-gray-400 flex-wrap">
+                  <span>{q.items.length} פריטים</span>
+                  {q.validUntil && <span>בתוקף עד {new Date(q.validUntil).toLocaleDateString('he-IL')}</span>}
+                  <span>{new Date(q.createdAt).toLocaleDateString('he-IL')}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-lg font-bold text-purple-700">₪{total(q).toLocaleString('he-IL')}</span>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setPrintQuote(q)}
+                    className="p-2 rounded-lg hover:bg-purple-50 text-gray-400 hover:text-purple-600 transition-colors"
+                    title="הדפס / ייצא PDF"
+                  >
+                    <Printer className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => { setEditQuote(q); setShowModal(true); }}
+                    className="p-2 rounded-lg hover:bg-purple-50 text-gray-400 hover:text-purple-600 transition-colors"
+                    title="ערוך"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(q.id)}
+                    className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                    title="מחק"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showModal && (
+        <QuoteModal
+          quote={editQuote}
+          onClose={() => { setShowModal(false); setEditQuote(null); }}
+          onSave={handleSave}
+        />
+      )}
+    </div>
+  );
+}

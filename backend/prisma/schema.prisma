@@ -57,6 +57,7 @@ model Client {
   tasks         Task[]
   payments      Payment[]
   documents     Document[]
+  quotes        Quote[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -163,4 +164,36 @@ model MagicToken {
 model Setting {
   key   String @id
   value String
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+model Quote {
+  id          String      @id @default(cuid())
+  clientId    String
+  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title       String
+  number      Int         @default(autoincrement())
+  status      QuoteStatus @default(DRAFT)
+  notes       String?
+  validUntil  DateTime?
+  items       QuoteItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model QuoteItem {
+  id          String  @id @default(cuid())
+  quoteId     String
+  quote       Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  description String
+  duration    String?
+  price       Float
+  quantity    Int     @default(1)
+  order       Int     @default(0)
 }
