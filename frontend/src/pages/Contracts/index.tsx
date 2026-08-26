@@ -13,6 +13,7 @@ export interface Contract {
   status: ContractStatus;
   signedAt?: string;
   signerName?: string;
+  signatureData?: string;
   validUntil?: string;
   createdAt: string;
   client: { id: string; fullName: string; businessName?: string; email: string };
