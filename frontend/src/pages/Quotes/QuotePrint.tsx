@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Printer } from 'lucide-react';
 import type { Quote } from './index';
 
@@ -16,6 +16,11 @@ const statusLabel: Record<Quote['status'], string> = {
 
 export default function QuotePrint({ quote, onClose }: Props) {
   const printRef = useRef<HTMLDivElement>(null);
+  const [logo, setLogo] = useState('');
+
+  useEffect(() => {
+    try { setLogo(localStorage.getItem('companyLogo') ?? ''); } catch {}
+  }, []);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -56,9 +61,12 @@ export default function QuotePrint({ quote, onClose }: Props) {
           {/* Header */}
           <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }} className="rounded-t-2xl print:rounded-none px-10 py-8 text-white">
             <div className="flex justify-between items-start">
-              <div>
-                <div className="text-2xl font-bold tracking-wide">ליוי שיווק ופרסום</div>
-                <div className="text-purple-200 text-sm mt-1">סוכנות שיווק ופרסום לעמותות</div>
+              <div className="flex items-center gap-4">
+                {logo && <img src={logo} alt="לוגו" className="h-12 object-contain rounded-lg bg-white/10 px-2 py-1" />}
+                <div>
+                  <div className="text-2xl font-bold tracking-wide">ליוי שיווק ופרסום</div>
+                  <div className="text-purple-200 text-sm mt-1">סוכנות שיווק ופרסום לעמותות</div>
+                </div>
               </div>
               <div className="text-left">
                 <div className="text-xs text-purple-300 uppercase tracking-widest">הצעת מחיר</div>

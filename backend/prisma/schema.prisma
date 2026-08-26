@@ -58,6 +58,8 @@ model Client {
   payments      Payment[]
   documents     Document[]
   quotes        Quote[]
+  projects      Project[]
+  contracts     Contract[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -99,8 +101,12 @@ model Task {
   id          String     @id @default(cuid())
   clientId    String
   client      Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  meetingId   String?
-  meeting     Meeting?   @relation(fields: [meetingId], references: [id])
+  meetingId      String?
+  meeting        Meeting?    @relation(fields: [meetingId], references: [id])
+  projectId      String?
+  project        Project?    @relation(fields: [projectId], references: [id])
+  subProjectId   String?
+  subProject     SubProject? @relation(fields: [subProjectId], references: [id])
   title       String
   description String?
   dueDate     DateTime?
@@ -166,6 +172,21 @@ model Setting {
   value String
 }
 
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ContractStatus {
+  DRAFT
+  SENT
+  SIGNED
+  EXPIRED
+}
+
 enum QuoteStatus {
   DRAFT
   SENT
@@ -185,6 +206,52 @@ model Quote {
   items       QuoteItem[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  clientId    String
+  client      Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  status      ProjectStatus @default(PLANNING)
+  startDate   DateTime?
+  endDate     DateTime?
+  budget      Float?
+  strategy    String?
+  goals       String?
+  subProjects SubProject[]
+  tasks       Task[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model SubProject {
+  id          String        @id @default(cuid())
+  projectId   String
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  status      ProjectStatus @default(PLANNING)
+  tasks       Task[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Contract {
+  id            String         @id @default(cuid())
+  clientId      String
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title         String
+  content       String
+  status        ContractStatus @default(DRAFT)
+  signedAt      DateTime?
+  signatureData String?
+  signerName    String?
+  signerIp      String?
+  validUntil    DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model QuoteItem {

@@ -16,6 +16,9 @@ import ClientPortal from './pages/ClientPortal';
 import Verify from './pages/Verify';
 import SettingsPage from './pages/Settings';
 import QuotesPage from './pages/Quotes';
+import ProjectsPage from './pages/Projects';
+import ContractsPage from './pages/Contracts';
+import SignContract from './pages/Contracts/SignContract';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore();
@@ -55,7 +58,11 @@ export default function App() {
           <Route path="/accounting" element={<AccountingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/quotes" element={<QuotesPage />} />
+          <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/contracts" element={<ContractsPage />} />
         </Route>
+
+        <Route path="/sign-contract/:id" element={<SignContract />} />
 
         <Route
           path="/portal"

@@ -24,9 +24,9 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
 
 router.post('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   try {
-    const { clientId, meetingId, title, description, dueDate, status } = req.body;
+    const { clientId, meetingId, projectId, subProjectId, title, description, dueDate, status } = req.body;
     const task = await prisma.task.create({
-      data: { clientId, meetingId, title, description, dueDate: dueDate ? new Date(dueDate) : undefined, status },
+      data: { clientId, meetingId, projectId, subProjectId, title, description, dueDate: dueDate ? new Date(dueDate) : undefined, status },
     });
     res.status(201).json(task);
   } catch {

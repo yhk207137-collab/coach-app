@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Eye, EyeOff, Loader2, Lock, CheckCircle, Calendar } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Eye, EyeOff, Loader2, Lock, CheckCircle, Calendar, Image, Trash2 } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../store/auth';
@@ -15,6 +15,8 @@ export default function SettingsPage() {
   const [done, setDone] = useState(false);
   const [calConnected, setCalConnected] = useState<boolean | null>(null);
   const [calLoading, setCalLoading] = useState(false);
+  const [logoData, setLogoData] = useState<string>(() => { try { return localStorage.getItem('companyLogo') ?? ''; } catch { return ''; } });
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api.get('/calendar/status').then(r => setCalConnected(r.data.connected)).catch(() => setCalConnected(false));
@@ -29,6 +31,26 @@ export default function SettingsPage() {
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
   }, []);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) { toast.error('הלוגו חייב להיות קטן מ-500KB'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const data = reader.result as string;
+      setLogoData(data);
+      try { localStorage.setItem('companyLogo', data); } catch {}
+      toast.success('הלוגו נשמר!');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeLogo = () => {
+    setLogoData('');
+    try { localStorage.removeItem('companyLogo'); } catch {}
+    toast.success('הלוגו הוסר');
+  };
 
   const connectGoogleCalendar = async () => {
     setCalLoading(true);
@@ -69,6 +91,45 @@ export default function SettingsPage() {
       </div>
 
       <div className="max-w-md space-y-6">
+
+        {/* Logo Upload */}
+        <div className="card">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
+              <Image className="w-5 h-5 text-orange-500" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-slate-900">לוגו החברה</h2>
+              <p className="text-sm text-slate-500">יופיע בהצעות מחיר ובחוזים</p>
+            </div>
+          </div>
+          {logoData ? (
+            <div className="flex items-center gap-4">
+              <img src={logoData} alt="לוגו" className="h-16 object-contain rounded-lg border border-gray-100 bg-gray-50 px-2" />
+              <div>
+                <p className="text-sm text-gray-600 mb-2">הלוגו שהועלה</p>
+                <button onClick={removeLogo} className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700">
+                  <Trash2 className="w-4 h-4" /> הסר לוגו
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div
+              onClick={() => logoInputRef.current?.click()}
+              className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors"
+            >
+              <Image className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">לחץ להעלאת לוגו</p>
+              <p className="text-xs text-gray-400 mt-1">PNG, JPG — עד 500KB</p>
+            </div>
+          )}
+          <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+          {!logoData && (
+            <button onClick={() => logoInputRef.current?.click()} className="mt-3 w-full py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
+              העלה לוגו
+            </button>
+          )}
+        </div>
 
         {/* Google Calendar */}
         <div className="card">

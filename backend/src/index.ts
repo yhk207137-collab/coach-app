@@ -19,6 +19,8 @@ import calendarRoutes from './routes/calendar';
 import dashboardRoutes from './routes/dashboard';
 import backupRoutes from './routes/backup';
 import quoteRoutes from './routes/quotes';
+import projectRoutes from './routes/projects';
+import contractRoutes from './routes/contracts';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -78,6 +80,8 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/backup', backupRoutes);
 app.use('/api/quotes', quoteRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/contracts', contractRoutes);
 
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 
