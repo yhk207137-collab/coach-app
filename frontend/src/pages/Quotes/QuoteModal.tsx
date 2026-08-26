@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, GripVertical } from 'lucide-react';
-import api from '../../lib/api';
+import api from '../../services/api';
 import type { Quote, QuoteItem } from './index';
 
 interface Client { id: string; fullName: string; businessName?: string; }
@@ -26,7 +26,7 @@ export default function QuoteModal({ quote, onClose, onSave }: Props) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api.get('/clients').then(r => setClients(r.data));
+    api.get('/clients').then((r: { data: Client[] }) => setClients(r.data));
   }, []);
 
   const setItem = (idx: number, field: keyof typeof items[0], val: string | number) => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, FileText, Printer, Trash2, Edit2, CheckCircle, Clock, XCircle, Send } from 'lucide-react';
-import api from '../../lib/api';
+import api from '../../services/api';
 import QuoteModal from './QuoteModal';
 import QuotePrint from './QuotePrint';
 
