@@ -147,7 +147,10 @@ router.post('/review/:id/revision', async (req, res) => {
     const notePrefix = `[בקשת תיקון ${new Date().toLocaleDateString('he-IL')}]: ${message}`;
     await prisma.quote.update({
       where: { id: req.params.id },
-      data: { notes: quote.notes ? `${notePrefix}\n\n${quote.notes}` : notePrefix },
+      data: {
+        status: 'REVISION',
+        notes: quote.notes ? `${notePrefix}\n\n${quote.notes}` : notePrefix,
+      },
     });
     res.json({ ok: true });
   } catch {

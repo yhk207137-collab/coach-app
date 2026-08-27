@@ -192,6 +192,7 @@ enum QuoteStatus {
   SENT
   ACCEPTED
   REJECTED
+  REVISION
 }
 
 model Quote {

@@ -18,7 +18,7 @@ export interface Quote {
   id: string;
   number: number;
   title: string;
-  status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED';
+  status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'REVISION';
   notes?: string;
   validUntil?: string;
   createdAt: string;
@@ -31,6 +31,7 @@ const statusLabel: Record<Quote['status'], string> = {
   SENT: 'נשלח',
   ACCEPTED: 'אושר',
   REJECTED: 'נדחה',
+  REVISION: '⚠️ בקש תיקון',
 };
 
 const statusIcon: Record<Quote['status'], React.ReactNode> = {
@@ -38,6 +39,7 @@ const statusIcon: Record<Quote['status'], React.ReactNode> = {
   SENT: <Send className="w-4 h-4 text-blue-500" />,
   ACCEPTED: <CheckCircle className="w-4 h-4 text-green-500" />,
   REJECTED: <XCircle className="w-4 h-4 text-red-500" />,
+  REVISION: <XCircle className="w-4 h-4 text-orange-500" />,
 };
 
 const statusColor: Record<Quote['status'], string> = {
@@ -45,6 +47,7 @@ const statusColor: Record<Quote['status'], string> = {
   SENT: 'bg-blue-100 text-blue-700',
   ACCEPTED: 'bg-green-100 text-green-700',
   REJECTED: 'bg-red-100 text-red-700',
+  REVISION: 'bg-orange-100 text-orange-700',
 };
 
 export default function QuotesPage() {
@@ -140,10 +143,16 @@ const reviewLink = (id: string) => `${window.location.origin}/review-quote/${id}
                   {q.validUntil && <span>בתוקף עד {new Date(q.validUntil).toLocaleDateString('he-IL')}</span>}
                   <span>{new Date(q.createdAt).toLocaleDateString('he-IL')}</span>
                 </div>
+                {q.status === 'REVISION' && q.notes && (
+                  <div className="mt-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-xs text-orange-800">
+                    <span className="font-semibold">בקשת תיקון: </span>
+                    {q.notes.replace(/^\[בקשת תיקון [^\]]+\]: /, '')}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-3 flex-wrap justify-end">
                 <span className="text-lg font-bold text-purple-700">₪{total(q).toLocaleString('he-IL')}</span>
-                {(q.status === 'DRAFT' || q.status === 'SENT') && (
+                {(q.status === 'DRAFT' || q.status === 'SENT' || q.status === 'REVISION') && (
                   <button
                     onClick={() => copyReviewLink(q.id)}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
