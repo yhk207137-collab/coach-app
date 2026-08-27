@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, FileText, Printer, Trash2, Edit2, CheckCircle, Clock, XCircle, Send, Copy, X, Link, Loader2 } from 'lucide-react';
+import { Plus, FileText, Printer, Trash2, Edit2, CheckCircle, Clock, XCircle, Send, Copy, X, Link } from 'lucide-react';
 import api from '../../services/api';
 import QuoteModal from './QuoteModal';
 import QuotePrint from './QuotePrint';
@@ -53,8 +53,6 @@ export default function QuotesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editQuote, setEditQuote] = useState<Quote | null>(null);
   const [printQuote, setPrintQuote] = useState<Quote | null>(null);
-  const [accepting, setAccepting] = useState<string | null>(null);
-  const [contractLink, setContractLink] = useState<{ id: string; title: string; clientName: string } | null>(null);
 
   const load = async () => {
     try {
@@ -85,23 +83,12 @@ export default function QuotesPage() {
 
   const total = (q: Quote) => q.items.reduce((s, i) => s + i.price * i.quantity, 0);
 
-  const handleAccept = async (q: Quote) => {
-    if (!confirm(`לאשר את הצעה #${String(q.number).padStart(4,'0')} ולצור חוזה אוטומטי?`)) return;
-    setAccepting(q.id);
-    try {
-      const res = await api.post(`/quotes/${q.id}/accept`);
-      const { quote: updated, contract } = res.data;
-      setQuotes(prev => prev.map(x => x.id === updated.id ? updated : x));
-      toast.success('ההצעה אושרה! החוזה נוצר אוטומטית');
-      setContractLink({ id: contract.id, title: contract.title, clientName: q.client.fullName });
-    } catch {
-      toast.error('שגיאה באישור הצעה');
-    } finally {
-      setAccepting(null);
-    }
-  };
-
+const reviewLink = (id: string) => `${window.location.origin}/review-quote/${id}`;
   const signLink = (id: string) => `${window.location.origin}/sign-contract/${id}`;
+  const copyReviewLink = (id: string) => {
+    navigator.clipboard.writeText(reviewLink(id));
+    toast.success('קישור ללקוח הועתק! שלח בוואטסאפ / מייל');
+  };
   const copyLink = (id: string) => {
     navigator.clipboard.writeText(signLink(id));
     toast.success('קישור לחתימה הועתק!');
@@ -158,13 +145,12 @@ export default function QuotesPage() {
                 <span className="text-lg font-bold text-purple-700">₪{total(q).toLocaleString('he-IL')}</span>
                 {(q.status === 'DRAFT' || q.status === 'SENT') && (
                   <button
-                    onClick={() => handleAccept(q)}
-                    disabled={accepting === q.id}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium disabled:opacity-50"
-                    title="אשר הצעה ויצור חוזה"
+                    onClick={() => copyReviewLink(q.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                    title="העתק קישור לשליחה ללקוח"
                   >
-                    {accepting === q.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                    אשר ויצור חוזה
+                    <Copy className="w-3.5 h-3.5" />
+                    שלח ללקוח
                   </button>
                 )}
                 <div className="flex gap-1">
@@ -192,48 +178,6 @@ export default function QuotesPage() {
         />
       )}
 
-      {/* Contract link modal after acceptance */}
-      {contractLink && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && setContractLink(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6" dir="rtl">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">הצעה אושרה! החוזה מוכן</h3>
-                  <p className="text-sm text-gray-500">{contractLink.clientName} — {contractLink.title}</p>
-                </div>
-              </div>
-              <button onClick={() => setContractLink(null)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700"><X className="w-4 h-4" /></button>
-            </div>
-
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4 text-sm text-green-800">
-              ✅ החוזה נוצר אוטומטית על בסיס ההצעה עם כל הפריטים והסכומים. שלח ללקוח לחתימה.
-            </div>
-
-            <div className="bg-gray-50 rounded-xl p-3 mb-4">
-              <p className="text-xs text-gray-500 mb-1 flex items-center gap-1"><Link className="w-3 h-3" /> קישור לחתימה דיגיטלית:</p>
-              <p className="text-sm text-blue-700 font-mono break-all">{signLink(contractLink.id)}</p>
-            </div>
-
-            <div className="space-y-1.5 text-sm text-gray-600 mb-5">
-              <p className="font-medium text-gray-800">מה עכשיו?</p>
-              <p>1. לחץ "העתק קישור" → שלח ללקוח בוואטסאפ / מייל</p>
-              <p>2. הלקוח פותח, קורא וחותם דיגיטלית</p>
-              <p>3. החוזה יסומן "חתום" אוטומטית</p>
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={() => copyLink(contractLink.id)} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 font-medium">
-                <Copy className="w-4 h-4" /> העתק קישור לחתימה
-              </button>
-              <button onClick={() => setContractLink(null)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50">סגור</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

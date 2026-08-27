@@ -19,6 +19,7 @@ import QuotesPage from './pages/Quotes';
 import ProjectsPage from './pages/Projects';
 import ContractsPage from './pages/Contracts';
 import SignContract from './pages/Contracts/SignContract';
+import ReviewQuote from './pages/Quotes/ReviewQuote';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore();
@@ -63,6 +64,7 @@ export default function App() {
         </Route>
 
         <Route path="/sign-contract/:id" element={<SignContract />} />
+        <Route path="/review-quote/:id" element={<ReviewQuote />} />
 
         <Route
           path="/portal"
