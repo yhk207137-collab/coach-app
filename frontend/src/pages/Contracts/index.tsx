@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plus, FileSignature, Edit2, Trash2, Send, CheckCircle, Clock, XCircle, Eye } from 'lucide-react';
+import { Plus, FileSignature, Edit2, Trash2, Send, CheckCircle, Clock, XCircle, Eye, Copy, X, Link } from 'lucide-react';
 import api from '../../services/api';
 import ContractModal from './ContractModal';
 import ContractView from './ContractView';
+import toast from 'react-hot-toast';
 
 export type ContractStatus = 'DRAFT' | 'SENT' | 'SIGNED' | 'EXPIRED';
 
@@ -73,9 +74,11 @@ export default function ContractsPage() {
 
   const signLink = (id: string) => `${window.location.origin}/sign-contract/${id}`;
 
+  const [linkModal, setLinkModal] = useState<{ id: string; title: string; clientName: string } | null>(null);
+
   const copyLink = (id: string) => {
     navigator.clipboard.writeText(signLink(id));
-    alert('קישור לחתימה הועתק!');
+    toast.success('קישור לחתימה הועתק ללוח!');
   };
 
   if (viewContract) return <ContractView contract={viewContract} onClose={() => { setViewContract(null); load(); }} />;
@@ -127,7 +130,7 @@ export default function ContractsPage() {
                   <Eye className="w-4 h-4" />
                 </button>
                 {c.status !== 'SIGNED' && (
-                  <button onClick={() => copyLink(c.id)} className="p-2 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600" title="העתק קישור לחתימה">
+                  <button onClick={() => setLinkModal({ id: c.id, title: c.title, clientName: c.client.fullName })} className="p-2 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600" title="שלח לחתימה דיגיטלית">
                     <Send className="w-4 h-4" />
                   </button>
                 )}
@@ -145,6 +148,51 @@ export default function ContractsPage() {
 
       {showModal && (
         <ContractModal contract={editContract} onClose={() => { setShowModal(false); setEditContract(null); }} onSave={handleSave} />
+      )}
+
+      {/* Send link modal */}
+      {linkModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && setLinkModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6" dir="rtl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                  <Link className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">שליחת חוזה לחתימה דיגיטלית</h3>
+                  <p className="text-sm text-gray-500">{linkModal.clientName} — {linkModal.title}</p>
+                </div>
+              </div>
+              <button onClick={() => setLinkModal(null)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700"><X className="w-4 h-4" /></button>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl p-3 mb-4">
+              <p className="text-xs text-gray-500 mb-1">קישור לחתימה:</p>
+              <p className="text-sm text-blue-700 font-mono break-all">{signLink(linkModal.id)}</p>
+            </div>
+
+            <div className="space-y-2 mb-4 text-sm text-gray-600">
+              <p className="font-medium text-gray-800">איך שולחים ללקוח?</p>
+              <ol className="list-decimal list-inside space-y-1 text-gray-600">
+                <li>לחץ "העתק קישור" למטה</li>
+                <li>שלח את הקישור ללקוח בוואטסאפ / אימייל / SMS</li>
+                <li>הלקוח פותח את הקישור בדפדפן, קורא את החוזה וחותם בעכבר/אצבע</li>
+                <li>החוזה יסומן אוטומטית כ"חתום" עם תאריך ושם החותם</li>
+              </ol>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => { copyLink(linkModal.id); }}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 font-medium"
+              >
+                <Copy className="w-4 h-4" /> העתק קישור
+              </button>
+              <button onClick={() => setLinkModal(null)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50">סגור</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

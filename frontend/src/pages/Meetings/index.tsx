@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Calendar, FileText, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Calendar, FileText, Pencil, Trash2, AlertTriangle, Printer } from 'lucide-react';
 import api from '../../services/api';
 import { Meeting } from '../../types';
 import { format, isToday, isTomorrow, isPast } from 'date-fns';
@@ -9,6 +9,7 @@ import { he } from 'date-fns/locale';
 import clsx from 'clsx';
 import MeetingModal from './MeetingModal';
 import SummaryModal from './SummaryModal';
+import MeetingPrint from './MeetingPrint';
 import toast from 'react-hot-toast';
 
 export default function MeetingsPage() {
@@ -17,6 +18,7 @@ export default function MeetingsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editMeeting, setEditMeeting] = useState<Meeting | null>(null);
   const [summaryFor, setSummaryFor] = useState<string | null>(null);
+  const [printMeeting, setPrintMeeting] = useState<Meeting | null>(null);
 
   const { data: meetings = [], isLoading } = useQuery<Meeting[]>({
     queryKey: ['meetings'],
@@ -123,7 +125,13 @@ export default function MeetingsPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         {m.summary ? (
-                          <span className="badge bg-emerald-50 text-emerald-700 text-xs">סוכם</span>
+                          <>
+                            <span className="badge bg-emerald-50 text-emerald-700 text-xs">סוכם</span>
+                            <button onClick={() => setPrintMeeting(m)}
+                              className="btn-ghost p-1.5 rounded-lg text-slate-400 hover:text-purple-600" title="הדפס סיכום">
+                              <Printer className="w-4 h-4" />
+                            </button>
+                          </>
                         ) : past ? (
                           <button onClick={() => setSummaryFor(m.id)} className="btn-secondary text-xs">
                             <FileText className="w-3.5 h-3.5" /> הוסף סיכום
@@ -161,6 +169,9 @@ export default function MeetingsPage() {
           onClose={() => setSummaryFor(null)}
           onSaved={() => { qc.invalidateQueries({ queryKey: ['meetings'] }); setSummaryFor(null); }}
         />
+      )}
+      {printMeeting && (
+        <MeetingPrint meeting={printMeeting} onClose={() => setPrintMeeting(null)} />
       )}
     </div>
   );

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderKanban, ChevronDown, ChevronRight, Trash2, Edit2, CheckCircle, Clock, PauseCircle, XCircle, BarChart3 } from 'lucide-react';
+import { Plus, FolderKanban, ChevronDown, ChevronRight, Trash2, Edit2, CheckCircle, Clock, PauseCircle, XCircle, BarChart3, Printer } from 'lucide-react';
 import api from '../../services/api';
 import ProjectModal from './ProjectModal';
 import ProjectDetail from './ProjectDetail';
+import ProjectPrint from './ProjectPrint';
 
 export interface SubProject {
   id: string;
@@ -66,6 +67,7 @@ export default function ProjectsPage() {
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<Project | null>(null);
+  const [printProject, setPrintProject] = useState<Project | null>(null);
 
   const load = async () => {
     try {
@@ -167,6 +169,7 @@ export default function ProjectsPage() {
                     <span>{p.subProjects.length} תת-פרויקטים</span>
                   </div>
                   <div className="flex gap-1">
+                    <button onClick={() => setPrintProject(p)} className="p-2 rounded-lg hover:bg-purple-50 text-gray-400 hover:text-purple-600" title="הדפס דוח פרויקט"><Printer className="w-4 h-4" /></button>
                     <button onClick={() => { setEditProject(p); setShowModal(true); }} className="p-2 rounded-lg hover:bg-purple-50 text-gray-400 hover:text-purple-600"><Edit2 className="w-4 h-4" /></button>
                     <button onClick={() => handleDelete(p.id)} className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                   </div>
@@ -192,6 +195,9 @@ export default function ProjectsPage() {
 
       {showModal && (
         <ProjectModal project={editProject} onClose={() => { setShowModal(false); setEditProject(null); }} onSave={handleSave} />
+      )}
+      {printProject && (
+        <ProjectPrint project={printProject} onClose={() => setPrintProject(null)} />
       )}
     </div>
   );
