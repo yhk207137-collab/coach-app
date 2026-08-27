@@ -86,6 +86,99 @@ router.put('/:id', requireAuth, requireCoach, async (req, res) => {
   }
 });
 
+router.post('/:id/accept', requireAuth, requireCoach, async (req, res) => {
+  try {
+    const quote = await prisma.quote.findUnique({
+      where: { id: req.params.id },
+      include: { client: true, items: { orderBy: { order: 'asc' } } },
+    });
+    if (!quote) return res.status(404).json({ error: 'לא נמצא' });
+
+    const total = quote.items.reduce((s, i) => s + i.price * i.quantity, 0);
+    const endDate = quote.validUntil
+      ? new Date(quote.validUntil).toLocaleDateString('he-IL')
+      : '___________';
+    const today = new Date().toLocaleDateString('he-IL');
+
+    const itemsText = quote.items
+      .map(i => `• ${i.description}${i.duration ? ` (${i.duration})` : ''} — ₪${(i.price * i.quantity).toLocaleString('he-IL')}`)
+      .join('\n');
+
+    const content = `חוזה התקשרות
+
+נערך ונחתם ב-${today}
+
+בין:
+ליוי שיווק ופרסום — סוכנות שיווק ופרסום לעמותות (להלן: "נותן השירות")
+
+לבין:
+${quote.client.fullName}${quote.client.businessName ? ` — ${quote.client.businessName}` : ''} (להלן: "מקבל השירות")
+
+נושא ההסכם: ${quote.title}
+
+───────────────────────────
+
+סעיף 1 — היקף השירותים
+נותן השירות מתחייב לספק את השירותים הבאים:
+
+${itemsText}
+
+───────────────────────────
+
+סעיף 2 — תמורה ותשלום
+הצדדים מסכימים כי התמורה הכוללת עבור השירותים תהיה:
+סכום כולל: ₪${total.toLocaleString('he-IL')}
+
+אופן התשלום יוסכם בין הצדדים בנפרד.
+
+───────────────────────────
+
+סעיף 3 — תקופת ההתקשרות
+תקופת ההסכם תחל ממועד החתימה ותסתיים בתאריך ${endDate}.
+
+───────────────────────────
+
+סעיף 4 — סודיות
+שני הצדדים מתחייבים לשמור על סודיות מלאה לגבי כל מידע שיועבר ביניהם במסגרת הסכם זה.
+
+───────────────────────────
+
+סעיף 5 — ביטול ההסכם
+ביטול ההסכם על ידי מי מהצדדים יעשה בהודעה בכתב של 14 יום מראש.
+
+───────────────────────────
+
+הסכם זה נכנס לתוקף עם חתימת שני הצדדים.
+
+חתימת נותן השירות: _______________________
+
+חתימת מקבל השירות: _______________________`;
+
+    const [updatedQuote, contract] = await prisma.$transaction([
+      prisma.quote.update({
+        where: { id: req.params.id },
+        data: { status: 'ACCEPTED' },
+        include: { client: true, items: { orderBy: { order: 'asc' } } },
+      }),
+      prisma.contract.create({
+        data: {
+          clientId: quote.clientId,
+          title: `חוזה התקשרות — ${quote.title}`,
+          content,
+          status: 'DRAFT',
+          validUntil: quote.validUntil,
+        },
+        include: { client: true },
+      }),
+    ]);
+
+    res.json({ quote: updatedQuote, contract });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.delete('/:id', requireAuth, requireCoach, async (req, res) => {
   try {
     await prisma.quote.delete({ where: { id: req.params.id } });
