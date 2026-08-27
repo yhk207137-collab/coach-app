@@ -16,9 +16,12 @@ export default function SettingsPage() {
   const [calConnected, setCalConnected] = useState<boolean | null>(null);
   const [calLoading, setCalLoading] = useState(false);
   const [logoData, setLogoData] = useState<string>(() => { try { return localStorage.getItem('companyLogo') ?? ''; } catch { return ''; } });
+  const [letterhead, setLetterhead] = useState<string>('');
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const letterheadInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    api.get('/settings/letterhead').then(r => { if (r.data.value) setLetterhead(r.data.value); }).catch(() => {});
     api.get('/calendar/status').then(r => setCalConnected(r.data.connected)).catch(() => setCalConnected(false));
 
     // Listen for message from Google OAuth popup
@@ -52,6 +55,26 @@ export default function SettingsPage() {
     try { localStorage.removeItem('companyLogo'); } catch {}
     try { await api.put('/settings/companyLogo', { value: null }); } catch {}
     toast.success('הלוגו הוסר');
+  };
+
+  const handleLetterheadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast.error('הבלאנק חייב להיות קטן מ-2MB'); return; }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const data = reader.result as string;
+      setLetterhead(data);
+      try { await api.put('/settings/letterhead', { value: data }); } catch {}
+      toast.success('הבלאנק נשמר!');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeLetterhead = async () => {
+    setLetterhead('');
+    try { await api.put('/settings/letterhead', { value: null }); } catch {}
+    toast.success('הבלאנק הוסר');
   };
 
   const connectGoogleCalendar = async () => {
@@ -131,6 +154,42 @@ export default function SettingsPage() {
               העלה לוגו
             </button>
           )}
+        </div>
+
+        {/* Letterhead Upload */}
+        <div className="card">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
+              <Image className="w-5 h-5 text-purple-500" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-slate-900">בלאנק (נייר מכתבים)</h2>
+              <p className="text-sm text-slate-500">הצעות מחיר וחוזים יוצגו על הבלאנק בהדפסה</p>
+            </div>
+          </div>
+          {letterhead ? (
+            <div className="space-y-3">
+              <img src={letterhead} alt="בלאנק" className="w-full rounded-xl border border-gray-100 object-contain max-h-48" />
+              <div className="flex gap-2">
+                <button onClick={() => letterheadInputRef.current?.click()} className="flex-1 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
+                  החלף בלאנק
+                </button>
+                <button onClick={removeLetterhead} className="flex items-center gap-1.5 px-4 py-2 text-sm text-red-500 hover:text-red-700 border border-red-100 rounded-xl hover:bg-red-50">
+                  <Trash2 className="w-4 h-4" /> הסר
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div
+              onClick={() => letterheadInputRef.current?.click()}
+              className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors"
+            >
+              <Image className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">לחץ להעלאת בלאנק</p>
+              <p className="text-xs text-gray-400 mt-1">PNG, JPG — עד 2MB (A4 מומלץ)</p>
+            </div>
+          )}
+          <input ref={letterheadInputRef} type="file" accept="image/*" className="hidden" onChange={handleLetterheadChange} />
         </div>
 
         {/* Google Calendar */}

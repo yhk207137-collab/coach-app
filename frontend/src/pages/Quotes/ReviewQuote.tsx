@@ -120,7 +120,7 @@ export default function ReviewQuote() {
       <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }} className="px-6 py-6 text-white">
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            {logo && <img src={logo} alt="לוגו" className="h-12 w-auto object-contain rounded-lg" />}
+            {logo && <img src={logo} alt="לוגו" className="h-20 w-auto object-contain rounded-lg" />}
             <div>
               <p className="text-purple-200 text-sm">הצעת מחיר #{String(quote.number).padStart(4, '0')}</p>
               <h1 className="text-xl font-bold">{quote.title}</h1>

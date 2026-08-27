@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, Printer } from 'lucide-react';
+import api from '../../services/api';
 import type { Quote } from './index';
 
 interface Props {
@@ -18,9 +19,11 @@ const statusLabel: Record<Quote['status'], string> = {
 export default function QuotePrint({ quote, onClose }: Props) {
   const printRef = useRef<HTMLDivElement>(null);
   const [logo, setLogo] = useState('');
+  const [letterhead, setLetterhead] = useState('');
 
   useEffect(() => {
     try { setLogo(localStorage.getItem('companyLogo') ?? ''); } catch {}
+    api.get('/settings/letterhead').then(r => { if (r.data.value) setLetterhead(r.data.value); }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -56,27 +59,34 @@ export default function QuotePrint({ quote, onClose }: Props) {
       <div className="flex-1 overflow-y-auto py-8 px-4 flex justify-center">
         <div
           ref={printRef}
-          className="bg-white shadow-xl w-full max-w-3xl rounded-2xl print:rounded-none print:shadow-none print:max-w-none"
+          className="bg-white shadow-xl w-full max-w-3xl rounded-2xl print:rounded-none print:shadow-none print:max-w-none relative overflow-hidden"
           style={{ fontFamily: "'Segoe UI', 'Arial Hebrew', Arial, sans-serif" }}
         >
+          {/* Letterhead background */}
+          {letterhead && (
+            <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
+              <img src={letterhead} alt="" className="w-full h-full object-cover opacity-100" style={{ objectPosition: 'top' }} />
+            </div>
+          )}
+          <div className="relative" style={{ zIndex: 1 }}>
           {/* Header */}
-          <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }} className="rounded-t-2xl print:rounded-none px-10 py-8 text-white">
+          <div style={{ background: letterhead ? 'transparent' : 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }} className={`rounded-t-2xl print:rounded-none px-10 py-8 ${letterhead ? 'text-gray-900' : 'text-white'}`}>
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-4">
-                {logo && <img src={logo} alt="לוגו" className="h-12 object-contain rounded-lg bg-white/10 px-2 py-1" />}
+                {logo && <img src={logo} alt="לוגו" className="h-16 object-contain rounded-lg px-2 py-1" style={{ background: letterhead ? 'transparent' : 'rgba(255,255,255,0.1)' }} />}
                 <div>
                   <div className="text-2xl font-bold tracking-wide">ליוי שיווק ופרסום</div>
-                  <div className="text-purple-200 text-sm mt-1">סוכנות שיווק ופרסום לעמותות</div>
+                  <div className={`text-sm mt-1 ${letterhead ? 'text-gray-600' : 'text-purple-200'}`}>סוכנות שיווק ופרסום לעמותות</div>
                 </div>
               </div>
               <div className="text-left">
-                <div className="text-xs text-purple-300 uppercase tracking-widest">הצעת מחיר</div>
+                <div className={`text-xs uppercase tracking-widest ${letterhead ? 'text-purple-700' : 'text-purple-300'}`}>הצעת מחיר</div>
                 <div className="text-3xl font-bold mt-1">#{String(quote.number).padStart(4, '0')}</div>
                 <div className={`mt-2 inline-block px-3 py-0.5 rounded-full text-xs font-medium ${
-                  quote.status === 'ACCEPTED' ? 'bg-green-400/20 text-green-200' :
-                  quote.status === 'REJECTED' ? 'bg-red-400/20 text-red-200' :
-                  quote.status === 'SENT' ? 'bg-blue-400/20 text-blue-200' :
-                  'bg-white/10 text-white/70'
+                  quote.status === 'ACCEPTED' ? 'bg-green-100 text-green-700' :
+                  quote.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
+                  quote.status === 'SENT' ? 'bg-blue-100 text-blue-700' :
+                  letterhead ? 'bg-gray-100 text-gray-600' : 'bg-white/10 text-white/70'
                 }`}>
                   {statusLabel[quote.status]}
                 </div>
@@ -169,6 +179,7 @@ export default function QuotePrint({ quote, onClose }: Props) {
             </div>
             <div className="text-xs text-gray-300 mt-1">הצעה זו הופקה ב-{today}</div>
           </div>
+          </div>{/* end relative wrapper */}
         </div>
       </div>
 
