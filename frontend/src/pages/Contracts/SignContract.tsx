@@ -99,7 +99,8 @@ export default function SignContract() {
       <div className="text-center p-8">
         <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
         <h1 className="text-2xl font-bold text-gray-900 mb-2">החוזה נחתם בהצלחה!</h1>
-        <p className="text-gray-500">תודה, {contract.signerName || signerName}. החוזה נשמר במערכת.</p>
+        <p className="text-gray-500 mb-1">תודה, {contract.signerName || signerName}. החוזה נשמר במערכת.</p>
+        <p className="text-sm text-green-600">✅ פרויקט חדש נפתח אוטומטית עבור ההתקשרות</p>
       </div>
     </div>
   );

@@ -48,18 +48,31 @@ router.post('/sign/:id', async (req, res) => {
   try {
     const { signatureData, signerName } = req.body;
     const ip = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '';
+
+    const existing = await prisma.contract.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'לא נמצא' });
+
     const contract = await prisma.contract.update({
       where: { id: req.params.id },
+      data: { status: 'SIGNED', signedAt: new Date(), signatureData, signerName, signerIp: ip },
+      include: { client: true },
+    });
+
+    // Auto-create a project upon signing
+    const projectName = contract.title.replace(/^חוזה התקשרות — /, '');
+    const project = await prisma.project.create({
       data: {
-        status: 'SIGNED',
-        signedAt: new Date(),
-        signatureData,
-        signerName,
-        signerIp: ip,
+        clientId: contract.clientId,
+        name: projectName,
+        status: 'ACTIVE',
+        startDate: new Date(),
+        endDate: contract.validUntil ?? null,
       },
     });
-    res.json(contract);
-  } catch {
+
+    res.json({ contract, project });
+  } catch (e) {
+    console.error(e);
     res.status(500).json({ error: 'Server error' });
   }
 });

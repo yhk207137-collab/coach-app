@@ -119,4 +119,7 @@ export interface DashboardData {
   openTasks: Task[];
   pendingPayments: Payment[];
   clientsWithoutFutureMeeting: Pick<Client, 'id' | 'fullName' | 'email'>[];
+  activeProjects: any[];
+  openQuotes: any[];
+  pendingContracts: any[];
 }

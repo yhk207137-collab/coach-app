@@ -19,6 +19,9 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
       openTasks,
       pendingPayments,
       clientsWithoutFutureMeeting,
+      activeProjects,
+      openQuotes,
+      pendingContracts,
     ] = await Promise.all([
       prisma.client.count({ where: { status: 'ACTIVE' } }),
 
@@ -60,6 +63,30 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
         select: { id: true, fullName: true, email: true },
         take: 10,
       }),
+
+      prisma.project.findMany({
+        where: { status: 'ACTIVE' },
+        include: {
+          client: { select: { id: true, fullName: true } },
+          tasks: { select: { status: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 6,
+      }),
+
+      prisma.quote.findMany({
+        where: { status: { in: ['DRAFT', 'SENT'] } },
+        include: { client: { select: { id: true, fullName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 6,
+      }),
+
+      prisma.contract.findMany({
+        where: { status: { in: ['DRAFT', 'SENT'] } },
+        include: { client: { select: { id: true, fullName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 6,
+      }),
     ]);
 
     res.json({
@@ -69,6 +96,9 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
       openTasks,
       pendingPayments,
       clientsWithoutFutureMeeting,
+      activeProjects,
+      openQuotes,
+      pendingContracts,
     });
   } catch (err) {
     console.error(err);
