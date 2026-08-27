@@ -76,6 +76,7 @@ export default function ReviewQuote() {
   };
 
   const [logo, setLogo] = useState<string | null>(null);
+  const [letterhead, setLetterhead] = useState<string | null>(null);
 
   useEffect(() => {
     api.get('/settings/public/companyLogo')
@@ -83,6 +84,9 @@ export default function ReviewQuote() {
       .catch(() => {
         try { setLogo(localStorage.getItem('companyLogo')); } catch {}
       });
+    api.get('/settings/public/letterhead')
+      .then(r => { if (r.data.value) setLetterhead(r.data.value); })
+      .catch(() => {});
   }, []);
 
   const total = quote?.items.reduce((s, i) => s + i.price * i.quantity, 0) ?? 0;
@@ -117,22 +121,32 @@ export default function ReviewQuote() {
   return (
     <div className="min-h-screen bg-gray-50" dir="rtl">
       {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }} className="px-6 py-6 text-white">
-        <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            {logo && <img src={logo} alt="לוגו" className="h-20 w-auto object-contain rounded-lg" />}
-            <div>
-              <p className="text-purple-200 text-sm">הצעת מחיר #{String(quote.number).padStart(4, '0')}</p>
-              <h1 className="text-xl font-bold">{quote.title}</h1>
-            </div>
+      <div className="relative overflow-hidden">
+        {letterhead && (
+          <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
+            <img src={letterhead} alt="" className="w-full h-full object-cover" style={{ objectPosition: 'top' }} />
           </div>
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-medium transition-colors print:hidden"
-          >
-            <Printer className="w-4 h-4" />
-            הדפס / PDF
-          </button>
+        )}
+        <div
+          style={{ background: letterhead ? 'transparent' : 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)', position: 'relative', zIndex: 1 }}
+          className={`px-6 py-6 ${letterhead ? 'text-gray-900' : 'text-white'}`}
+        >
+          <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              {logo && <img src={logo} alt="לוגו" className="h-20 w-auto object-contain rounded-lg" />}
+              <div>
+                <p className={`text-sm ${letterhead ? 'text-purple-700' : 'text-purple-200'}`}>הצעת מחיר #{String(quote.number).padStart(4, '0')}</p>
+                <h1 className="text-xl font-bold">{quote.title}</h1>
+              </div>
+            </div>
+            <button
+              onClick={() => window.print()}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors print:hidden ${letterhead ? 'bg-purple-100 hover:bg-purple-200 text-purple-800' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+            >
+              <Printer className="w-4 h-4" />
+              הדפס / PDF
+            </button>
+          </div>
         </div>
       </div>
 
