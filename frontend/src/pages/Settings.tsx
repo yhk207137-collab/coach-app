@@ -37,18 +37,20 @@ export default function SettingsPage() {
     if (!file) return;
     if (file.size > 500 * 1024) { toast.error('הלוגו חייב להיות קטן מ-500KB'); return; }
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const data = reader.result as string;
       setLogoData(data);
       try { localStorage.setItem('companyLogo', data); } catch {}
+      try { await api.put('/settings/companyLogo', { value: data }); } catch {}
       toast.success('הלוגו נשמר!');
     };
     reader.readAsDataURL(file);
   };
 
-  const removeLogo = () => {
+  const removeLogo = async () => {
     setLogoData('');
     try { localStorage.removeItem('companyLogo'); } catch {}
+    try { await api.put('/settings/companyLogo', { value: null }); } catch {}
     toast.success('הלוגו הוסר');
   };
 

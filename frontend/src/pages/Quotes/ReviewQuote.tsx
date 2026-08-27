@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, MessageSquare, Loader2, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { CheckCircle, MessageSquare, Loader2, ChevronDown, ChevronUp, AlertTriangle, Printer } from 'lucide-react';
 import axios from 'axios';
 
 interface QuoteItem {
@@ -75,7 +75,16 @@ export default function ReviewQuote() {
     }
   };
 
-  const logo = typeof window !== 'undefined' ? localStorage.getItem('companyLogo') : null;
+  const [logo, setLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get('/settings/public/companyLogo')
+      .then(r => setLogo(r.data.value))
+      .catch(() => {
+        try { setLogo(localStorage.getItem('companyLogo')); } catch {}
+      });
+  }, []);
+
   const total = quote?.items.reduce((s, i) => s + i.price * i.quantity, 0) ?? 0;
 
   if (loading) return (
@@ -109,12 +118,21 @@ export default function ReviewQuote() {
     <div className="min-h-screen bg-gray-50" dir="rtl">
       {/* Header */}
       <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }} className="px-6 py-6 text-white">
-        <div className="max-w-3xl mx-auto flex items-center gap-4">
-          {logo && <img src={logo} alt="לוגו" className="h-12 w-auto object-contain rounded-lg" />}
-          <div>
-            <p className="text-purple-200 text-sm">הצעת מחיר #{String(quote.number).padStart(4, '0')}</p>
-            <h1 className="text-xl font-bold">{quote.title}</h1>
+        <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            {logo && <img src={logo} alt="לוגו" className="h-12 w-auto object-contain rounded-lg" />}
+            <div>
+              <p className="text-purple-200 text-sm">הצעת מחיר #{String(quote.number).padStart(4, '0')}</p>
+              <h1 className="text-xl font-bold">{quote.title}</h1>
+            </div>
           </div>
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-medium transition-colors print:hidden"
+          >
+            <Printer className="w-4 h-4" />
+            הדפס / PDF
+          </button>
         </div>
       </div>
 

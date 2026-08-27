@@ -23,6 +23,7 @@ import backupRoutes from './routes/backup';
 import quoteRoutes from './routes/quotes';
 import projectRoutes from './routes/projects';
 import contractRoutes from './routes/contracts';
+import settingsRoutes from './routes/settings';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -84,6 +85,7 @@ app.use('/api/backup', backupRoutes);
 app.use('/api/quotes', quoteRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/contracts', contractRoutes);
+app.use('/api/settings', settingsRoutes);
 
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 
