@@ -12,6 +12,7 @@ const statusLabel: Record<Quote['status'], string> = {
   SENT: 'נשלח ללקוח',
   ACCEPTED: 'אושר',
   REJECTED: 'נדחה',
+  REVISION: 'בקשת תיקון',
 };
 
 export default function QuotePrint({ quote, onClose }: Props) {
