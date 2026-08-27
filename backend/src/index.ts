@@ -5,6 +5,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import rateLimit from 'express-rate-limit';
+import cron from 'node-cron';
+import { backupToSheets } from './services/sheets';
 
 import authRoutes from './routes/auth';
 import clientRoutes from './routes/clients';
@@ -127,6 +129,17 @@ async function bootstrap() {
   }
 
   app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+
+  // Daily auto-backup to Google Sheets at 03:00 AM server time
+  cron.schedule('0 3 * * *', async () => {
+    try {
+      const url = await backupToSheets();
+      console.log('[CRON] Daily backup to Google Sheets completed:', url);
+    } catch (e: any) {
+      console.error('[CRON] Daily backup failed:', e.message);
+    }
+  });
+  console.log('[STARTUP] Daily backup scheduled at 03:00 AM');
 }
 
 bootstrap();
