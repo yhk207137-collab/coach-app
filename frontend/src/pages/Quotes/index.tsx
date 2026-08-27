@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, FileText, Printer, Trash2, Edit2, CheckCircle, Clock, XCircle, Send, Copy, X, Link } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, FileText, Printer, Trash2, Edit2, CheckCircle, Clock, XCircle, Send, Copy, X, Link, RefreshCw } from 'lucide-react';
 import api from '../../services/api';
 import QuoteModal from './QuoteModal';
 import QuotePrint from './QuotePrint';
@@ -53,20 +53,34 @@ const statusColor: Record<Quote['status'], string> = {
 export default function QuotesPage() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editQuote, setEditQuote] = useState<Quote | null>(null);
   const [printQuote, setPrintQuote] = useState<Quote | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const load = async () => {
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await api.get('/quotes');
       setQuotes(res.data);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await load(true);
+    setRefreshing(false);
+    toast.success('רשימה עודכנה');
+  };
+
+  useEffect(() => {
+    load();
+    intervalRef.current = setInterval(() => load(true), 30000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, []);
 
   const handleDelete = async (id: string) => {
     if (!confirm('למחוק הצעת מחיר זו?')) return;
@@ -108,13 +122,24 @@ const reviewLink = (id: string) => `${window.location.origin}/review-quote/${id}
           <h1 className="text-2xl font-bold text-gray-900">הצעות מחיר</h1>
           <p className="text-sm text-gray-500 mt-0.5">{quotes.length} הצעות</p>
         </div>
-        <button
+        <div className="flex gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+            title="רענן רשימה"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            רענן
+          </button>
+          <button
           onClick={() => { setEditQuote(null); setShowModal(true); }}
           className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-medium"
         >
           <Plus className="w-4 h-4" />
           הצעת מחיר חדשה
         </button>
+        </div>
       </div>
 
       {loading ? (
