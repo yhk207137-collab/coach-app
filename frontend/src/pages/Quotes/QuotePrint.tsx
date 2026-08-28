@@ -62,21 +62,20 @@ export default function QuotePrint({ quote, onClose }: Props) {
           className="bg-white shadow-xl w-full max-w-3xl rounded-2xl print:rounded-none print:shadow-none print:max-w-none relative overflow-hidden"
           style={{ fontFamily: "'Segoe UI', 'Arial Hebrew', Arial, sans-serif" }}
         >
-          {/* Letterhead background */}
-          {letterhead && (
-            <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-              <img src={letterhead} alt="" className="w-full h-full object-cover opacity-100" style={{ objectPosition: 'top' }} />
-            </div>
-          )}
-          <div className="relative" style={{ zIndex: 1 }}>
-          {/* Header */}
-          <div style={{ background: letterhead ? 'transparent' : 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }} className={`rounded-t-2xl print:rounded-none px-10 py-8 ${letterhead ? 'text-gray-900' : 'text-white'}`}>
-            <div className="flex justify-between items-start">
+          {/* Header — letterhead as background image of header only */}
+          <div
+            className="rounded-t-2xl print:rounded-none px-10 py-8 relative overflow-hidden"
+            style={letterhead ? {} : { background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }}
+          >
+            {letterhead && (
+              <img src={letterhead} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ zIndex: 0 }} />
+            )}
+            <div className={`relative flex justify-between items-start ${letterhead ? 'text-gray-900' : 'text-white'}`} style={{ zIndex: 1 }}>
               <div className="flex items-center gap-4">
-                {logo && <img src={logo} alt="לוגו" className="h-16 object-contain rounded-lg px-2 py-1" style={{ background: letterhead ? 'transparent' : 'rgba(255,255,255,0.1)' }} />}
+                {logo && <img src={logo} alt="לוגו" className="h-16 object-contain rounded-lg px-2 py-1" style={{ background: letterhead ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.1)' }} />}
                 <div>
-                  <div className="text-2xl font-bold tracking-wide">ליוי שיווק ופרסום</div>
-                  <div className={`text-sm mt-1 ${letterhead ? 'text-gray-600' : 'text-purple-200'}`}>סוכנות שיווק ופרסום לעמותות</div>
+                  <div className="text-2xl font-bold tracking-wide" style={{ textShadow: letterhead ? '0 1px 3px rgba(255,255,255,0.8)' : 'none' }}>ליוי שיווק ופרסום</div>
+                  <div className={`text-sm mt-1 ${letterhead ? 'text-gray-700' : 'text-purple-200'}`} style={{ textShadow: letterhead ? '0 1px 2px rgba(255,255,255,0.7)' : 'none' }}>סוכנות שיווק ופרסום לעמותות</div>
                 </div>
               </div>
               <div className="text-left">
@@ -86,13 +85,14 @@ export default function QuotePrint({ quote, onClose }: Props) {
                   quote.status === 'ACCEPTED' ? 'bg-green-100 text-green-700' :
                   quote.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
                   quote.status === 'SENT' ? 'bg-blue-100 text-blue-700' :
-                  letterhead ? 'bg-gray-100 text-gray-600' : 'bg-white/10 text-white/70'
+                  letterhead ? 'bg-white/70 text-gray-700' : 'bg-white/10 text-white/70'
                 }`}>
                   {statusLabel[quote.status]}
                 </div>
               </div>
             </div>
           </div>
+          <div>
 
           {/* Meta strip */}
           <div className="px-10 py-5 border-b border-gray-100 grid grid-cols-3 gap-6 text-sm">
@@ -179,7 +179,7 @@ export default function QuotePrint({ quote, onClose }: Props) {
             </div>
             <div className="text-xs text-gray-300 mt-1">הצעה זו הופקה ב-{today}</div>
           </div>
-          </div>{/* end relative wrapper */}
+          </div>{/* end content wrapper */}
         </div>
       </div>
 
