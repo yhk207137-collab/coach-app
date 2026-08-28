@@ -1,13 +1,12 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { requireAuth, requireCoach, AuthRequest } from '../middleware/auth';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const uploadDir = process.env.UPLOAD_DIR || './uploads';
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });

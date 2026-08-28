@@ -100,7 +100,7 @@ app.get('*', (_req, res) => {
 async function bootstrap() {
   try {
     console.log('[STARTUP] Running prisma db push...');
-    execSync('npx prisma db push --skip-generate --accept-data-loss', { stdio: 'inherit' });
+    execSync('npx prisma db push --skip-generate', { stdio: 'inherit' });
     console.log('[STARTUP] DB schema synced');
   } catch (e) {
     console.error('[STARTUP] prisma db push failed:', e);

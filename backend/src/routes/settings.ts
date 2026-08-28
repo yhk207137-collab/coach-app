@@ -1,9 +1,8 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { requireAuth, requireCoach } from '../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Public: get a single setting by key (e.g. logo for client-facing pages)
 router.get('/public/:key', async (req, res) => {

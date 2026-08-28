@@ -1,7 +1,6 @@
 import { google } from 'googleapis';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
-const prisma = new PrismaClient();
 const TOKENS_KEY = 'google_calendar_tokens';
 
 function createOAuth2Client() {

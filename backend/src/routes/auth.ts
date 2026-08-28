@@ -3,11 +3,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 function makeJwt(user: { id: string; email: string; role: string; clientId?: string | null }) {
   return jwt.sign(
@@ -103,10 +102,7 @@ router.post('/magic', async (req, res) => {
         console.error('[AUTH] SMTP error:', emailErr?.message || emailErr);
       }
     }
-    console.log(`[AUTH] OTP for ${email}: ${otp}`);
-
-    // Return OTP to frontend so user can enter it directly (no email needed)
-    res.json({ ok: true, otp });
+    res.json({ ok: true });
   } catch {
     res.status(500).json({ error: 'Server error' });
   }
