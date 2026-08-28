@@ -62,36 +62,44 @@ export default function QuotePrint({ quote, onClose }: Props) {
           className="bg-white shadow-xl w-full max-w-3xl rounded-2xl print:rounded-none print:shadow-none print:max-w-none relative overflow-hidden"
           style={{ fontFamily: "'Segoe UI', 'Arial Hebrew', Arial, sans-serif" }}
         >
-          {/* Header — letterhead as background image of header only */}
-          <div
-            className="rounded-t-2xl print:rounded-none px-10 py-8 relative overflow-hidden"
-            style={letterhead ? {} : { background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }}
-          >
-            {letterhead && (
-              <img src={letterhead} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ zIndex: 0 }} />
-            )}
-            <div className={`relative flex justify-between items-start ${letterhead ? 'text-gray-900' : 'text-white'}`} style={{ zIndex: 1 }}>
-              <div className="flex items-center gap-4">
-                {logo && <img src={logo} alt="לוגו" className="h-16 object-contain rounded-lg px-2 py-1" style={{ background: letterhead ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.1)' }} />}
-                <div>
-                  <div className="text-2xl font-bold tracking-wide" style={{ textShadow: letterhead ? '0 1px 3px rgba(255,255,255,0.8)' : 'none' }}>ליוי שיווק ופרסום</div>
-                  <div className={`text-sm mt-1 ${letterhead ? 'text-gray-700' : 'text-purple-200'}`} style={{ textShadow: letterhead ? '0 1px 2px rgba(255,255,255,0.7)' : 'none' }}>סוכנות שיווק ופרסום לעמותות</div>
-                </div>
-              </div>
-              <div className="text-left">
-                <div className={`text-xs uppercase tracking-widest ${letterhead ? 'text-purple-700' : 'text-purple-300'}`}>הצעת מחיר</div>
-                <div className="text-3xl font-bold mt-1">#{String(quote.number).padStart(4, '0')}</div>
-                <div className={`mt-2 inline-block px-3 py-0.5 rounded-full text-xs font-medium ${
+          {/* Letterhead — shown in full at top, OR gradient header if no letterhead */}
+          {letterhead ? (
+            <>
+              <img src={letterhead} alt="בלאנק" className="w-full block rounded-t-2xl print:rounded-none" style={{ display: 'block' }} />
+              {/* Quote number + status badge below letterhead */}
+              <div className="flex items-center justify-between px-10 py-4 border-b border-gray-100">
+                <div className="text-sm text-gray-500 font-medium">הצעת מחיר #{String(quote.number).padStart(4, '0')}</div>
+                <div className={`inline-block px-3 py-0.5 rounded-full text-xs font-medium ${
                   quote.status === 'ACCEPTED' ? 'bg-green-100 text-green-700' :
                   quote.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
                   quote.status === 'SENT' ? 'bg-blue-100 text-blue-700' :
-                  letterhead ? 'bg-white/70 text-gray-700' : 'bg-white/10 text-white/70'
-                }`}>
-                  {statusLabel[quote.status]}
+                  'bg-gray-100 text-gray-600'
+                }`}>{statusLabel[quote.status]}</div>
+              </div>
+            </>
+          ) : (
+            <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }} className="rounded-t-2xl print:rounded-none px-10 py-8 text-white">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-4">
+                  {logo && <img src={logo} alt="לוגו" className="h-16 object-contain rounded-lg px-2 py-1" style={{ background: 'rgba(255,255,255,0.1)' }} />}
+                  <div>
+                    <div className="text-2xl font-bold tracking-wide">ליוי שיווק ופרסום</div>
+                    <div className="text-sm mt-1 text-purple-200">סוכנות שיווק ופרסום לעמותות</div>
+                  </div>
+                </div>
+                <div className="text-left">
+                  <div className="text-xs uppercase tracking-widest text-purple-300">הצעת מחיר</div>
+                  <div className="text-3xl font-bold mt-1">#{String(quote.number).padStart(4, '0')}</div>
+                  <div className={`mt-2 inline-block px-3 py-0.5 rounded-full text-xs font-medium ${
+                    quote.status === 'ACCEPTED' ? 'bg-green-100 text-green-700' :
+                    quote.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
+                    quote.status === 'SENT' ? 'bg-blue-100 text-blue-700' :
+                    'bg-white/10 text-white/70'
+                  }`}>{statusLabel[quote.status]}</div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
           <div>
 
           {/* Meta strip */}
