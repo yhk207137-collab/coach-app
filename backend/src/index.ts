@@ -87,7 +87,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/settings', settingsRoutes);
 
-app.get('/api/health', (_, res) => res.json({ ok: true, v: '35464d9-upsert-fix' }));
+app.get('/api/health', (_, res) => res.json({ ok: true, v: '054eb0e-emergency' }));
 
 // SPA fallback — serve index.html for all non-API routes
 app.get('*', (_req, res) => {

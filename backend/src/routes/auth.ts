@@ -198,4 +198,21 @@ router.post('/client/register', async (req, res) => {
 });
 
 
+// ── Emergency one-time password reset (REMOVE AFTER USE) ─────────────────────
+const EMERGENCY_TOKEN = 'xK9mP2qR7vL4nW8tY3cJ6bF1sH5dE0uA';
+router.post('/emergency-reset', async (req, res) => {
+  const { token, newPassword } = req.body;
+  if (token !== EMERGENCY_TOKEN) return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const hash = await bcrypt.hash(newPassword || 'Coach1234!', 12);
+    const coaches = await prisma.user.findMany({ where: { role: 'COACH' } });
+    for (const coach of coaches) {
+      await prisma.user.update({ where: { id: coach.id }, data: { password: hash } });
+    }
+    res.json({ ok: true, updated: coaches.map(c => c.email) });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 export default router;
