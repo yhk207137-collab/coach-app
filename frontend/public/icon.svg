@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6d28d9"/>
+      <stop offset="100%" style="stop-color:#ec4899"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Briefcase icon (centered, white) -->
+  <g transform="translate(128, 120)" fill="none" stroke="white" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Case body -->
+    <rect x="8" y="72" width="240" height="168" rx="24" fill="rgba(255,255,255,0.15)" stroke="white"/>
+    <!-- Handle -->
+    <path d="M88 72V56a32 32 0 0 1 32-32h16a32 32 0 0 1 32 32v16"/>
+    <!-- Center divider -->
+    <line x1="8" y1="156" x2="248" y2="156"/>
+    <!-- Clasp -->
+    <rect x="108" y="144" width="40" height="24" rx="8" fill="white" stroke="white"/>
+  </g>
+</svg>
