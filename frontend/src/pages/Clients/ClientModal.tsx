@@ -11,7 +11,7 @@ interface Props {
 }
 
 export default function ClientModal({ client, onClose, onSaved }: Props) {
-  const { register, handleSubmit, formState: { isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, formState: { isSubmitting } } = useForm({
     defaultValues: {
       fullName: client?.fullName ?? '',
       email: client?.email ?? '',
@@ -20,9 +20,13 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
       businessField: client?.businessField ?? '',
       startDate: client?.startDate ? client.startDate.split('T')[0] : new Date().toISOString().split('T')[0],
       status: client?.status ?? 'ACTIVE',
+      clientType: (client as any)?.clientType ?? 'SESSION',
+      monthlyFee: (client as any)?.monthlyFee ?? '',
       notes: client?.notes ?? '',
     },
   });
+
+  const clientType = watch('clientType');
 
   const onSubmit = async (data: any) => {
     try {
@@ -81,6 +85,20 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
                 <option value="ENDED">הסתיים</option>
               </select>
             </div>
+            <div>
+              <label className="label">סוג לקוח</label>
+              <select {...register('clientType')} className="input">
+                <option value="SESSION">לפי פגישות</option>
+                <option value="RETAINER">ריטיינר / חודשי</option>
+                <option value="PROJECT">פרויקט חד-פעמי</option>
+              </select>
+            </div>
+            {clientType !== 'SESSION' && (
+              <div>
+                <label className="label">{clientType === 'RETAINER' ? 'תשלום חודשי (₪)' : 'תקציב פרויקט (₪)'}</label>
+                <input {...register('monthlyFee')} type="number" className="input" placeholder="0" />
+              </div>
+            )}
             <div className="col-span-2">
               <label className="label">הערות</label>
               <textarea {...register('notes')} className="input min-h-[80px] resize-none" placeholder="הערות נוספות..." />

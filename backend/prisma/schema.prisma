@@ -19,6 +19,28 @@ enum ClientStatus {
   ENDED
 }
 
+enum ClientType {
+  SESSION
+  RETAINER
+  PROJECT
+}
+
+enum LeadStage {
+  COLD
+  WARM
+  HOT
+  PROPOSAL
+  WON
+  LOST
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+}
+
 enum SummaryType {
   STRUCTURED
   FREE
@@ -51,6 +73,8 @@ model Client {
   businessField String?
   startDate     DateTime     @default(now())
   status        ClientStatus @default(ACTIVE)
+  clientType    ClientType   @default(SESSION)
+  monthlyFee    Float?
   notes         String?
   user          User?
   meetings      Meeting[]
@@ -60,6 +84,7 @@ model Client {
   quotes        Quote[]
   projects      Project[]
   contracts     Contract[]
+  invoices      Invoice[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -264,4 +289,65 @@ model QuoteItem {
   price       Float
   quantity    Int     @default(1)
   order       Int     @default(0)
+}
+
+model Lead {
+  id             String         @id @default(cuid())
+  fullName       String
+  email          String?
+  phone          String?
+  company        String?
+  source         String?
+  stage          LeadStage      @default(COLD)
+  notes          String?
+  estimatedValue Float?
+  activities     LeadActivity[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model LeadActivity {
+  id        String    @id @default(cuid())
+  leadId    String
+  lead      Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type      String
+  notes     String
+  dueDate   DateTime?
+  done      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+}
+
+model Invoice {
+  id        String        @id @default(cuid())
+  clientId  String
+  client    Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  number    Int           @default(autoincrement())
+  status    InvoiceStatus @default(DRAFT)
+  issueDate DateTime      @default(now())
+  dueDate   DateTime?
+  notes     String?
+  items     InvoiceItem[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int     @default(1)
+  price       Float
+  order       Int     @default(0)
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  unit        String   @default("חד-פעמי")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

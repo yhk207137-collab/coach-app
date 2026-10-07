@@ -20,6 +20,8 @@ import ProjectsPage from './pages/Projects';
 import ContractsPage from './pages/Contracts';
 import SignContract from './pages/Contracts/SignContract';
 import ReviewQuote from './pages/Quotes/ReviewQuote';
+import LeadsPage from './pages/Leads';
+import ServicesPage from './pages/Services';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore();
@@ -61,6 +63,8 @@ export default function App() {
           <Route path="/quotes" element={<QuotesPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/contracts" element={<ContractsPage />} />
+          <Route path="/leads" element={<LeadsPage />} />
+          <Route path="/services" element={<ServicesPage />} />
         </Route>
 
         <Route path="/sign-contract/:id" element={<SignContract />} />

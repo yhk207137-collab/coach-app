@@ -1,19 +1,21 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare,
-  CreditCard, FolderOpen, Sparkles, LogOut, Briefcase, CalendarDays, BarChart2, X, Settings, FileText, FolderKanban, FileSignature,
+  CreditCard, FolderOpen, Sparkles, LogOut, Briefcase, CalendarDays, BarChart2, X, Settings, FileText, FolderKanban, FileSignature, Target, Package,
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import clsx from 'clsx';
 
 const nav = [
   { to: '/', icon: LayoutDashboard, label: 'לוח בקרה', exact: true },
+  { to: '/leads', icon: Target, label: 'לידים – CRM' },
   { to: '/clients', icon: Users, label: 'לקוחות' },
   { to: '/calendar', icon: CalendarDays, label: 'יומן' },
   { to: '/meetings', icon: Calendar, label: 'פגישות' },
   { to: '/tasks', icon: CheckSquare, label: 'משימות' },
   { to: '/payments', icon: CreditCard, label: 'תשלומים' },
   { to: '/accounting', icon: BarChart2, label: 'הנהלת חשבונות' },
+  { to: '/services', icon: Package, label: 'קטלוג שירותים' },
   { to: '/quotes', icon: FileText, label: 'הצעות מחיר' },
   { to: '/projects', icon: FolderKanban, label: 'פרויקטים' },
   { to: '/contracts', icon: FileSignature, label: 'חוזים' },

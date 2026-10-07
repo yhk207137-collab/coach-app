@@ -52,10 +52,10 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
 
 router.post('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   try {
-    const { fullName, phone, email, businessName, businessField, startDate, status, notes } = req.body;
+    const { fullName, phone, email, businessName, businessField, startDate, status, notes, clientType, monthlyFee } = req.body;
 
     const client = await prisma.client.create({
-      data: { fullName, phone, email, businessName, businessField, startDate: startDate ? new Date(startDate) : undefined, status, notes },
+      data: { fullName, phone, email, businessName, businessField, startDate: startDate ? new Date(startDate) : undefined, status, notes, clientType, monthlyFee: monthlyFee ? parseFloat(monthlyFee) : undefined },
     });
 
     try { await sendClientWelcomeEmail(email, fullName); } catch (e) { console.error('Email failed:', e); }

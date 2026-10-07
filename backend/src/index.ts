@@ -24,6 +24,9 @@ import quoteRoutes from './routes/quotes';
 import projectRoutes from './routes/projects';
 import contractRoutes from './routes/contracts';
 import settingsRoutes from './routes/settings';
+import leadRoutes from './routes/leads';
+import invoiceRoutes from './routes/invoices';
+import serviceRoutes from './routes/services';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -86,6 +89,9 @@ app.use('/api/quotes', quoteRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/leads', leadRoutes);
+app.use('/api/invoices', invoiceRoutes);
+app.use('/api/services', serviceRoutes);
 
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 
