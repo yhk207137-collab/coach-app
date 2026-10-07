@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Eye, EyeOff, Loader2, Lock, CheckCircle, Calendar, Image, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Lock, CheckCircle, Calendar, Image, Trash2, ExternalLink, Receipt } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../store/auth';
@@ -190,6 +190,31 @@ export default function SettingsPage() {
             </div>
           )}
           <input ref={letterheadInputRef} type="file" accept="image/*" className="hidden" onChange={handleLetterheadChange} />
+        </div>
+
+        {/* IsraCard Business Integration */}
+        <div className="card">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden bg-red-600">
+              <Receipt className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-slate-900">ישרכארט עסקים — חשבוניות וקבלות</h2>
+              <p className="text-sm text-slate-500">הנפקת חשבוניות וקבלות מנוהלת דרך ישרכארט עסקים</p>
+            </div>
+          </div>
+          <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-sm text-amber-800 mb-4">
+            המערכת מחוברת לישרכארט עסקים להנפקת חשבוניות וקבלות. לחץ על הכפתור למטה כדי לפתוח את האפליקציה ולהנפיק מסמכים.
+          </div>
+          <a
+            href="https://www.isracard.co.il/business"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-primary w-full justify-center py-2.5 flex items-center gap-2 no-underline"
+          >
+            <ExternalLink className="w-4 h-4" />
+            פתח ישרכארט עסקים
+          </a>
         </div>
 
         {/* Google Calendar */}
