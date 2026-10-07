@@ -87,7 +87,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/settings', settingsRoutes);
 
-app.get('/api/health', (_, res) => res.json({ ok: true }));
+app.get('/api/health', (_, res) => res.json({ ok: true, v: '21249ee-pwd-reset' }));
 
 // SPA fallback — serve index.html for all non-API routes
 app.get('*', (_req, res) => {
