@@ -112,6 +112,7 @@ async function bootstrap() {
     const prisma = new PrismaClient();
     const email = process.env.COACH_EMAIL;
     const password = process.env.COACH_PASSWORD;
+    const coachCount = await prisma.user.count({ where: { role: 'COACH' } });
     if (email && password) {
       const existing = await prisma.user.findUnique({ where: { email } });
       if (!existing) {
@@ -122,8 +123,18 @@ async function bootstrap() {
       } else {
         console.log('[STARTUP] Coach user already exists');
       }
+    } else if (coachCount === 0) {
+      // No env vars set and no coach users — create default admin so the system is accessible
+      const defaultEmail = 'yhk207137@gmail.com';
+      const defaultPass = process.env.INIT_PASS || 'Coach1234!';
+      const existing = await prisma.user.findUnique({ where: { email: defaultEmail } });
+      if (!existing) {
+        const hash = await bcrypt.hash(defaultPass, 12);
+        await prisma.user.create({ data: { email: defaultEmail, password: hash, name: 'ליוי', role: 'COACH' } });
+        console.log('[STARTUP] Default coach user created:', defaultEmail);
+      }
     } else {
-      console.log('[STARTUP] COACH_EMAIL/COACH_PASSWORD not set, skipping seed');
+      console.log('[STARTUP] COACH_EMAIL/COACH_PASSWORD not set, coach exists — skipping seed');
     }
     await prisma.$disconnect();
   } catch (e) {
