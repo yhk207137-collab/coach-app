@@ -87,7 +87,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/settings', settingsRoutes);
 
-app.get('/api/health', (_, res) => res.json({ ok: true, v: '054eb0e-emergency' }));
+app.get('/api/health', (_, res) => res.json({ ok: true }));
 
 // SPA fallback — serve index.html for all non-API routes
 app.get('*', (_req, res) => {
@@ -114,14 +114,15 @@ async function bootstrap() {
     const password = process.env.COACH_PASSWORD;
     const coachCount = await prisma.user.count({ where: { role: 'COACH' } });
     if (email && password) {
+      const hash = await bcrypt.hash(password, 12);
       const existing = await prisma.user.findUnique({ where: { email } });
       if (!existing) {
         const name = process.env.COACH_NAME || 'המאמן';
-        const hash = await bcrypt.hash(password, 12);
         await prisma.user.create({ data: { email, password: hash, name, role: 'COACH' } });
         console.log('[STARTUP] Coach user created:', email);
       } else {
-        console.log('[STARTUP] Coach user already exists');
+        await prisma.user.update({ where: { email }, data: { password: hash } });
+        console.log('[STARTUP] Coach user password updated:', email);
       }
     } else {
       // No COACH_EMAIL/COACH_PASSWORD env vars — ensure yhk207137@gmail.com exists with correct password
