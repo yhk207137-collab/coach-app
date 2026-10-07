@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Eye, EyeOff, Loader2, Lock, CheckCircle, Calendar, Image, Trash2, ExternalLink, Receipt } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Lock, CheckCircle, Calendar, Image, Trash2, ExternalLink, Receipt, Download } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../store/auth';
@@ -15,6 +15,8 @@ export default function SettingsPage() {
   const [done, setDone] = useState(false);
   const [calConnected, setCalConnected] = useState<boolean | null>(null);
   const [calLoading, setCalLoading] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   const [logoData, setLogoData] = useState<string>(() => { try { return localStorage.getItem('companyLogo') ?? ''; } catch { return ''; } });
   const [letterhead, setLetterhead] = useState<string>('');
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -75,6 +77,37 @@ export default function SettingsPage() {
     setLetterhead('');
     try { await api.put('/settings/letterhead', { value: null }); } catch {}
     toast.success('הבלאנק הוסר');
+  };
+
+  const handleBackupToSheets = async () => {
+    setBackupLoading(true);
+    try {
+      const { data } = await api.post('/backup/sheets');
+      toast.success('גיבוי הצליח!');
+      window.open(data.url, '_blank');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'הגיבוי נכשל — ודא שיומן גוגל מחובר');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleExportJSON = async () => {
+    setExportLoading(true);
+    try {
+      const res = await api.get('/backup/export', { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('הקובץ הורד בהצלחה');
+    } catch {
+      toast.error('שגיאה בהורדת הגיבוי');
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   const connectGoogleCalendar = async () => {
@@ -215,6 +248,35 @@ export default function SettingsPage() {
             <ExternalLink className="w-4 h-4" />
             פתח ישרכארט עסקים
           </a>
+        </div>
+
+        {/* Backup */}
+        <div className="card">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+              <Download className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-slate-900">גיבוי נתונים</h2>
+              <p className="text-sm text-slate-500">שמור עותק של כל הנתונים שלך</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <button
+              onClick={handleExportJSON}
+              disabled={exportLoading}
+              className="btn-primary w-full justify-center py-2.5"
+            >
+              {exportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Download className="w-4 h-4" /> הורד גיבוי JSON</>}
+            </button>
+            <button
+              onClick={handleBackupToSheets}
+              disabled={backupLoading}
+              className="btn-secondary w-full justify-center py-2.5"
+            >
+              {backupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>גיבוי ל-Google Sheets (דורש חיבור יומן)</>}
+            </button>
+          </div>
         </div>
 
         {/* Google Calendar */}

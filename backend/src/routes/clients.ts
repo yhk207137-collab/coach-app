@@ -39,6 +39,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
         tasks: { orderBy: { createdAt: 'desc' } },
         payments: { include: { history: { orderBy: { date: 'desc' } } } },
         documents: { orderBy: { createdAt: 'desc' } },
+        projects: { include: { subProjects: true, tasks: true }, orderBy: { createdAt: 'desc' } },
         user: { select: { email: true } },
       },
     });

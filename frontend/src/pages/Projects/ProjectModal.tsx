@@ -9,11 +9,12 @@ interface Props {
   project: Project | null;
   onClose: () => void;
   onSave: (p: Project) => void;
+  preselectedClientId?: string;
 }
 
-export default function ProjectModal({ project, onClose, onSave }: Props) {
+export default function ProjectModal({ project, onClose, onSave, preselectedClientId }: Props) {
   const [clients, setClients] = useState<Client[]>([]);
-  const [clientId, setClientId] = useState(project?.client.id ?? '');
+  const [clientId, setClientId] = useState(project?.client.id ?? preselectedClientId ?? '');
   const [name, setName] = useState(project?.name ?? '');
   const [description, setDescription] = useState(project?.description ?? '');
   const [status, setStatus] = useState<ProjectStatusType>(project?.status ?? 'PLANNING');

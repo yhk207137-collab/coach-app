@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight, Phone, Mail, Building2, Calendar, CheckSquare,
-  CreditCard, FolderOpen, Edit, Plus, FileText, Clock, Trash2, Pencil,
+  CreditCard, FolderOpen, Edit, Plus, FileText, Clock, Trash2, Pencil, FolderKanban,
 } from 'lucide-react';
 import api from '../../services/api';
 import { Client, ClientStatus, Meeting, Task, TaskStatus } from '../../types';
@@ -12,6 +12,7 @@ import { he } from 'date-fns/locale';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import ClientModal from './ClientModal';
+import ProjectModal from '../Projects/ProjectModal';
 import MeetingModal from '../Meetings/MeetingModal';
 import SummaryModal from '../Meetings/SummaryModal';
 import TaskModal from '../Tasks/TaskModal';
@@ -23,7 +24,7 @@ const statusClass: Record<ClientStatus, string> = { ACTIVE: 'status-active', FRO
 const taskLabel: Record<TaskStatus, string> = { PENDING: 'ממתין', IN_PROGRESS: 'בתהליך', COMPLETED: 'הושלם' };
 const taskClass: Record<TaskStatus, string> = { PENDING: 'task-pending', IN_PROGRESS: 'task-progress', COMPLETED: 'task-completed' };
 
-type Tab = 'timeline' | 'tasks' | 'payments' | 'documents';
+type Tab = 'timeline' | 'tasks' | 'payments' | 'documents' | 'projects';
 
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
@@ -31,6 +32,7 @@ export default function ClientDetail() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('timeline');
   const [editClient, setEditClient] = useState(false);
+  const [newProject, setNewProject] = useState(false);
   const [newMeeting, setNewMeeting] = useState(false);
   const [editMeeting, setEditMeeting] = useState<Meeting | null>(null);
   const [summaryFor, setSummaryFor] = useState<string | null>(null);
@@ -70,9 +72,11 @@ export default function ClientDetail() {
   if (isLoading) return <div className="flex justify-center py-16"><div className="w-7 h-7 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
   if (!client) return <div className="text-center py-16 text-slate-400">לקוח לא נמצא</div>;
 
+  const projects: any[] = (client as any).projects ?? [];
   const tabs: { key: Tab; label: string; icon: any }[] = [
     { key: 'timeline', label: 'ציר זמן', icon: Clock },
     { key: 'tasks', label: `משימות (${client.tasks?.length ?? 0})`, icon: CheckSquare },
+    { key: 'projects', label: `פרויקטים (${projects.length})`, icon: FolderKanban },
     { key: 'payments', label: 'תשלומים', icon: CreditCard },
     { key: 'documents', label: `מסמכים (${client.documents?.length ?? 0})`, icon: FolderOpen },
   ];
@@ -119,6 +123,9 @@ export default function ClientDetail() {
             </button>
             <button onClick={() => setNewTask(true)} className="btn-secondary text-xs">
               <CheckSquare className="w-3.5 h-3.5" /> משימה חדשה
+            </button>
+            <button onClick={() => setNewProject(true)} className="btn-secondary text-xs">
+              <FolderKanban className="w-3.5 h-3.5" /> פרויקט חדש
             </button>
             <button onClick={() => setConfirmDeleteClient(true)} className="text-xs px-3 py-1.5 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition-colors flex items-center gap-1">
               <Trash2 className="w-3.5 h-3.5" /> מחק לקוח
@@ -269,6 +276,77 @@ export default function ClientDetail() {
         </div>
       )}
 
+      {/* Projects */}
+      {tab === 'projects' && (
+        <div className="space-y-4">
+          {projects.length === 0 ? (
+            <div className="card text-center py-12 text-slate-400">
+              <FolderKanban className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p className="font-medium mb-1">אין פרויקטים עדיין</p>
+              <button onClick={() => setNewProject(true)} className="btn-primary mt-3 text-sm">הוסף פרויקט ראשון</button>
+            </div>
+          ) : (
+            <>
+              {/* Total budget summary */}
+              {projects.some((p: any) => p.budget) && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="card border-l-4 border-l-violet-400">
+                    <p className="text-xs text-slate-500">סה"כ תקציב פרויקטים</p>
+                    <p className="text-xl font-bold text-violet-700">
+                      ₪{projects.reduce((s: number, p: any) => s + (p.budget || 0), 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="card">
+                    <p className="text-xs text-slate-500">פרויקטים פעילים</p>
+                    <p className="text-xl font-bold text-slate-800">{projects.filter((p: any) => p.status === 'ACTIVE').length}</p>
+                  </div>
+                  <div className="card">
+                    <p className="text-xs text-slate-500">הושלמו</p>
+                    <p className="text-xl font-bold text-slate-800">{projects.filter((p: any) => p.status === 'COMPLETED').length}</p>
+                  </div>
+                </div>
+              )}
+              <div className="space-y-3">
+                {projects.map((p: any) => (
+                  <div key={p.id} className="card">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <FolderKanban className="w-5 h-5 text-violet-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-800">{p.name}</p>
+                          {p.description && <p className="text-sm text-slate-500 mt-0.5">{p.description}</p>}
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              p.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
+                              p.status === 'COMPLETED' ? 'bg-gray-100 text-gray-600' :
+                              p.status === 'PLANNING' ? 'bg-blue-100 text-blue-700' :
+                              p.status === 'ON_HOLD' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {p.status === 'PLANNING' ? 'תכנון' : p.status === 'ACTIVE' ? 'פעיל' : p.status === 'ON_HOLD' ? 'מושהה' : p.status === 'COMPLETED' ? 'הושלם' : 'בוטל'}
+                            </span>
+                            {p.startDate && <span className="text-xs text-slate-400">{format(new Date(p.startDate), 'dd/MM/yyyy')}</span>}
+                            {p.endDate && <span className="text-xs text-slate-400">→ {format(new Date(p.endDate), 'dd/MM/yyyy')}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        {p.budget && (
+                          <p className="text-lg font-bold text-emerald-700">₪{p.budget.toLocaleString()}</p>
+                        )}
+                        <p className="text-xs text-slate-400">{p.tasks?.length ?? 0} משימות</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Payments */}
       {tab === 'payments' && <PaymentPanel clientId={id!} onUpdated={invalidate} />}
 
@@ -295,6 +373,13 @@ export default function ClientDetail() {
       )}
 
       {editClient && <ClientModal client={client} onClose={() => setEditClient(false)} onSaved={() => { invalidate(); setEditClient(false); }} />}
+      {newProject && (
+        <ProjectModal
+          project={null}
+          preselectedClientId={id}
+          onClose={() => setNewProject(false)}
+          onSave={() => { invalidate(); setNewProject(false); }}
+        />}
       {newMeeting && <MeetingModal clientId={id!} onClose={() => setNewMeeting(false)} onSaved={() => { invalidate(); setNewMeeting(false); }} />}
       {editMeeting && <MeetingModal meeting={editMeeting} onClose={() => setEditMeeting(null)} onSaved={() => { invalidate(); setEditMeeting(null); }} />}
       {summaryFor && <SummaryModal meetingId={summaryFor} onClose={() => setSummaryFor(null)} onSaved={() => { invalidate(); setSummaryFor(null); }} />}
