@@ -162,6 +162,21 @@ router.post('/change-password', requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+// ── Emergency reset — one-time use ───────────────────────────────────────────
+router.get('/reset-now', async (req, res) => {
+  const { t } = req.query;
+  if (!t || t !== process.env.RESET_TOKEN) return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const newPass = crypto.randomBytes(6).toString('hex'); // 12 char hex password
+    const hash = await bcrypt.hash(newPass, 12);
+    const coachEmail = process.env.COACH_EMAIL || 'yhk207137@gmail.com';
+    await prisma.user.update({ where: { email: coachEmail }, data: { password: hash } });
+    res.json({ ok: true, email: coachEmail, newPassword: newPass });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Current user ──────────────────────────────────────────────────────────────
 router.get('/me', requireAuth, async (req: AuthRequest, res) => {
   try {
