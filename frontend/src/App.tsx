@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/auth';
+import api from './services/api';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -36,8 +38,30 @@ function RequireCoach({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+const RENEW_EVERY_MS = 12 * 60 * 60 * 1000;
+
+// Sliding session: every time the app is opened (or brought back to the foreground) the token is renewed.
+function useSessionRenewal() {
+  const setAuth = useAuthStore((s) => s.setAuth);
+  useEffect(() => {
+    let lastRenewal = 0;
+    const renew = () => {
+      if (!localStorage.getItem('token') || Date.now() - lastRenewal < RENEW_EVERY_MS) return;
+      lastRenewal = Date.now();
+      api.get('/auth/me')
+        .then(({ data }) => { if (data?.token && data?.user) setAuth(data.user, data.token); })
+        .catch(() => { lastRenewal = 0; });
+    };
+    renew();
+    const onVisible = () => { if (document.visibilityState === 'visible') renew(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [setAuth]);
+}
+
 export default function App() {
   const { user } = useAuthStore();
+  useSessionRenewal();
 
   return (
     <BrowserRouter>

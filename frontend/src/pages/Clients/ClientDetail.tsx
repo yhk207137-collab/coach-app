@@ -379,7 +379,8 @@ export default function ClientDetail() {
           preselectedClientId={id}
           onClose={() => setNewProject(false)}
           onSave={() => { invalidate(); setNewProject(false); }}
-        />}
+        />
+      )}
       {newMeeting && <MeetingModal clientId={id!} onClose={() => setNewMeeting(false)} onSaved={() => { invalidate(); setNewMeeting(false); }} />}
       {editMeeting && <MeetingModal meeting={editMeeting} onClose={() => setEditMeeting(null)} onSaved={() => { invalidate(); setEditMeeting(null); }} />}
       {summaryFor && <SummaryModal meetingId={summaryFor} onClose={() => setSummaryFor(null)} onSaved={() => { invalidate(); setSummaryFor(null); }} />}

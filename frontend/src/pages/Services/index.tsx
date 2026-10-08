@@ -138,7 +138,7 @@ export default function ServicesPage() {
             <div className="modal-footer">
               <button onClick={() => { setShowModal(false); setEditing(null); }} className="btn-secondary">ביטול</button>
               <button
-                onClick={() => editing ? updateMut.mutate(form) : createMut.mutate()}
+                onClick={() => editing ? updateMut.mutate({ ...form, price: Number(form.price) }) : createMut.mutate()}
                 disabled={!form.name || !form.price || createMut.isPending || updateMut.isPending}
                 className="btn-primary"
               >

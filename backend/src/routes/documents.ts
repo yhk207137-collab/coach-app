@@ -5,14 +5,12 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireCoach, AuthRequest } from '../middleware/auth';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
+import { UPLOAD_DIR } from '../lib/uploads';
 
 const router = Router();
 
-const uploadDir = process.env.UPLOAD_DIR || './uploads';
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
 const storage = multer.diskStorage({
-  destination: uploadDir,
+  destination: UPLOAD_DIR,
   filename: (_, file, cb) => {
     const ext = path.extname(file.originalname);
     cb(null, `${uuidv4()}${ext}`);
@@ -81,7 +79,7 @@ router.delete('/:id', requireAuth, requireCoach, async (req: AuthRequest, res) =
     const doc = await prisma.document.findUnique({ where: { id: req.params.id }, include: { client: { select: { id: true } } } });
     if (!doc) return res.status(404).json({ error: 'Not found' });
 
-    const filePath = path.join(uploadDir, path.basename(doc.url));
+    const filePath = path.join(UPLOAD_DIR, path.basename(doc.url));
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
     await prisma.document.delete({ where: { id: req.params.id } });

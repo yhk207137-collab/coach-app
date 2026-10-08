@@ -7,6 +7,7 @@ import path from 'path';
 import rateLimit from 'express-rate-limit';
 import cron from 'node-cron';
 import { backupToSheets } from './services/sheets';
+import { UPLOAD_DIR } from './lib/uploads';
 
 import authRoutes from './routes/auth';
 import clientRoutes from './routes/clients';
@@ -62,12 +63,32 @@ const aiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const sendCodeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'נשלחו יותר מדי קודים, נסה שוב בעוד 15 דקות' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const verifyCodeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'יותר מדי ניסיונות, נסה שוב בעוד 15 דקות' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use('/api/auth/login', authLimiter);
+app.post('/api/auth/magic', sendCodeLimiter);
+app.use('/api/auth/magic/verify', verifyCodeLimiter);
+app.use('/api/auth/otp', verifyCodeLimiter);
+app.use('/api/auth/reset-password', verifyCodeLimiter);
 app.use('/api/ai', aiLimiter);
 app.use('/api/', apiLimiter);
 
 // Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.use('/uploads', express.static(UPLOAD_DIR));
 
 // Serve built frontend (production)
 const publicDir = path.join(__dirname, '..', 'public');
@@ -93,7 +114,9 @@ app.use('/api/leads', leadRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/services', serviceRoutes);
 
-app.get('/api/health', (_, res) => res.json({ ok: true }));
+app.get('/api/health', (_, res) =>
+  res.json({ ok: true, version: (process.env.RAILWAY_GIT_COMMIT_SHA || 'dev').slice(0, 7) })
+);
 
 // SPA fallback — serve index.html for all non-API routes
 app.get('*', (_req, res) => {
@@ -106,7 +129,7 @@ app.get('*', (_req, res) => {
 async function bootstrap() {
   try {
     console.log('[STARTUP] Running prisma db push...');
-    execSync('npx prisma db push --skip-generate', { stdio: 'inherit' });
+    execSync('npx prisma db push --skip-generate', { stdio: 'inherit', timeout: 120_000 });
     console.log('[STARTUP] DB schema synced');
   } catch (e) {
     console.error('[STARTUP] prisma db push failed:', e);
@@ -116,34 +139,25 @@ async function bootstrap() {
     const { PrismaClient } = await import('@prisma/client');
     const bcrypt = await import('bcryptjs');
     const prisma = new PrismaClient();
-    const email = process.env.COACH_EMAIL;
+    // The password is owned by the user (Settings / "forgot password"); env vars only bootstrap the first account.
+    const email = process.env.COACH_EMAIL?.trim().toLowerCase();
     const password = process.env.COACH_PASSWORD;
     if (email && password) {
-      const existing = await prisma.user.findUnique({ where: { email } });
+      const existing = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
       if (!existing) {
-        // First time — create the user
         const hash = await bcrypt.hash(password, 12);
         const name = process.env.COACH_NAME || 'המאמן';
         await prisma.user.create({ data: { email, password: hash, name, role: 'COACH' } });
         console.log('[STARTUP] Coach user created:', email);
       } else if (process.env.FORCE_RESET_PASSWORD === 'true') {
-        // Only reset password when explicitly requested via env var
         const hash = await bcrypt.hash(password, 12);
-        await prisma.user.update({ where: { email }, data: { password: hash } });
-        console.log('[STARTUP] Coach password force-reset (FORCE_RESET_PASSWORD=true):', email);
+        await prisma.user.update({ where: { id: existing.id }, data: { password: hash } });
+        console.log('[STARTUP] Coach password force-reset (FORCE_RESET_PASSWORD=true):', existing.email);
       } else {
-        console.log('[STARTUP] Coach user exists, password unchanged:', email);
+        console.log('[STARTUP] Coach user exists, password unchanged:', existing.email);
       }
     } else {
-      const defaultEmail = 'yhk207137@gmail.com';
-      const existing = await prisma.user.findUnique({ where: { email: defaultEmail } });
-      if (!existing) {
-        const hash = await bcrypt.hash('Coach1234!', 12);
-        await prisma.user.create({ data: { email: defaultEmail, password: hash, name: 'ליוי', role: 'COACH' } });
-        console.log('[STARTUP] Default coach user created:', defaultEmail);
-      } else {
-        console.log('[STARTUP] Coach user exists, skipping seed:', defaultEmail);
-      }
+      console.log('[STARTUP] COACH_EMAIL/COACH_PASSWORD not set, skipping seed');
     }
     await prisma.$disconnect();
   } catch (e) {

@@ -5,12 +5,12 @@ import fs from 'fs';
 import { requireAuth, requireCoach, AuthRequest } from '../middleware/auth';
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
+import { UPLOAD_DIR } from '../lib/uploads';
 
 const router = Router();
 
-const uploadDir = process.env.UPLOAD_DIR || './uploads';
 const audioStorage = multer.diskStorage({
-  destination: uploadDir,
+  destination: UPLOAD_DIR,
   filename: (_, file, cb) => cb(null, `audio-${uuidv4()}${path.extname(file.originalname)}`),
 });
 const audioUpload = multer({ storage: audioStorage, limits: { fileSize: 100 * 1024 * 1024 } });

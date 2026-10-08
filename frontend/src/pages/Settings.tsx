@@ -125,7 +125,7 @@ export default function SettingsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (next !== confirm) return toast.error('הסיסמאות אינן תואמות');
-    if (next.length < 4) return toast.error('הסיסמה חייבת להכיל לפחות 4 תווים');
+    if (next.length < 6) return toast.error('הסיסמה חייבת להכיל לפחות 6 תווים');
     setLoading(true);
     try {
       await api.post('/auth/change-password', { currentPassword: current, newPassword: next });
@@ -358,7 +358,7 @@ export default function SettingsPage() {
                 <input
                   type={showNext ? 'text' : 'password'}
                   className="input pl-10"
-                  placeholder="לפחות 4 תווים"
+                  placeholder="לפחות 6 תווים"
                   value={next}
                   onChange={e => setNext(e.target.value)}
                   required
