@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Eye, EyeOff, Loader2, Lock, CheckCircle, Calendar, Image, Trash2, ExternalLink, Receipt, Download } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Lock, CheckCircle, Calendar, Image, Trash2, ExternalLink, Receipt, Download, Mail } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../store/auth';
@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const [calLoading, setCalLoading] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  const [emailBackupLoading, setEmailBackupLoading] = useState(false);
   const [logoData, setLogoData] = useState<string>(() => { try { return localStorage.getItem('companyLogo') ?? ''; } catch { return ''; } });
   const [letterhead, setLetterhead] = useState<string>('');
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -77,6 +78,18 @@ export default function SettingsPage() {
     setLetterhead('');
     try { await api.put('/settings/letterhead', { value: null }); } catch {}
     toast.success('הבלאנק הוסר');
+  };
+
+  const handleEmailBackup = async () => {
+    setEmailBackupLoading(true);
+    try {
+      const { data } = await api.post('/backup/email');
+      toast.success(`גיבוי מלא נשלח אל ${data.sentTo.join(', ')}`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'שליחת הגיבוי נכשלה');
+    } finally {
+      setEmailBackupLoading(false);
+    }
   };
 
   const handleBackupToSheets = async () => {
@@ -261,20 +274,31 @@ export default function SettingsPage() {
               <p className="text-sm text-slate-500">שמור עותק של כל הנתונים שלך</p>
             </div>
           </div>
+          <div className="flex items-start gap-2 bg-emerald-50 text-emerald-700 rounded-xl p-3 text-sm mb-3">
+            <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <span>גיבוי מלא נשלח אוטומטית למייל שלך בכל לילה ב-03:00. שמור את המיילים — אפשר לשחזר מהם את כל המערכת.</span>
+          </div>
           <div className="space-y-3">
+            <button
+              onClick={handleEmailBackup}
+              disabled={emailBackupLoading}
+              className="btn-primary w-full justify-center py-2.5"
+            >
+              {emailBackupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Mail className="w-4 h-4" /> שלח גיבוי למייל עכשיו</>}
+            </button>
             <button
               onClick={handleExportJSON}
               disabled={exportLoading}
-              className="btn-primary w-full justify-center py-2.5"
+              className="btn-secondary w-full justify-center py-2.5"
             >
-              {exportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Download className="w-4 h-4" /> הורד גיבוי JSON</>}
+              {exportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Download className="w-4 h-4" /> הורד קובץ גיבוי למחשב</>}
             </button>
             <button
               onClick={handleBackupToSheets}
-              disabled={backupLoading}
+              disabled={backupLoading || !calConnected}
               className="btn-secondary w-full justify-center py-2.5"
             >
-              {backupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>גיבוי ל-Google Sheets (דורש חיבור יומן)</>}
+              {backupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>גיבוי ל-Google Sheets{!calConnected && ' (חבר קודם את יומן גוגל למטה)'}</>}
             </button>
           </div>
         </div>

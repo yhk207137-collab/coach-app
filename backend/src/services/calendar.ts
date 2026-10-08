@@ -56,9 +56,28 @@ async function getAuthorizedClient() {
   return client;
 }
 
+export function isRevokedGoogleGrant(err: any) {
+  return err?.response?.data?.error === 'invalid_grant' || String(err?.message ?? '').includes('invalid_grant');
+}
+
+export async function forgetGoogleTokens() {
+  await prisma.setting.deleteMany({ where: { key: TOKENS_KEY } });
+}
+
+// Verifies the stored refresh token still works; a revoked/expired grant is cleared so the UI asks to reconnect.
 export async function isCalendarConnected(): Promise<boolean> {
-  const row = await prisma.setting.findUnique({ where: { key: TOKENS_KEY } });
-  return !!row;
+  const client = await getAuthorizedClient();
+  if (!client) return false;
+  try {
+    await client.getAccessToken();
+    return true;
+  } catch (err) {
+    if (isRevokedGoogleGrant(err)) {
+      console.warn('[GOOGLE] Stored grant is no longer valid; clearing it so the user can reconnect');
+      await forgetGoogleTokens();
+    }
+    return false;
+  }
 }
 
 export async function addToGoogleCalendar(meeting: any, client: any): Promise<string | undefined> {

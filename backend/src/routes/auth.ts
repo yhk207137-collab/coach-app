@@ -2,8 +2,8 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
 import { prisma } from '../lib/prisma';
+import { sendEmail } from '../lib/email';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -36,40 +36,8 @@ function findUserByEmail(email: string) {
   return prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
 }
 
-async function deliverEmail(to: string, subject: string, html: string) {
-  const key = process.env.SMTP_PASS;
-  if (!key) throw new Error('Email not configured (SMTP_PASS missing)');
-  const fromName = process.env.FROM_NAME || 'ליוי שיווק ופרסום';
-  const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
-  const host = process.env.SMTP_HOST || 'smtp.resend.com';
-
-  // Railway blocks outbound SMTP on non-Pro plans, so Resend is called over HTTPS instead.
-  if (host.includes('resend')) {
-    const r = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: `${fromName} <${fromEmail}>`, to: [to], subject, html }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!r.ok) throw new Error(`Resend API ${r.status}: ${await r.text()}`);
-    return;
-  }
-
-  const port = parseInt(process.env.SMTP_PORT || '587');
-  const transport = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user: process.env.SMTP_USER, pass: key },
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 15_000,
-  });
-  await transport.sendMail({ from: `"${fromName}" <${fromEmail}>`, to, subject, html });
-}
-
 async function sendCodeEmail(to: string, code: string, link: string) {
-  await deliverEmail(
+  await sendEmail(
     to,
     `קוד כניסה: ${code}`,
     `

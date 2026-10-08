@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { prisma } from '../lib/prisma';
+import { isRevokedGoogleGrant, forgetGoogleTokens } from './calendar';
 
 const TOKENS_KEY = 'google_calendar_tokens';
 const SHEET_ID_KEY = 'google_backup_sheet_id';
@@ -62,6 +63,18 @@ function now() {
 }
 
 export async function backupToSheets(): Promise<string> {
+  try {
+    return await writeBackupToSheets();
+  } catch (err: any) {
+    if (isRevokedGoogleGrant(err)) {
+      await forgetGoogleTokens();
+      throw new Error('החיבור לגוגל פג תוקף — חבר מחדש את יומן גוגל בדף ההגדרות');
+    }
+    throw err;
+  }
+}
+
+async function writeBackupToSheets(): Promise<string> {
   const auth = await getAuthorizedClient();
   const spreadsheetId = await getOrCreateSpreadsheet(auth);
   const sheets = google.sheets({ version: 'v4', auth });

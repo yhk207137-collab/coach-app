@@ -36,7 +36,7 @@ router.get('/callback', async (req, res) => {
   try {
     const tokens = await getTokensFromCode(code as string);
     await saveTokens(tokens);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = `${req.protocol}://${req.get('host')}`;
     res.send(`
       <html><body dir="rtl" style="font-family:Arial;text-align:center;padding:40px">
         <h2>✅ יומן גוגל חובר בהצלחה!</h2>
