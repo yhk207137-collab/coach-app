@@ -1,12 +1,13 @@
-FROM node:20-alpine AS frontend-builder
+FROM node:20-slim AS frontend-builder
 WORKDIR /app
 COPY frontend/package*.json ./frontend/
 RUN cd frontend && npm install
 COPY frontend/ ./frontend/
 RUN cd frontend && npm run build
 
-FROM node:20-alpine AS backend-builder
+FROM node:20-slim AS backend-builder
 WORKDIR /app
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 COPY backend/package*.json ./backend/
 RUN cd backend && npm install
 COPY backend/prisma ./backend/prisma
