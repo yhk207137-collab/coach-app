@@ -36,20 +36,43 @@ function findUserByEmail(email: string) {
   return prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
 }
 
-async function sendCodeEmail(to: string, code: string, link: string) {
-  if (!process.env.SMTP_PASS) throw new Error('SMTP not configured');
+async function deliverEmail(to: string, subject: string, html: string) {
+  const key = process.env.SMTP_PASS;
+  if (!key) throw new Error('Email not configured (SMTP_PASS missing)');
+  const fromName = process.env.FROM_NAME || 'ליוי שיווק ופרסום';
+  const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
+  const host = process.env.SMTP_HOST || 'smtp.resend.com';
+
+  // Railway blocks outbound SMTP on non-Pro plans, so Resend is called over HTTPS instead.
+  if (host.includes('resend')) {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: `${fromName} <${fromEmail}>`, to: [to], subject, html }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) throw new Error(`Resend API ${r.status}: ${await r.text()}`);
+    return;
+  }
+
   const port = parseInt(process.env.SMTP_PORT || '587');
   const transport = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.resend.com',
+    host,
     port,
     secure: port === 465,
-    auth: { user: process.env.SMTP_USER || 'resend', pass: process.env.SMTP_PASS },
+    auth: { user: process.env.SMTP_USER, pass: key },
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
   });
-  await transport.sendMail({
-    from: `"${process.env.FROM_NAME || 'ליוי שיווק ופרסום'}" <${process.env.FROM_EMAIL || 'onboarding@resend.dev'}>`,
+  await transport.sendMail({ from: `"${fromName}" <${fromEmail}>`, to, subject, html });
+}
+
+async function sendCodeEmail(to: string, code: string, link: string) {
+  await deliverEmail(
     to,
-    subject: `קוד כניסה: ${code}`,
-    html: `
+    `קוד כניסה: ${code}`,
+    `
       <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
         <h2 style="color: #1e293b;">ליוי שיווק ופרסום</h2>
         <p style="color: #475569;">הקוד שלך לכניסה או לאיפוס סיסמה:</p>
@@ -61,8 +84,8 @@ async function sendCodeEmail(to: string, code: string, link: string) {
         <p style="color:#94a3b8; font-size:13px;">או כניסה ישירה בלחיצה:</p>
         <a href="${link}" style="color:#6366f1; font-size:13px;">${link}</a>
       </div>
-    `,
-  });
+    `
+  );
 }
 
 async function consumeCode(email: string, code: string) {
