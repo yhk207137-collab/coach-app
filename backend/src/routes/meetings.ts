@@ -69,9 +69,8 @@ router.post('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
       }
     } catch (e) { console.error('Google Calendar failed:', e); }
 
-    try {
-      await sendMeetingConfirmation(client.email, client.fullName, meeting);
-    } catch (e) { console.error('Email failed:', e); }
+    sendMeetingConfirmation(client.email, client.fullName, meeting)
+      .catch((e) => console.error('[EMAIL] Meeting confirmation failed:', e?.message || e));
 
     res.status(201).json({ ...meeting, googleEventId });
   } catch {

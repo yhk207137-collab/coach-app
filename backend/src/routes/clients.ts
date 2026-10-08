@@ -51,35 +51,58 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+// Strips invisible bidi/zero-width marks that Hebrew keyboards and copy-paste insert into emails/phones.
+const INVISIBLE = /[​-‏‪-‮⁦-⁩﻿\s]/g;
+const cleanEmail = (v: unknown) => String(v ?? '').replace(INVISIBLE, '').toLowerCase();
+const cleanText = (v: unknown) => {
+  const s = String(v ?? '').replace(/[​-‏‪-‮⁦-⁩﻿]/g, '').trim();
+  return s || null;
+};
+
+function clientData(body: any) {
+  const fee = parseFloat(body.monthlyFee);
+  return {
+    fullName: String(body.fullName ?? '').trim(),
+    email: cleanEmail(body.email),
+    phone: cleanText(body.phone),
+    businessName: cleanText(body.businessName),
+    businessField: cleanText(body.businessField),
+    notes: cleanText(body.notes),
+    status: body.status || undefined,
+    clientType: body.clientType || undefined,
+    monthlyFee: isNaN(fee) ? null : fee,
+    startDate: body.startDate ? new Date(body.startDate) : undefined,
+  };
+}
+
 router.post('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   try {
-    const { fullName, phone, email, businessName, businessField, startDate, status, notes, clientType, monthlyFee } = req.body;
+    const data = clientData(req.body);
+    if (!data.fullName || !data.email) return res.status(400).json({ error: 'שם ומייל הם שדות חובה' });
 
-    const client = await prisma.client.create({
-      data: { fullName, phone, email, businessName, businessField, startDate: startDate ? new Date(startDate) : undefined, status, notes, clientType, monthlyFee: monthlyFee ? parseFloat(monthlyFee) : undefined },
-    });
+    const client = await prisma.client.create({ data });
 
-    try { await sendClientWelcomeEmail(email, fullName); } catch (e) { console.error('Email failed:', e); }
+    sendClientWelcomeEmail(client.email, client.fullName)
+      .catch((e) => console.error('[EMAIL] Client welcome failed:', e?.message || e));
 
     res.status(201).json(client);
   } catch (err: any) {
-    if (err.code === 'P2002') return res.status(400).json({ error: 'Email already exists' });
-    res.status(500).json({ error: 'Server error' });
+    if (err.code === 'P2002') return res.status(400).json({ error: 'כבר קיים לקוח עם המייל הזה' });
+    console.error('[CLIENTS] create failed:', err?.message || err);
+    res.status(500).json({ error: 'שגיאה בשמירת הלקוח' });
   }
 });
 
 router.put('/:id', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   try {
-    const client = await prisma.client.update({
-      where: { id: req.params.id },
-      data: {
-        ...req.body,
-        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
-      },
-    });
+    const data = clientData(req.body);
+    if (!data.fullName || !data.email) return res.status(400).json({ error: 'שם ומייל הם שדות חובה' });
+    const client = await prisma.client.update({ where: { id: req.params.id }, data });
     res.json(client);
-  } catch {
-    res.status(500).json({ error: 'Server error' });
+  } catch (err: any) {
+    if (err.code === 'P2002') return res.status(400).json({ error: 'כבר קיים לקוח עם המייל הזה' });
+    console.error('[CLIENTS] update failed:', err?.message || err);
+    res.status(500).json({ error: 'שגיאה בשמירת הלקוח' });
   }
 });
 

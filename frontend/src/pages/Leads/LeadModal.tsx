@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import api from '../../services/api';
 import type { LeadStage } from './index';
+import { cleanEmail } from '../../utils/text';
 
 interface Props {
   onClose: () => void;
@@ -53,7 +54,7 @@ export default function LeadModal({ onClose, stages, initial }: Props) {
             </div>
             <div>
               <label className="form-label">מייל</label>
-              <input className="form-input" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" />
+              <input className="form-input" type="text" inputMode="email" dir="ltr" autoCapitalize="none" value={form.email} onChange={e => set('email', cleanEmail(e.target.value))} placeholder="email@example.com" />
             </div>
           </div>
 

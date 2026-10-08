@@ -4,6 +4,7 @@ import { Briefcase, Eye, EyeOff, Loader2, Mail, KeyRound, ArrowRight } from 'luc
 import { useAuthStore } from '../store/auth';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { cleanEmail } from '../utils/text';
 
 type Mode = 'password' | 'code' | 'forgot';
 
@@ -84,11 +85,12 @@ export default function Login() {
     <div>
       <label className="label">כתובת מייל</label>
       <input
-        type="email"
+        type="text"
+        inputMode="email"
         className="input"
         placeholder="your@email.com"
         value={email}
-        onChange={e => setEmail(e.target.value)}
+        onChange={e => setEmail(cleanEmail(e.target.value))}
         required
         dir="ltr"
         autoComplete="username"

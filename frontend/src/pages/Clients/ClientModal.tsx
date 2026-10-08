@@ -3,6 +3,7 @@ import { X, Loader2 } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { Client } from '../../types';
+import { cleanEmail, EMAIL_PATTERN } from '../../utils/text';
 
 interface Props {
   client?: Client;
@@ -11,7 +12,7 @@ interface Props {
 }
 
 export default function ClientModal({ client, onClose, onSaved }: Props) {
-  const { register, handleSubmit, watch, formState: { isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, formState: { isSubmitting, errors } } = useForm({
     defaultValues: {
       fullName: client?.fullName ?? '',
       email: client?.email ?? '',
@@ -59,7 +60,16 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
             </div>
             <div>
               <label className="label">דוא"ל *</label>
-              <input {...register('email', { required: true })} type="email" className="input" dir="ltr" placeholder="email@example.com" />
+              <input
+                {...register('email', {
+                  required: 'חובה למלא מייל',
+                  setValueAs: (v: string) => cleanEmail(v ?? ''),
+                  pattern: { value: EMAIL_PATTERN, message: 'כתובת המייל לא תקינה' },
+                })}
+                type="text" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                className="input" dir="ltr" placeholder="email@example.com"
+              />
+              {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message as string}</p>}
             </div>
             <div>
               <label className="label">טלפון</label>
