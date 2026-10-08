@@ -86,6 +86,22 @@ router.post('/:clientId', requireAuth, requireCoach, async (req: AuthRequest, re
   }
 });
 
+// Adds to what the client owes (e.g. one more meeting) without touching what was already paid.
+router.post('/:clientId/charge', requireAuth, requireCoach, async (req: AuthRequest, res) => {
+  try {
+    const amount = parseFloat(req.body.amount);
+    if (isNaN(amount) || amount <= 0) return res.status(400).json({ error: 'סכום לא תקין' });
+    const payment = await prisma.payment.upsert({
+      where: { clientId: req.params.clientId },
+      update: { totalAmount: { increment: amount } },
+      create: { clientId: req.params.clientId, totalAmount: amount },
+    });
+    res.json(payment);
+  } catch {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.post('/:clientId/record', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   try {
     const { amount, note, date, isPaid = true, scheduledDate, paymentMethod } = req.body;
@@ -110,7 +126,7 @@ router.post('/:clientId/record', requireAuth, requireCoach, async (req: AuthRequ
     if (isPaid) {
       await prisma.payment.update({
         where: { id: payment.id },
-        data: { paidAmount: { increment: amount } },
+        data: { paidAmount: { increment: parsedAmount } },
       });
     }
 

@@ -38,9 +38,40 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
     queryFn: () => api.get(`/payments/${clientId}`).then(r => r.data).catch(() => null),
   });
 
-  const { register: regPlan, handleSubmit: submitPlan, formState: { isSubmitting: planSub } } = useForm({
-    defaultValues: { totalAmount: payment?.totalAmount ?? 0, nextPaymentDate: '' },
+  const [addCharge, setAddCharge] = useState(false);
+  const [chargeAmount, setChargeAmount] = useState('');
+  const [chargeSaving, setChargeSaving] = useState(false);
+
+  const { register: regPlan, handleSubmit: submitPlan, reset: resetPlan, formState: { isSubmitting: planSub } } = useForm({
+    defaultValues: { totalAmount: 0 as number | string, nextPaymentDate: '' },
   });
+
+  const openPlanEditor = () => {
+    resetPlan({
+      totalAmount: payment?.totalAmount ?? 0,
+      nextPaymentDate: payment?.nextPaymentDate ? payment.nextPaymentDate.slice(0, 10) : '',
+    });
+    setSetupPlan(true);
+  };
+
+  const saveCharge = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseFloat(chargeAmount);
+    if (!(amount > 0)) return toast.error('הכנס סכום חיובי');
+    setChargeSaving(true);
+    try {
+      await api.post(`/payments/${clientId}/charge`, { amount });
+      qc.invalidateQueries({ queryKey: ['payment', clientId] });
+      setAddCharge(false);
+      setChargeAmount('');
+      toast.success(`נוספו ₪${amount.toLocaleString()} לסכום העסקה`);
+      onUpdated?.();
+    } catch {
+      toast.error('שגיאה בהוספת הסכום');
+    } finally {
+      setChargeSaving(false);
+    }
+  };
 
   const { register: regRecord, handleSubmit: submitRecord, reset, formState: { errors: recErrors, isSubmitting: recSub } } = useForm({
     defaultValues: { amount: '', note: '', date: new Date().toISOString().split('T')[0], scheduledDate: '', paymentMethod: '' },
@@ -163,11 +194,41 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
 
           {/* Actions */}
           <div className="flex gap-2 flex-wrap">
-            <button onClick={() => { setAddRecord(true); setRecordType('paid'); }} className="btn-primary text-sm">
-              <Plus className="w-4 h-4" /> רישום תשלום
+            <button onClick={() => { setAddCharge(true); setAddRecord(false); }} className="btn-primary text-sm">
+              <Plus className="w-4 h-4" /> הוספת סכום לעסקה (פגישה נוספת)
             </button>
-            <button onClick={() => setSetupPlan(true)} className="btn-secondary text-sm">עריכת תכנית</button>
+            <button onClick={() => { setAddRecord(true); setAddCharge(false); setRecordType('paid'); }} className="btn-secondary text-sm">
+              <Plus className="w-4 h-4" /> רישום תשלום שהתקבל
+            </button>
+            <button onClick={openPlanEditor} className="btn-secondary text-sm">עריכת תכנית</button>
           </div>
+
+          {addCharge && (
+            <div className="card border border-primary-100">
+              <h3 className="font-semibold text-slate-900 mb-1">הוספת סכום לעסקה</h3>
+              <p className="text-sm text-slate-500 mb-3">למשל פגישה נוספת. הסכום יתווסף למה שהלקוח צריך לשלם.</p>
+              <form onSubmit={saveCharge} className="space-y-3">
+                <div>
+                  <label className="label">סכום להוספה (₪)</label>
+                  <input
+                    type="number" min="1" step="0.01" className="input" placeholder="320" autoFocus
+                    value={chargeAmount} onChange={e => setChargeAmount(e.target.value)}
+                  />
+                </div>
+                {parseFloat(chargeAmount) > 0 && (
+                  <p className="text-sm text-slate-600">
+                    סכום העסקה יעלה מ-₪{totalAmount.toLocaleString()} ל-<b>₪{(totalAmount + parseFloat(chargeAmount)).toLocaleString()}</b>
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <button type="submit" disabled={chargeSaving} className="btn-primary">
+                    {chargeSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'הוסף לעסקה'}
+                  </button>
+                  <button type="button" onClick={() => { setAddCharge(false); setChargeAmount(''); }} className="btn-secondary">ביטול</button>
+                </div>
+              </form>
+            </div>
+          )}
 
           {/* Add record form */}
           {addRecord && (
@@ -300,6 +361,13 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
             </div>
           )}
         </>
+      )}
+      {editRecord && (
+        <EditRecordModal
+          record={editRecord}
+          onClose={() => setEditRecord(null)}
+          onSaved={() => { setEditRecord(null); qc.invalidateQueries({ queryKey: ['payment', clientId] }); onUpdated?.(); }}
+        />
       )}
     </div>
   );
