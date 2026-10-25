@@ -24,6 +24,11 @@ import SignContract from './pages/Contracts/SignContract';
 import ReviewQuote from './pages/Quotes/ReviewQuote';
 import LeadsPage from './pages/Leads';
 import ServicesPage from './pages/Services';
+import ContactsPage from './pages/Marketing/Contacts';
+import CampaignsPage from './pages/Marketing/Campaigns';
+import CampaignReport from './pages/Marketing/Report';
+import CampaignEditor from './pages/Marketing/Editor';
+import Unsubscribe from './pages/Unsubscribe';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore();
@@ -89,7 +94,12 @@ export default function App() {
           <Route path="/contracts" element={<ContractsPage />} />
           <Route path="/leads" element={<LeadsPage />} />
           <Route path="/services" element={<ServicesPage />} />
+          <Route path="/marketing/contacts" element={<ContactsPage />} />
+          <Route path="/marketing/campaigns" element={<CampaignsPage />} />
+          <Route path="/marketing/campaigns/:id/report" element={<CampaignReport />} />
         </Route>
+        <Route path="/marketing/campaigns/:id/edit" element={<RequireCoach><CampaignEditor /></RequireCoach>} />
+        <Route path="/unsubscribe/:token" element={<Unsubscribe />} />
 
         <Route path="/sign-contract/:id" element={<SignContract />} />
         <Route path="/review-quote/:id" element={<ReviewQuote />} />

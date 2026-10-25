@@ -159,6 +159,20 @@
   .form-label {
     @apply label;
   }
+
+  .rich-editable:empty::before {
+    content: attr(data-placeholder);
+    color: #94a3b8;
+    pointer-events: none;
+  }
+
+  .rich-editable a {
+    color: inherit;
+    text-decoration: underline;
+  }
+
+  .rich-editable ul { list-style: disc; padding-right: 22px; }
+  .rich-editable ol { list-style: decimal; padding-right: 22px; }
 }
 
 @layer utilities {

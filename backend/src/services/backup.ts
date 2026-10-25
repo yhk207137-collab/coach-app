@@ -9,7 +9,7 @@ export async function buildFullBackup() {
   const [
     users, clients, meetings, meetingSummaries, tags, tasks, payments, paymentRecords, documents,
     quotes, quoteItems, projects, subProjects, contracts, leads, leadActivities, invoices, invoiceItems,
-    services, settings,
+    services, settings, contacts, campaigns, campaignSends, emailTemplates, media,
   ] = await Promise.all([
     prisma.user.findMany({ select: { id: true, email: true, name: true, role: true, clientId: true, createdAt: true } }),
     prisma.client.findMany({ orderBy: { fullName: 'asc' } }),
@@ -31,12 +31,17 @@ export async function buildFullBackup() {
     prisma.invoiceItem.findMany(),
     prisma.service.findMany(),
     prisma.setting.findMany({ where: { key: { notIn: SECRET_SETTING_KEYS } } }),
+    prisma.contact.findMany({ orderBy: { createdAt: 'asc' } }),
+    prisma.campaign.findMany({ orderBy: { createdAt: 'asc' } }),
+    prisma.campaignSend.findMany({ orderBy: { createdAt: 'asc' } }),
+    prisma.emailTemplate.findMany(),
+    prisma.media.findMany(),
   ]);
 
   const data = {
     users, clients, meetings, meetingSummaries, tags, tasks, payments, paymentRecords, documents,
     quotes, quoteItems, projects, subProjects, contracts, leads, leadActivities, invoices, invoiceItems,
-    services, settings,
+    services, settings, contacts, campaigns, campaignSends, emailTemplates, media,
   };
   const counts = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v.length]));
   return { exportedAt: new Date().toISOString(), version: 2, counts, ...data };
@@ -67,6 +72,8 @@ export async function emailBackup() {
         <tr><td style="padding:4px 12px;">לידים</td><td><b>${c.leads}</b></td></tr>
         <tr><td style="padding:4px 12px;">הצעות מחיר</td><td><b>${c.quotes}</b></td></tr>
         <tr><td style="padding:4px 12px;">חוזים</td><td><b>${c.contracts}</b></td></tr>
+        <tr><td style="padding:4px 12px;">אנשי קשר לדיוור</td><td><b>${c.contacts}</b></td></tr>
+        <tr><td style="padding:4px 12px;">קמפיינים</td><td><b>${c.campaigns}</b></td></tr>
       </table>
     </div>
   `;

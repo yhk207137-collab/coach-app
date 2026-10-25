@@ -123,21 +123,21 @@ model MeetingSummary {
 }
 
 model Task {
-  id          String     @id @default(cuid())
-  clientId    String
-  client      Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  meetingId      String?
-  meeting        Meeting?    @relation(fields: [meetingId], references: [id])
-  projectId      String?
-  project        Project?    @relation(fields: [projectId], references: [id])
-  subProjectId   String?
-  subProject     SubProject? @relation(fields: [subProjectId], references: [id])
-  title       String
-  description String?
-  dueDate     DateTime?
-  status      TaskStatus @default(PENDING)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id           String      @id @default(cuid())
+  clientId     String
+  client       Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  meetingId    String?
+  meeting      Meeting?    @relation(fields: [meetingId], references: [id])
+  projectId    String?
+  project      Project?    @relation(fields: [projectId], references: [id])
+  subProjectId String?
+  subProject   SubProject? @relation(fields: [subProjectId], references: [id])
+  title        String
+  description  String?
+  dueDate      DateTime?
+  status       TaskStatus  @default(PENDING)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 }
 
 model Payment {
@@ -221,17 +221,17 @@ enum QuoteStatus {
 }
 
 model Quote {
-  id          String      @id @default(cuid())
-  clientId    String
-  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  title       String
-  number      Int         @default(autoincrement())
-  status      QuoteStatus @default(DRAFT)
-  notes       String?
-  validUntil  DateTime?
-  items       QuoteItem[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id         String      @id @default(cuid())
+  clientId   String
+  client     Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title      String
+  number     Int         @default(autoincrement())
+  status     QuoteStatus @default(DRAFT)
+  notes      String?
+  validUntil DateTime?
+  items      QuoteItem[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 }
 
 model Project {
@@ -350,4 +350,131 @@ model Service {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// ── Email marketing ─────────────────────────────────────────────────────────
+
+enum ContactStatus {
+  SUBSCRIBED
+  UNSUBSCRIBED
+  BOUNCED
+  COMPLAINED
+}
+
+enum CampaignKind {
+  BROADCAST
+  WELCOME
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  ACTIVE
+  PAUSED
+}
+
+enum SendStatus {
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  BOUNCED
+  FAILED
+  SKIPPED
+}
+
+model Contact {
+  id             String         @id @default(cuid())
+  email          String         @unique
+  name           String?
+  phone          String?
+  status         ContactStatus  @default(SUBSCRIBED)
+  source         String?
+  tags           String[]       @default([])
+  notes          String?
+  consentAt      DateTime?
+  consentText    String?
+  consentPage    String?
+  consentIp      String?
+  unsubscribedAt DateTime?
+  unsubToken     String         @unique @default(cuid())
+  sends          CampaignSend[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Campaign {
+  id           String         @id @default(cuid())
+  kind         CampaignKind   @default(BROADCAST)
+  name         String
+  subject      String         @default("")
+  preheader    String?
+  fromName     String?
+  markAsAd     Boolean        @default(true)
+  design       Json
+  audienceTags String[]       @default([])
+  status       CampaignStatus @default(DRAFT)
+  scheduledAt  DateTime?
+  startedAt    DateTime?
+  sentAt       DateTime?
+  baseUrl      String?
+  sends        CampaignSend[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model CampaignSend {
+  id             String          @id @default(cuid())
+  campaignId     String
+  campaign       Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  email          String
+  status         SendStatus      @default(QUEUED)
+  resendId       String?
+  error          String?
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  openedAt       DateTime?
+  clickedAt      DateTime?
+  unsubscribedAt DateTime?
+  opens          Int             @default(0)
+  clicks         Int             @default(0)
+  events         CampaignEvent[]
+  createdAt      DateTime        @default(now())
+
+  @@unique([campaignId, contactId])
+  @@index([status])
+}
+
+model CampaignEvent {
+  id        String       @id @default(cuid())
+  sendId    String
+  send      CampaignSend @relation(fields: [sendId], references: [id], onDelete: Cascade)
+  type      String
+  url       String?
+  createdAt DateTime     @default(now())
+
+  @@index([sendId])
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  design    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  filename  String
+  name      String
+  mimeType  String
+  size      Int
+  width     Int?
+  height    Int?
+  createdAt DateTime @default(now())
 }

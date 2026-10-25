@@ -6,8 +6,12 @@ import helmet from 'helmet';
 import path from 'path';
 import rateLimit from 'express-rate-limit';
 import cron from 'node-cron';
+import multer from 'multer';
 import { runNightlyBackup } from './services/backup';
 import { UPLOAD_DIR } from './lib/uploads';
+import { startMarketingWorker } from './services/marketing';
+import marketingRoutes from './routes/marketing';
+import { publicRouter, trackingRouter } from './routes/public';
 
 import authRoutes from './routes/auth';
 import clientRoutes from './routes/clients';
@@ -34,9 +38,21 @@ const PORT = process.env.PORT || 4000;
 
 app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Called from landing pages on other domains and from inside emails, so these get their own open CORS.
+const publicLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { ok: false, error: 'rate-limited' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/public', cors({ origin: true }), publicLimiter, publicRouter);
+app.use('/api/t', trackingRouter);
+
+app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true }));
 
 // Rate limiting
 const authLimiter = rateLimit({
@@ -113,6 +129,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/services', serviceRoutes);
+app.use('/api/marketing', marketingRoutes);
 
 app.get('/api/health', (_, res) =>
   res.json({ ok: true, version: (process.env.RAILWAY_GIT_COMMIT_SHA || 'dev').slice(0, 7) })
@@ -125,6 +142,16 @@ app.get('*', (_req, res) => {
     if (err) res.status(200).json({ ok: true, note: 'Frontend not built yet' });
   });
 });
+
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'הקובץ גדול מדי' : 'שגיאה בהעלאת הקובץ' });
+  }
+  console.error('[ERROR]', req.method, req.path, err?.message || err);
+  if (!res.headersSent) res.status(500).json({ error: 'שגיאת שרת' });
+});
+
+process.on('unhandledRejection', (reason: any) => console.error('[UNHANDLED]', reason?.message || reason));
 
 async function bootstrap() {
   try {
@@ -166,6 +193,7 @@ async function bootstrap() {
 
   app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 
+  startMarketingWorker();
   cron.schedule('0 3 * * *', runNightlyBackup, { timezone: 'Asia/Jerusalem' });
   console.log('[STARTUP] Nightly backup (email + Google Sheets) scheduled at 03:00 Asia/Jerusalem');
 }
