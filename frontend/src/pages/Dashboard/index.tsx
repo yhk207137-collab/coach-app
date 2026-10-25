@@ -42,7 +42,7 @@ const SEVERITY = {
 };
 
 function Delta({ now, before, suffix }: { now: number; before: number; suffix: string }) {
-  if (before <= 0) return now > 0 ? <p className="text-xs text-slate-400">{suffix}</p> : null;
+  if (before <= 0) return null;
   const pct = Math.round(((now - before) / before) * 100);
   const up = pct >= 0;
   const Icon = up ? TrendingUp : TrendingDown;
@@ -55,7 +55,7 @@ function Delta({ now, before, suffix }: { now: number; before: number; suffix: s
 
 function Tile({ icon: Icon, label, value, sub, tone, onClick }: { icon: any; label: string; value: string; sub?: React.ReactNode; tone: string; onClick?: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="card text-right p-5 hover:shadow-card-hover hover:-translate-y-0.5 transition-all">
+    <button type="button" onClick={onClick} className="card text-right p-5 hover:shadow-card-hover hover:-translate-y-0.5 transition-all flex flex-col justify-start">
       <div className="flex items-center gap-2 mb-3">
         <span className={clsx('w-8 h-8 rounded-lg flex items-center justify-center', tone)}><Icon className="w-4 h-4" /></span>
         <span className="text-sm text-slate-600">{label}</span>
