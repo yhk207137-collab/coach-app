@@ -112,14 +112,3 @@ export interface Tag {
   name: string;
 }
 
-export interface DashboardData {
-  activeClients: number;
-  todayMeetings: Meeting[];
-  upcomingMeetings: Meeting[];
-  openTasks: Task[];
-  pendingPayments: Payment[];
-  clientsWithoutFutureMeeting: Pick<Client, 'id' | 'fullName' | 'email'>[];
-  activeProjects: any[];
-  openQuotes: any[];
-  pendingContracts: any[];
-}
