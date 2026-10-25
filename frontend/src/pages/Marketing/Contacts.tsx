@@ -9,7 +9,7 @@ import {
   CheckCircle2, FileSpreadsheet, ChevronLeft, ChevronRight, Mail, ShieldCheck,
 } from 'lucide-react';
 import api from '../../services/api';
-import { cleanEmail } from '../../utils/text';
+import { cleanEmail, EMAIL_PATTERN } from '../../utils/text';
 import { Contact, CONTACT_STATUS, ContactStatus } from './shared';
 import { parseTable, rowsToContacts } from './importParser';
 
@@ -104,6 +104,7 @@ function ImportModal({ tags, onClose, onDone }: { tags: string[]; onClose: () =>
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ created: number; updated: number; invalid: number; skippedUnsubscribed: number } | null>(null);
   const parsed = useMemo(() => (text.trim() ? rowsToContacts(parseTable(text)) : null), [text]);
+  const invalidCount = parsed ? parsed.rows.filter((r) => !EMAIL_PATTERN.test(cleanEmail(r.email))).length : 0;
 
   const readFile = async (file?: File) => {
     if (!file) return;
@@ -158,7 +159,7 @@ function ImportModal({ tags, onClose, onDone }: { tags: string[]; onClose: () =>
             {parsed && (
               <div className="rounded-xl border border-slate-200 overflow-hidden">
                 <div className="px-4 py-2 bg-slate-50 text-sm text-slate-600 flex justify-between">
-                  <span>זוהו <strong>{parsed.rows.length}</strong> אנשי קשר</span>
+                  <span>זוהו <strong>{parsed.rows.length - invalidCount}</strong> אנשי קשר{invalidCount > 0 && <span className="text-amber-600"> · {invalidCount} שורות עם מייל לא תקין ידולגו</span>}</span>
                   {parsed.columns.email === undefined && <span className="text-red-500">לא נמצאה עמודת מייל</span>}
                 </div>
                 <table className="w-full text-sm">
@@ -186,7 +187,7 @@ function ImportModal({ tags, onClose, onDone }: { tags: string[]; onClose: () =>
           <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
             <button onClick={onClose} className="btn-secondary">ביטול</button>
             <button onClick={run} disabled={busy || !consent || !parsed?.rows.length} className="btn-primary">
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : `ייבוא ${parsed?.rows.length || 0} אנשי קשר`}
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : `ייבוא ${(parsed?.rows.length || 0) - invalidCount} אנשי קשר`}
             </button>
           </div>
         )}

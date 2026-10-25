@@ -76,7 +76,7 @@ export default function SendStep({ campaign, meta, onMeta, flush, settings, doma
 
   const subjectLen = meta.subject.length + (meta.markAsAd ? 8 : 0);
   const checks = [
-    { ok: !!meta.subject.trim(), label: 'יש נושא למייל' },
+    { ok: !!meta.subject.trim(), label: meta.subject.trim() ? 'יש נושא למייל' : 'חסר נושא למייל' },
     { ok: missingLinks === 0, label: missingLinks ? `${missingLinks} כפתורים בלי קישור` : 'לכל הכפתורים יש קישור' },
     { ok: emptyImages === 0, label: emptyImages ? `${emptyImages} תמונות שלא נבחרו (לא יוצגו)` : 'כל התמונות נבחרו', soft: true },
     ...(isWelcome ? [] : [{ ok: (audience?.count ?? 0) > 0, label: `${audience?.count ?? 0} נמענים רשומים בקהל שנבחר` }]),

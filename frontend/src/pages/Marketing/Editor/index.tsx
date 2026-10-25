@@ -269,8 +269,9 @@ export default function CampaignEditor() {
           </aside>
           <main className="flex-1 overflow-y-auto relative">
             {richSelected && !readOnly && (
-              <div className="sticky top-3 z-40 flex justify-center pointer-events-none">
-                <div className="pointer-events-auto"><FormatToolbar /></div>
+              // Zero-height sticky row: the toolbar floats over the canvas instead of pushing the email down.
+              <div className="sticky top-3 z-40 h-0 flex justify-center pointer-events-none">
+                <div className="pointer-events-auto h-fit"><FormatToolbar /></div>
               </div>
             )}
             <div className={clsx(readOnly && 'pointer-events-none')}>

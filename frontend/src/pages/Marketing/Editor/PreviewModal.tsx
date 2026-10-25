@@ -51,7 +51,7 @@ export default function PreviewModal({ campaignId, design, subject, preheader, m
                 <p className="text-sm text-slate-800 truncate">{data.subject || '(ללא נושא)'}</p>
                 {preheader && <p className="text-xs text-slate-400 truncate">{preheader}</p>}
               </div>
-              <iframe title="תצוגה מקדימה" srcDoc={data.html} sandbox="allow-popups allow-popups-to-escape-sandbox" className="flex-1 w-full bg-white" />
+              <iframe title="תצוגה מקדימה" srcDoc={data.html} sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" className="flex-1 w-full bg-white" />
             </div>
           )}
           <p className="text-xs text-slate-400 mt-3">כך המייל ייראה אצל הנמען. השם "{'{{שם}}'}" מוחלף בשם של כל נמען.</p>

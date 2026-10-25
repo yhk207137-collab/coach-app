@@ -67,12 +67,14 @@ export default function MediaPicker({ onClose, onSelect }: Props) {
     queryFn: () => api.get('/marketing/media').then((r) => r.data),
   });
 
-  const handleFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const handleFiles = async (fileList: FileList | null) => {
+    // Copy first: clearing the input afterwards empties the live FileList.
+    const files = Array.from(fileList || []).slice(0, 10);
+    if (files.length === 0) return;
     setUploading(true);
     try {
       let last: MediaItem | null = null;
-      for (const file of Array.from(files).slice(0, 10)) last = await uploadImage(file);
+      for (const file of files) last = await uploadImage(file);
       await qc.invalidateQueries({ queryKey: ['marketing-media'] });
       if (last && files.length === 1) {
         onSelect(last);
