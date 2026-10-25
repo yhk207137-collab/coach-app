@@ -68,7 +68,7 @@ function Tile({ icon: Icon, label, value, sub, tone, onClick }: { icon: any; lab
 
 function Panel({ title, icon: Icon, action, children, className }: { title: string; icon: any; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <section className={clsx('card p-5', className)}>
+    <section className={clsx('card p-5 min-w-0', className)}>
       <div className="flex items-center justify-between mb-4 gap-2">
         <h2 className="font-semibold text-slate-900 flex items-center gap-2"><Icon className="w-4 h-4 text-slate-400" />{title}</h2>
         {action}
@@ -81,6 +81,9 @@ function Panel({ title, icon: Icon, action, children, className }: { title: stri
 const MoreLink = ({ to, label = 'הכל' }: { to: string; label?: string }) => (
   <Link to={to} className="text-xs text-primary-600 hover:underline flex items-center gap-0.5">{label}<ChevronLeft className="w-3.5 h-3.5" /></Link>
 );
+
+// Hebrew reads '1 לקוחות' as wrong, so a count of one gets its own phrase.
+const count = (n: number, one: string, many: string) => (n === 1 ? one : `${n} ${many}`);
 
 const Empty = ({ children }: { children: React.ReactNode }) => <p className="text-sm text-slate-400 text-center py-6">{children}</p>;
 
@@ -115,7 +118,7 @@ export default function Dashboard() {
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{d.greeting}{d.firstName ? `, ${d.firstName}` : ''}</h1>
-          <p className="page-subtitle">{format(new Date(), 'EEEE, d בMMMM yyyy', { locale: he })}{d.attentionTotal > 0 ? ` · ${d.attentionTotal} דברים מחכים לטיפול` : ' · הכל מטופל'}</p>
+          <p className="page-subtitle">{format(new Date(), 'EEEE, d בMMMM yyyy', { locale: he })}{d.attentionTotal > 0 ? ` · ${count(d.attentionTotal, 'דבר אחד מחכה לטיפול', 'דברים מחכים לטיפול')}` : ' · הכל מטופל'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => navigate('/clients')} className="btn-secondary text-sm"><Plus className="w-4 h-4" /> לקוח</button>
@@ -126,8 +129,8 @@ export default function Dashboard() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <button type="button" onClick={() => navigate('/accounting')} className="card col-span-2 lg:col-span-1 lg:row-span-2 p-6 text-right hover:shadow-card-hover transition-all flex flex-col">
+      <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-4">
+        <button type="button" onClick={() => navigate('/accounting')} className="card col-span-2 lg:col-span-1 lg:row-span-2 2xl:row-span-1 p-6 text-right hover:shadow-card-hover transition-all flex flex-col">
           <p className="text-sm text-slate-600 flex items-center gap-2"><Wallet className="w-4 h-4 text-slate-400" /> הכנסות החודש</p>
           <p className="text-5xl font-bold text-slate-900 mt-3 tracking-tight">{ils(d.revenue.thisMonth)}</p>
           <div className="mt-2 space-y-1">
@@ -145,13 +148,13 @@ export default function Dashboard() {
           onClick={() => navigate('/payments')}
           sub={d.receivables.overdueAmount > 0
             ? <span className="text-red-600 font-medium">{ils(d.receivables.overdueAmount)} באיחור</span>
-            : d.receivables.clientsOwing ? `${d.receivables.clientsOwing} לקוחות` : 'אין חובות פתוחים'} />
+            : d.receivables.clientsOwing ? count(d.receivables.clientsOwing, 'לקוח אחד', 'לקוחות') : 'אין חובות פתוחים'} />
         <Tile icon={CalendarClock} label="צפוי ב-30 יום" value={ils(d.forecast.next30)} tone="bg-teal-50 text-teal-700"
-          onClick={() => navigate('/payments')} sub={`${d.forecast.items.length ? `${d.forecast.items.length} תשלומים מתוכננים` : 'אין תשלומים מתוכננים'}`} />
+          onClick={() => navigate('/payments')} sub={d.forecast.items.length ? count(d.forecast.items.length, 'תשלום אחד מתוכנן', 'תשלומים מתוכננים') : 'אין תשלומים מתוכננים'} />
         <Tile icon={Repeat} label="הכנסה חודשית קבועה" value={ils(d.mrr.amount)} tone="bg-violet-50 text-violet-700"
-          onClick={() => navigate('/clients')} sub={d.mrr.clients ? `${d.mrr.clients} לקוחות ריטיינר` : 'עדיין אין לקוחות ריטיינר'} />
+          onClick={() => navigate('/clients')} sub={d.mrr.clients ? count(d.mrr.clients, 'לקוח ריטיינר אחד', 'לקוחות ריטיינר') : 'עדיין אין לקוחות ריטיינר'} />
         <Tile icon={Target} label="פוטנציאל מכירות" value={ils(d.pipeline.openLeadsValue + d.pipeline.openQuotesValue)} tone="bg-blue-50 text-blue-700"
-          onClick={() => navigate('/leads')} sub={`${d.pipeline.openLeadsCount} לידים · ${d.pipeline.openQuotesCount} הצעות פתוחות`} />
+          onClick={() => navigate('/leads')} sub={`${count(d.pipeline.openLeadsCount, 'ליד אחד', 'לידים')} · ${count(d.pipeline.openQuotesCount, 'הצעה פתוחה אחת', 'הצעות פתוחות')}`} />
       </div>
 
       {/* Revenue + attention */}
@@ -292,7 +295,7 @@ export default function Dashboard() {
             </div>
           )}
           <p className="text-xs text-slate-400 mt-4 pt-3 border-t border-slate-100">
-            {d.meetings.thisMonth} פגישות החודש · {d.meetings.lastMonth} בחודש שעבר · {d.tasks.open} משימות פתוחות{d.tasks.overdue ? ` (${d.tasks.overdue} באיחור)` : ''}
+            {count(d.meetings.thisMonth, 'פגישה אחת', 'פגישות')} החודש · {d.meetings.lastMonth} בחודש שעבר · {count(d.tasks.open, 'משימה פתוחה אחת', 'משימות פתוחות')}{d.tasks.overdue ? ` (${d.tasks.overdue} באיחור)` : ''}
           </p>
         </Panel>
 
@@ -314,7 +317,7 @@ export default function Dashboard() {
                   );
                 })}
               </div>
-              <p className="text-xs text-slate-400 mt-4 pt-3 border-t border-slate-100">{d.projects.count} פרויקטים · תקציב כולל {ils(d.projects.budget)}</p>
+              <p className="text-xs text-slate-400 mt-4 pt-3 border-t border-slate-100">{count(d.projects.count, 'פרויקט אחד', 'פרויקטים')} · תקציב כולל {ils(d.projects.budget)}</p>
             </>
           )}
         </Panel>

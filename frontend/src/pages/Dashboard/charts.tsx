@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 
 // Validated pair (CVD + contrast on white): collected vs. expected money.
@@ -55,9 +55,27 @@ export function Sparkline({ values, currentIndex, w = 120, h = 36, className }: 
   );
 }
 
+// Measures the real width so the chart keeps a fixed height and crisp text at any screen size.
+function useWidth<T extends HTMLElement>(fallback: number) {
+  const ref = useRef<T>(null);
+  const [width, setWidth] = useState(fallback);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setWidth(Math.max(280, Math.round(el.getBoundingClientRect().width)));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, []);
+  return [ref, width] as const;
+}
+
 export function RevenueChart({ data }: { data: MonthPoint[] }) {
   const [hover, setHover] = useState<number | null>(null);
-  const W = 720, H = 240, L = 44, R = 8, T = 16, B = 30;
+  const [boxRef, W] = useWidth<HTMLDivElement>(720);
+  const H = 260, L = 44, R = 8, T = 16, B = 30;
   const plotW = W - L - R, plotH = H - T - B;
   const max = niceMax(Math.max(...data.map((d) => d.collected + d.scheduled)));
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => f * max);
@@ -76,8 +94,8 @@ export function RevenueChart({ data }: { data: MonthPoint[] }) {
   };
 
   return (
-    <div className="relative">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" style={{ direction: 'ltr' }} role="img" aria-label="הכנסות לפי חודש">
+    <div className="relative min-w-0 overflow-hidden" ref={boxRef}>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block max-w-full" style={{ direction: 'ltr' }} role="img" aria-label="הכנסות לפי חודש">
         {ticks.map((t) => (
           <g key={t}>
             <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke={t === 0 ? '#cbd5e1' : GRID} strokeWidth={1} />

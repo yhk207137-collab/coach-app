@@ -20,6 +20,8 @@ function shiftMonth(key: string, delta: number) {
 }
 
 const daysBetween = (from: Date, to: Date) => Math.floor((to.getTime() - from.getTime()) / DAY);
+const ago = (n: number) => (n <= 0 ? 'היום' : n === 1 ? 'אתמול' : n === 2 ? 'לפני יומיים' : `לפני ${n} ימים`);
+const forDays = (n: number) => (n <= 1 ? 'יום אחד' : n === 2 ? 'יומיים' : `${n} ימים`);
 
 const STAGES = [
   { key: 'COLD', label: 'קר' },
@@ -213,37 +215,38 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
     attention.push({
       kind: 'payment', severity: 'critical', amount: r.amount, href: `/clients/${r.payment.clientId}`,
       title: `תשלום באיחור · ${r.payment.client.fullName}`,
-      detail: `היה אמור להיכנס לפני ${daysBetween(r.scheduledDate!, now)} ימים`,
+      detail: `היה אמור להיכנס ${ago(daysBetween(r.scheduledDate!, now))}`,
     });
   }
   for (const p of overduePlans) {
     attention.push({
       kind: 'payment', severity: 'critical', amount: p.balance, href: `/clients/${p.clientId}`,
-      title: `יתרה פתוחה · ${p.name}`, detail: `מועד התשלום עבר לפני ${daysBetween(p.nextPaymentDate!, now)} ימים`,
+      title: `יתרה פתוחה · ${p.name}`, detail: `מועד התשלום עבר ${ago(daysBetween(p.nextPaymentDate!, now))}`,
     });
   }
   for (const q of quotes.filter((q) => q.status === 'SENT' && daysBetween(q.updatedAt, now) >= 5)) {
     attention.push({
       kind: 'quote', severity: 'warning', amount: Math.round(quoteValue(q)) || undefined, href: '/quotes',
-      title: `הצעת מחיר בלי תשובה · ${q.client.fullName}`, detail: `"${q.title}" נשלחה לפני ${daysBetween(q.updatedAt, now)} ימים. כדאי לעשות פולואפ`,
+      title: `הצעת מחיר בלי תשובה · ${q.client.fullName}`, detail: `"${q.title}" נשלחה ${ago(daysBetween(q.updatedAt, now))}. כדאי לעשות פולואפ`,
     });
   }
   for (const c of contracts.filter((c) => daysBetween(c.updatedAt, now) >= 3)) {
     attention.push({
       kind: 'contract', severity: 'warning', href: '/contracts',
-      title: `חוזה לא נחתם · ${c.client.fullName}`, detail: `"${c.title}" ממתין לחתימה ${daysBetween(c.updatedAt, now)} ימים`,
+      title: `חוזה לא נחתם · ${c.client.fullName}`, detail: `"${c.title}" ממתין לחתימה ${forDays(daysBetween(c.updatedAt, now))}`,
     });
   }
   for (const l of leads.filter((l) => ['HOT', 'PROPOSAL'].includes(l.stage) && daysBetween(l.updatedAt, now) >= 7)) {
     attention.push({
       kind: 'lead', severity: 'warning', amount: l.estimatedValue || undefined, href: '/leads',
-      title: `ליד ${l.stage === 'HOT' ? 'חם' : 'בשלב הצעה'} מתקרר · ${l.fullName}`, detail: `אין עדכון כבר ${daysBetween(l.updatedAt, now)} ימים`,
+      title: `ליד ${l.stage === 'HOT' ? 'חם' : 'בשלב הצעה'} מתקרר · ${l.fullName}`, detail: `אין עדכון כבר ${forDays(daysBetween(l.updatedAt, now))}`,
     });
   }
   if (overdueTasks.length) {
     attention.push({
       kind: 'task', severity: 'warning', href: '/tasks',
-      title: `${overdueTasks.length} משימות באיחור`, detail: overdueTasks.slice(0, 2).map((t) => t.title).join(' · '),
+      title: overdueTasks.length === 1 ? 'משימה אחת באיחור' : `${overdueTasks.length} משימות באיחור`,
+      detail: overdueTasks.slice(0, 2).map((t) => t.title.trim()).join(' · '),
     });
   }
   const hasFuture = new Set(futureMeetingClientIds.map((m) => m.clientId));
@@ -254,7 +257,7 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
     if (days !== null && days < 10) continue;
     attention.push({
       kind: 'client', severity: 'info', href: `/clients/${c.id}`,
-      title: `אין פגישה מתוכננת · ${c.fullName}`, detail: days === null ? 'עוד לא נקבעה פגישה ראשונה' : `הפגישה האחרונה הייתה לפני ${days} ימים`,
+      title: `אין פגישה מתוכננת · ${c.fullName}`, detail: days === null ? 'עוד לא נקבעה פגישה ראשונה' : `הפגישה האחרונה הייתה ${ago(days)}`,
     });
   }
   const rank = { critical: 0, warning: 1, info: 2 };
@@ -271,7 +274,8 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
 
   const hour = Number(hourFmt.format(now));
   const greeting = hour >= 5 && hour < 12 ? 'בוקר טוב' : hour < 17 && hour >= 12 ? 'צהריים טובים' : hour >= 17 && hour < 21 ? 'ערב טוב' : 'לילה טוב';
-  const rawName = user?.name && user.name !== 'המאמן' ? user.name : mkt.senderName;
+  // The seeded account name is a placeholder like "המאמן שלי"; the sender name holds the person's real name.
+  const rawName = user?.name && !/^המאמן/.test(user.name.trim()) ? user.name : mkt.senderName;
 
   res.json({
     greeting,
