@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import { cleanEmail, EMAIL_PATTERN } from '../../utils/text';
-import { Contact, CONTACT_STATUS, ContactStatus } from './shared';
+import { Contact, CONTACT_STATUS, ContactStatus, CONSENT_METHOD } from './shared';
 import { parseTable, rowsToContacts } from './importParser';
 
 interface Stats {
@@ -257,8 +257,9 @@ function ContactDrawer({ id, tags, onClose, onChanged }: { id: string; tags: str
 
             <div className="rounded-xl bg-slate-50 p-4 text-xs text-slate-500 space-y-1">
               <p className="font-medium text-slate-700 flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5" /> תיעוד הסכמה</p>
-              <p>{c.consentText || '—'}</p>
-              {c.consentAt && <p>{format(new Date(c.consentAt), 'd/M/yyyy HH:mm')}</p>}
+              {c.consentMethod && <p className="text-slate-700">{CONSENT_METHOD[c.consentMethod] || c.consentMethod}</p>}
+              <p>"{c.consentText || '—'}"</p>
+              {c.consentAt && <p>{format(new Date(c.consentAt), 'd/M/yyyy HH:mm')}{c.consentIp ? <> · <span dir="ltr">IP {c.consentIp}</span></> : null}</p>}
               {c.consentPage && <p dir="ltr" className="truncate">{c.consentPage}</p>}
               {c.unsubscribedAt && <p className="text-slate-700">הוסר/ה מהרשימה ב-{format(new Date(c.unsubscribedAt), 'd/M/yyyy HH:mm')}</p>}
             </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Loader2, ImagePlus, CheckCircle2, AlertTriangle, Globe } from 'lucide-react';
 import toast from 'react-hot-toast';
+import clsx from 'clsx';
 import api from '../../services/api';
 import { DomainStatus, MarketingSettings } from './shared';
 import MediaPicker from './MediaPicker';
@@ -96,8 +97,13 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                 <input className="input" value={form.businessName} onChange={(e) => set('businessName', e.target.value)} />
               </div>
               <div>
-                <label className="label">פרטי קשר / כתובת</label>
-                <input className="input" value={form.details} onChange={(e) => set('details', e.target.value)} placeholder="טלפון, כתובת או אתר" />
+                <label className="label">כתובת העסק *</label>
+                <input className={clsx('input', !form.address.trim() && 'border-amber-300')} value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="רחוב, מספר, עיר" />
+                <p className="text-xs text-slate-400 mt-1">החוק מחייב שם, כתובת ודרך ליצירת קשר בכל מייל פרסומי. בלי כתובת אי אפשר לשלוח קמפיין.</p>
+              </div>
+              <div>
+                <label className="label">פרטי קשר</label>
+                <input className="input" value={form.details} onChange={(e) => set('details', e.target.value)} placeholder="טלפון, מייל או אתר" />
               </div>
               <div>
                 <label className="label">למה הנמען מקבל את המייל</label>

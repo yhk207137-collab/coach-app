@@ -80,6 +80,7 @@ export default function SendStep({ campaign, meta, onMeta, flush, settings, doma
     { ok: missingLinks === 0, label: missingLinks ? `${missingLinks} כפתורים בלי קישור` : 'לכל הכפתורים יש קישור' },
     { ok: emptyImages === 0, label: emptyImages ? `${emptyImages} תמונות שלא נבחרו (לא יוצגו)` : 'כל התמונות נבחרו', soft: true },
     ...(isWelcome ? [] : [{ ok: (audience?.count ?? 0) > 0, label: `${audience?.count ?? 0} נמענים רשומים בקהל שנבחר` }]),
+    ...(isWelcome ? [] : [{ ok: !!settings?.address?.trim(), label: settings?.address?.trim() ? 'כתובת העסק מופיעה בתחתית' : 'חסרה כתובת עסק (החוק מחייב) · בהגדרות הדיוור' }]),
     { ok: !!domain?.ready, label: domain?.ready ? `נשלח מהכתובת ${domain.from}` : 'דומיין שליחה עדיין לא מחובר' },
   ];
   const blocking = checks.filter((c) => !c.ok && !(c as any).soft);

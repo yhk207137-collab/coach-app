@@ -27,11 +27,13 @@ publicRouter.post('/subscribe', async (req, res) => {
 
   const name = str(b.name, 80);
   const list = str(b.list, 40);
+  // "checkbox" = the person actively ticked an explicit consent box; "form" = older form without one.
   const consent = {
     consentAt: new Date(),
-    consentText: str(b.consent, 300) || 'נרשם/ה בטופס ההרשמה לדיוור',
+    consentText: str(b.consent, 500) || 'נרשם/ה בטופס ההרשמה לדיוור',
     consentPage: str(b.page, 300),
     consentIp: String(req.ip || '').slice(0, 64),
+    consentMethod: b.agree === 'yes' ? 'checkbox' : 'form',
   };
 
   const existing = await prisma.contact.findUnique({ where: { email } });
@@ -93,8 +95,8 @@ publicRouter.post('/resubscribe/:token', async (req, res) => {
     await prisma.contact.update({
       where: { id: contact.id },
       data: {
-        status: 'SUBSCRIBED', unsubscribedAt: null, consentAt: new Date(),
-        consentText: 'חזר/ה לרשימה בלחיצה בדף ההסרה', consentIp: String(req.ip || '').slice(0, 64),
+        status: 'SUBSCRIBED', unsubscribedAt: null, consentAt: new Date(), consentMethod: 'resubscribe',
+        consentText: 'חזר/ה לרשימה בלחיצה על "חזרה לרשימה" בדף ההסרה', consentIp: String(req.ip || '').slice(0, 64),
       },
     });
   }

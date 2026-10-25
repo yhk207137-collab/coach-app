@@ -11,6 +11,7 @@ export interface MarketingSettings {
   senderName: string;
   replyTo: string;
   businessName: string;
+  address: string;
   details: string;
   reason: string;
   brand: string;
@@ -30,6 +31,7 @@ export async function getMarketingSettings(): Promise<MarketingSettings> {
     senderName: saved.senderName ?? 'יהושע כהן',
     replyTo: saved.replyTo ?? coach?.email ?? '',
     businessName: saved.businessName ?? 'יהושע כהן — אסטרטגיה וליווי לעמותות',
+    address: saved.address ?? '',
     details: saved.details ?? 'לפרטים: 050-4167903',
     reason: saved.reason ?? 'קיבלת את המייל הזה כי נרשמת לדיוור "המדריך לעמותה מנצחת".',
     brand: saved.brand ?? '#6d28d9',
@@ -44,6 +46,7 @@ export async function saveMarketingSettings(patch: Partial<MarketingSettings>) {
     senderName: patch.senderName !== undefined ? clean(patch.senderName, 60) : current.senderName,
     replyTo: patch.replyTo !== undefined ? clean(patch.replyTo, 120).toLowerCase() : current.replyTo,
     businessName: patch.businessName !== undefined ? clean(patch.businessName, 120) : current.businessName,
+    address: patch.address !== undefined ? clean(patch.address, 160) : current.address,
     details: patch.details !== undefined ? clean(patch.details, 200) : current.details,
     reason: patch.reason !== undefined ? clean(patch.reason, 200) : current.reason,
     brand: patch.brand !== undefined && /^#[0-9a-fA-F]{6}$/.test(String(patch.brand)) ? String(patch.brand) : current.brand,
@@ -57,7 +60,7 @@ export async function saveMarketingSettings(patch: Partial<MarketingSettings>) {
   return next;
 }
 
-const footerFrom = (s: MarketingSettings): FooterInfo => ({ businessName: s.businessName, details: s.details, reason: s.reason });
+const footerFrom = (s: MarketingSettings): FooterInfo => ({ businessName: s.businessName, address: s.address, details: s.details, reason: s.reason });
 
 // ── Public URL used inside emails (links, pixel, unsubscribe) ────────────────
 

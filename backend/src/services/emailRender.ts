@@ -7,6 +7,7 @@ export interface MergeData {
 
 export interface FooterInfo {
   businessName: string;
+  address?: string;
   details: string;
   reason: string;
 }
@@ -219,12 +220,19 @@ export function renderEmail(design: any, ctx: RenderContext): RenderedEmail {
     }
   }
 
+  // Israeli law (Communications Law §30A): sender name, address and contact details, and a simple way to opt out.
+  const contactLine = [ctx.footer.address, ctx.footer.details].filter(Boolean).map(esc).join(' · ');
   const footerLines = [
     ctx.footer.businessName ? `<strong>${esc(ctx.footer.businessName)}</strong>` : '',
-    ctx.footer.details ? esc(ctx.footer.details) : '',
+    contactLine,
     ctx.footer.reason ? esc(ctx.footer.reason) : '',
-    `<a href="${esc(ctx.unsubscribeUrl)}" target="_blank" style="color:#64748b;text-decoration:underline;">להסרה מרשימת התפוצה לחצו כאן</a>`,
   ].filter(Boolean).join('<br>');
+  const unsubscribeButton =
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:14px auto 6px auto;"><tr>` +
+    `<td align="center" style="border:1px solid #94a3b8;border-radius:8px;background:#ffffff;">` +
+    `<a href="${esc(ctx.unsubscribeUrl)}" target="_blank" style="display:inline-block;padding:9px 20px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;color:#334155;text-decoration:none;border-radius:8px;">הסרה מרשימת התפוצה</a>` +
+    `</td></tr></table>` +
+    `<div style="font-size:11px;color:#94a3b8;">אפשר גם להשיב למייל הזה עם המילה "הסר". ההסרה מיידית.</div>`;
 
   const preheader = ctx.preheader ? merge(ctx.preheader) : '';
   const fontLink = s.font === 'heebo'
@@ -260,7 +268,7 @@ ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;c
     <tr><td style="height:16px;font-size:0;line-height:0;">&nbsp;</td></tr>
   </table>
   <table role="presentation" class="container" width="${WIDTH}" cellpadding="0" cellspacing="0" border="0" dir="rtl" style="width:${WIDTH}px;max-width:${WIDTH}px;">
-    <tr><td align="center" style="padding:20px ${PAD}px 8px ${PAD}px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.7;color:#64748b;text-align:center;">${footerLines}</td></tr>
+    <tr><td align="center" style="padding:20px ${PAD}px 8px ${PAD}px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.7;color:#64748b;text-align:center;">${footerLines}${unsubscribeButton}</td></tr>
   </table>
 </td></tr>
 </table>
@@ -274,9 +282,10 @@ ${ctx.openPixelUrl ? `<img src="${esc(ctx.openPixelUrl)}" width="1" height="1" a
     '',
     '―――',
     ctx.footer.businessName,
-    ctx.footer.details,
+    [ctx.footer.address, ctx.footer.details].filter(Boolean).join(' · '),
     ctx.footer.reason,
     `להסרה מרשימת התפוצה: ${ctx.unsubscribeUrl}`,
+    'אפשר גם להשיב למייל הזה עם המילה "הסר".',
   ].filter((l) => l !== undefined && l !== null).join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
 
   return { html, text };

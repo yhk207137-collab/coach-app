@@ -70,6 +70,8 @@ export interface Contact {
   consentAt: string | null;
   consentText: string | null;
   consentPage: string | null;
+  consentIp?: string | null;
+  consentMethod?: string | null;
   unsubscribedAt: string | null;
   createdAt: string;
 }
@@ -78,6 +80,7 @@ export interface MarketingSettings {
   senderName: string;
   replyTo: string;
   businessName: string;
+  address: string;
   details: string;
   reason: string;
   brand: string;
@@ -105,6 +108,14 @@ export const CONTACT_STATUS: Record<ContactStatus, { label: string; cls: string 
   UNSUBSCRIBED: { label: 'הוסר', cls: 'bg-slate-100 text-slate-500' },
   BOUNCED: { label: 'כתובת שגויה', cls: 'bg-amber-100 text-amber-700' },
   COMPLAINED: { label: 'דיווח ספאם', cls: 'bg-red-100 text-red-600' },
+};
+
+export const CONSENT_METHOD: Record<string, string> = {
+  checkbox: 'סימן/ה תיבת הסכמה בטופס ההרשמה',
+  form: 'שלח/ה את טופס ההרשמה (גרסה ישנה, בלי תיבת סימון)',
+  manual: 'נוסף/ה ידנית, עם אישור שהסכים/ה',
+  import: 'ייבוא מרשימת נרשמים',
+  resubscribe: 'חזר/ה לרשימה בעצמו/ה',
 };
 
 export const CAMPAIGN_STATUS: Record<CampaignStatus, { label: string; cls: string }> = {

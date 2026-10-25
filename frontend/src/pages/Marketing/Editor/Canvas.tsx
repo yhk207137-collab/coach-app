@@ -195,9 +195,11 @@ export default function Canvas(p: Props) {
       {p.settings && (
         <div className="mx-auto text-center py-5 px-8 select-none" style={{ width: p.mobile ? 375 : 600, maxWidth: '100%', fontFamily: 'Arial', fontSize: 12, lineHeight: 1.7, color: '#64748b' }}>
           {p.settings.businessName && <div><strong>{p.settings.businessName}</strong></div>}
-          {p.settings.details && <div>{p.settings.details}</div>}
+          {(p.settings.address || p.settings.details) && <div>{[p.settings.address, p.settings.details].filter(Boolean).join(' · ')}</div>}
+          {!p.settings.address && <div className="text-amber-600">⚠ חסרה כתובת העסק (בהגדרות הדיוור)</div>}
           {p.settings.reason && <div>{p.settings.reason}</div>}
-          <div className="underline">להסרה מרשימת התפוצה לחצו כאן</div>
+          <div className="inline-block mt-3 mb-1 px-5 py-2 rounded-lg border border-slate-400 bg-white text-[13px] font-bold text-slate-700">הסרה מרשימת התפוצה</div>
+          <div className="text-[11px] text-slate-400">אפשר גם להשיב למייל הזה עם המילה "הסר". ההסרה מיידית.</div>
           <div className="mt-2 text-[11px] text-slate-400 no-underline">(התחתית מתווספת אוטומטית לכל מייל, ונערכת בהגדרות הדיוור)</div>
         </div>
       )}

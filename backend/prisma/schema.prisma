@@ -398,6 +398,7 @@ model Contact {
   consentText    String?
   consentPage    String?
   consentIp      String?
+  consentMethod  String?
   unsubscribedAt DateTime?
   unsubToken     String         @unique @default(cuid())
   sends          CampaignSend[]

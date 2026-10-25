@@ -78,15 +78,21 @@ router.get('/contacts/stats', async (_req, res) => {
   res.json({ total, subscribed, unsubscribed, bounced, newThisMonth, tags: tagRows, sources: sourceRows });
 });
 
+const CONSENT_METHOD_HE: Record<string, string> = {
+  checkbox: 'סימן/ה תיבת הסכמה בטופס', form: 'שלח/ה טופס הרשמה', manual: 'הוסף ידנית', import: 'ייבוא', resubscribe: 'חזר/ה לרשימה בעצמו/ה',
+};
+const fmtDateTime = (d: Date | null) => (d ? d.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }) : '');
+
 router.get('/contacts/export.csv', async (req, res) => {
   const contacts = await prisma.contact.findMany({ where: contactFilter(req.query), orderBy: { createdAt: 'desc' } });
   const statusHe: Record<string, string> = { SUBSCRIBED: 'רשום', UNSUBSCRIBED: 'הוסר', BOUNCED: 'כתובת שגויה', COMPLAINED: 'דיווח ספאם' };
   const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [
-    ['שם', 'מייל', 'טלפון', 'סטטוס', 'תגיות', 'מקור', 'תאריך הרשמה', 'הערות'].map(q).join(','),
+    ['שם', 'מייל', 'טלפון', 'סטטוס', 'תגיות', 'מקור', 'תאריך הרשמה', 'הערות', 'מועד ההסכמה', 'אופן ההסכמה', 'נוסח ההסכמה', 'דף ההרשמה', 'כתובת IP', 'מועד הסרה'].map(q).join(','),
     ...contacts.map((c) => [
       c.name, c.email, c.phone, statusHe[c.status], c.tags.join(' | '), c.source,
       c.createdAt.toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' }), c.notes,
+      fmtDateTime(c.consentAt), CONSENT_METHOD_HE[c.consentMethod || ''] || c.consentMethod, c.consentText, c.consentPage, c.consentIp, fmtDateTime(c.unsubscribedAt),
     ].map(q).join(',')),
   ];
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -124,6 +130,7 @@ router.post('/contacts', async (req, res) => {
         source: 'ידני',
         consentAt: new Date(),
         consentText: 'אושר ידנית על ידי בעל המערכת',
+        consentMethod: 'manual',
       },
     });
     res.status(201).json(contact);
@@ -147,7 +154,7 @@ router.put('/contacts/:id', async (req, res) => {
   if (req.body.status === 'UNSUBSCRIBED') Object.assign(data, { status: 'UNSUBSCRIBED', unsubscribedAt: new Date() });
   if (req.body.status === 'SUBSCRIBED') {
     if (!req.body.consentConfirmed) return res.status(400).json({ error: 'יש לאשר שאיש הקשר ביקש לחזור לרשימה' });
-    Object.assign(data, { status: 'SUBSCRIBED', unsubscribedAt: null, consentAt: new Date(), consentText: 'הוחזר לרשימה ידנית לבקשת איש הקשר' });
+    Object.assign(data, { status: 'SUBSCRIBED', unsubscribedAt: null, consentAt: new Date(), consentMethod: 'manual', consentText: 'הוחזר לרשימה ידנית לבקשת איש הקשר' });
   }
   try {
     res.json(await prisma.contact.update({ where: { id: req.params.id }, data }));
@@ -199,6 +206,7 @@ router.post('/contacts/import', async (req, res) => {
           email, name, phone, tags, source,
           consentAt: row.date && !isNaN(Date.parse(row.date)) ? new Date(row.date) : new Date(),
           consentText: str(req.body.consentText, 300) || 'יובא ברשימה שאושרה כרשימת נרשמים',
+          consentMethod: 'import',
         },
       });
       created++;
@@ -443,6 +451,10 @@ router.post('/campaigns/:id/send', async (req, res) => {
   if (!campaign.subject.trim()) return res.status(400).json({ error: 'חסר נושא למייל' });
   const domain = await sendingDomainStatus();
   if (!domain.ready) return res.status(400).json({ error: 'כדי לשלוח לנרשמים צריך קודם לחבר דומיין שליחה (בהגדרות הדיוור)' });
+  const mktSettings = await getMarketingSettings();
+  if (!mktSettings.address.trim()) {
+    return res.status(400).json({ error: 'החוק מחייב כתובת עסק בתחתית המייל. הוסיפו אותה בהגדרות הדיוור.' });
+  }
   let scheduledAt: Date | null = null;
   if (req.body.scheduledAt) {
     scheduledAt = new Date(req.body.scheduledAt);
