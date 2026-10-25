@@ -389,6 +389,10 @@ router.delete('/campaigns/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
+// Account names default to a placeholder like "המאמן שלי"; previews should greet the real person.
+const ownerName = (name: string | null | undefined, s: { senderName: string }) =>
+  name && !/^המאמן/.test(name.trim()) ? name : s.senderName || 'ישראל ישראלי';
+
 router.post('/campaigns/:id/preview', async (req: AuthRequest, res) => {
   const campaign = await prisma.campaign.findUnique({ where: { id: req.params.id } });
   if (!campaign) return res.status(404).json({ error: 'הקמפיין לא נמצא' });
@@ -401,7 +405,7 @@ router.post('/campaigns/:id/preview', async (req: AuthRequest, res) => {
     markAsAd: req.body.markAsAd ?? campaign.markAsAd,
   };
   const coach = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { name: true, email: true } });
-  const sample = { name: str(req.body.sampleName, 80) ?? coach?.name ?? 'ישראל ישראלי', email: coach?.email ?? '', unsubToken: 'preview' };
+  const sample = { name: str(req.body.sampleName, 80) ?? ownerName(coach?.name, settings), email: coach?.email ?? '', unsubToken: 'preview' };
   const built = buildForSend(merged, sample, null, await getBaseUrl(), settings);
   res.json({ subject: built.subject, html: built.html, text: built.text, fromName: merged.fromName || settings.senderName });
 });
@@ -417,7 +421,7 @@ router.post('/campaigns/:id/test', async (req: AuthRequest, res) => {
   const base = await getBaseUrl();
   const results: { email: string; ok: boolean; error?: string }[] = [];
   for (const email of emails) {
-    const built = buildForSend(campaign, { name: coach?.name ?? null, email, unsubToken: 'preview' }, null, base, settings);
+    const built = buildForSend(campaign, { name: ownerName(coach?.name, settings), email, unsubToken: 'preview' }, null, base, settings);
     try {
       await sendEmail(email, `[בדיקה] ${built.subject}`, built.html, [], {
         fromName: campaign.fromName || settings.senderName,
