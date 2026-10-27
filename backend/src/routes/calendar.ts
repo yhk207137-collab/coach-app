@@ -36,14 +36,15 @@ router.get('/callback', async (req, res) => {
   try {
     const tokens = await getTokensFromCode(code as string);
     await saveTokens(tokens);
-    const frontendUrl = `${req.protocol}://${req.get('host')}`;
+    // The app may be open on the custom domain while Google returns to the Railway host.
+    const origins = [...new Set([`${req.protocol}://${req.get('host')}`, process.env.PUBLIC_URL?.replace(/\/$/, '')].filter(Boolean))];
     res.send(`
       <html><body dir="rtl" style="font-family:Arial;text-align:center;padding:40px">
         <h2>✅ יומן גוגל חובר בהצלחה!</h2>
         <p>אפשר לסגור את החלון הזה.</p>
         <script>
           setTimeout(() => {
-            window.opener && window.opener.postMessage('google-calendar-connected', '${frontendUrl}');
+            if (window.opener) ${JSON.stringify(origins)}.forEach((o) => window.opener.postMessage('google-calendar-connected', o));
             window.close();
           }, 1500);
         </script>
