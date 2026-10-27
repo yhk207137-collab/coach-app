@@ -79,6 +79,8 @@ export async function sendEmail(
   if (!resendKey()) throw new EmailError('Email not configured (SMTP_PASS missing)');
   const fromName = options.fromName || process.env.FROM_NAME || 'ליוי שיווק ופרסום';
   const fromEmail = fromEmailAddress();
+  // Replies go to a real inbox even when the sending address has no mailbox of its own.
+  const replyTo = options.replyTo || process.env.REPLY_TO || undefined;
 
   // Railway blocks outbound SMTP on non-Pro plans, so Resend is called over HTTPS instead.
   if (usesResend()) {
@@ -91,7 +93,7 @@ export async function sendEmail(
         subject,
         html,
         ...(options.text ? { text: options.text } : {}),
-        ...(options.replyTo ? { reply_to: options.replyTo } : {}),
+        ...(replyTo ? { reply_to: replyTo } : {}),
         ...(options.headers ? { headers: options.headers } : {}),
         ...(attachments.length
           ? { attachments: attachments.map((a) => ({ filename: a.filename, content: a.content.toString('base64') })) }
@@ -117,7 +119,7 @@ export async function sendEmail(
   });
   const info = await transport.sendMail({
     from: `"${fromName}" <${fromEmail}>`, to, subject, html, attachments,
-    text: options.text, replyTo: options.replyTo, headers: options.headers,
+    text: options.text, replyTo, headers: options.headers,
   });
   return info.messageId;
 }
