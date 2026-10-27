@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, Calendar, CheckSquare, CreditCard, FolderOpen, Sparkles, LogOut, Briefcase, CalendarDays,
+  LayoutDashboard, Users, Calendar, CheckSquare, CreditCard, FolderOpen, Sparkles, LogOut, CalendarDays,
   BarChart2, X, Settings, FileText, FolderKanban, FileSignature, Target, Package, Mail, BookUser, ChevronDown,
   Megaphone, Wallet, CalendarClock,
 } from 'lucide-react';
@@ -58,7 +58,7 @@ interface Props {
 }
 
 export default function Sidebar({ open, onClose }: Props) {
-  const { user, clearAuth } = useAuthStore();
+  const { clearAuth } = useAuthStore();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const activeGroup = GROUPS.find((g) => isInGroup(g, pathname))?.key ?? null;
@@ -99,19 +99,17 @@ export default function Sidebar({ open, onClose }: Props) {
           'lg:static lg:w-64 lg:z-auto lg:translate-x-0 lg:flex-shrink-0',
           open ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
         )}
-        style={{ background: 'linear-gradient(160deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%)' }}
+        style={{ background: 'linear-gradient(160deg, #0a1e3c 0%, #0f2547 55%, #13294d 100%)' }}
       >
-        <div className="px-6 py-6 border-b border-white/10">
+        <div className="px-5 py-5 border-b border-white/10">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gradient-to-br from-pink-400 to-purple-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                <Briefcase className="w-5 h-5 text-white" />
+            <NavLink to="/" onClick={handleNav} className="flex items-center gap-3 min-w-0" aria-label="יהושע כהן — אסטרטגיה וליווי לעמותות">
+              <img src="/brand/mark-light.png" alt="" className="h-10 w-auto flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="font-extrabold text-white text-[17px] leading-tight tracking-tight">יהושע כהן</p>
+                <p className="text-[11px] text-primary-200/80 leading-tight mt-0.5">אסטרטגיה וליווי לעמותות</p>
               </div>
-              <div>
-                <p className="font-bold text-white text-sm leading-tight">ליוי שיווק ופרסום</p>
-                <p className="text-xs text-white/50">{user?.name}</p>
-              </div>
-            </div>
+            </NavLink>
             <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg text-white/40 hover:text-white">
               <X className="w-5 h-5" />
             </button>
@@ -141,7 +139,7 @@ export default function Sidebar({ open, onClose }: Props) {
                   >
                     <g.icon size={18} className="flex-shrink-0" />
                     <span className="flex-1 text-right">{g.label}</span>
-                    {hasActive && !expanded && <span className="w-1.5 h-1.5 rounded-full bg-pink-400" aria-hidden="true" />}
+                    {hasActive && !expanded && <span className="w-1.5 h-1.5 rounded-full bg-primary-300" aria-hidden="true" />}
                     <ChevronDown size={16} className={clsx('flex-shrink-0 opacity-60 transition-transform duration-200', expanded && 'rotate-180')} />
                   </button>
                   <div className={clsx('grid transition-all duration-200 ease-out', expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0')}>

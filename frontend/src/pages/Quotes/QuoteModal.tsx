@@ -76,7 +76,7 @@ export default function QuoteModal({ quote, onClose, onSave }: Props) {
                 value={clientId}
                 onChange={e => setClientId(e.target.value)}
                 required
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
               >
                 <option value="">בחר לקוח</option>
                 {clients.map(c => (
@@ -92,7 +92,7 @@ export default function QuoteModal({ quote, onClose, onSave }: Props) {
                 onChange={e => setTitle(e.target.value)}
                 required
                 placeholder="לדוגמה: שירותי שיווק דיגיטלי Q3 2026"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
               />
             </div>
             <div>
@@ -100,7 +100,7 @@ export default function QuoteModal({ quote, onClose, onSave }: Props) {
               <select
                 value={status}
                 onChange={e => setStatus(e.target.value as Quote['status'])}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
               >
                 <option value="DRAFT">טיוטה</option>
                 <option value="SENT">נשלח</option>
@@ -114,7 +114,7 @@ export default function QuoteModal({ quote, onClose, onSave }: Props) {
                 type="date"
                 value={validUntil}
                 onChange={e => setValidUntil(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
               />
             </div>
           </div>
@@ -122,7 +122,7 @@ export default function QuoteModal({ quote, onClose, onSave }: Props) {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-gray-700">פריטי שירות</label>
-              <button type="button" onClick={addItem} className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 font-medium">
+              <button type="button" onClick={addItem} className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 font-medium">
                 <Plus className="w-3.5 h-3.5" /> הוסף פריט
               </button>
             </div>
@@ -139,7 +139,7 @@ export default function QuoteModal({ quote, onClose, onSave }: Props) {
                       onChange={e => setItem(idx, 'description', e.target.value)}
                       placeholder="תיאור השירות *"
                       required
-                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
                     />
                   </div>
                   <div className="col-span-2">
@@ -148,7 +148,7 @@ export default function QuoteModal({ quote, onClose, onSave }: Props) {
                       value={item.duration ?? ''}
                       onChange={e => setItem(idx, 'duration', e.target.value)}
                       placeholder="משך (לדוג׳ 3 חודשים)"
-                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
                     />
                   </div>
                   <div className="col-span-1">
@@ -157,7 +157,7 @@ export default function QuoteModal({ quote, onClose, onSave }: Props) {
                       value={item.quantity}
                       onChange={e => setItem(idx, 'quantity', e.target.value)}
                       min={1}
-                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
                     />
                   </div>
                   <div className="col-span-2">
@@ -169,7 +169,7 @@ export default function QuoteModal({ quote, onClose, onSave }: Props) {
                         onChange={e => setItem(idx, 'price', e.target.value)}
                         min={0}
                         placeholder="0"
-                        className="w-full border border-gray-200 rounded-lg pr-6 pl-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+                        className="w-full border border-gray-200 rounded-lg pr-6 pl-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
                       />
                     </div>
                   </div>
@@ -184,7 +184,7 @@ export default function QuoteModal({ quote, onClose, onSave }: Props) {
               ))}
             </div>
             <div className="flex justify-end mt-3 text-sm font-semibold text-gray-700">
-              סה"כ: <span className="text-purple-700 mr-2">₪{total.toLocaleString('he-IL')}</span>
+              סה"כ: <span className="text-primary-700 mr-2">₪{total.toLocaleString('he-IL')}</span>
             </div>
           </div>
 
@@ -195,7 +195,7 @@ export default function QuoteModal({ quote, onClose, onSave }: Props) {
               onChange={e => setNotes(e.target.value)}
               rows={3}
               placeholder="תנאי תשלום, הערות מיוחדות..."
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
             />
           </div>
         </form>
@@ -205,7 +205,7 @@ export default function QuoteModal({ quote, onClose, onSave }: Props) {
           <button
             onClick={handleSubmit as unknown as React.MouseEventHandler}
             disabled={saving}
-            className="px-5 py-2 rounded-xl bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
+            className="px-5 py-2 rounded-xl bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
           >
             {saving ? 'שומר...' : 'שמור'}
           </button>

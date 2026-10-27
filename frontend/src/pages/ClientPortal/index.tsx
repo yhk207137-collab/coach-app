@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, CheckSquare, FileText, LogOut, Briefcase, TrendingUp, FolderOpen, CheckCircle } from 'lucide-react';
+import { Calendar, CheckSquare, FileText, LogOut, TrendingUp, FolderOpen, CheckCircle } from 'lucide-react';
 import api from '../../services/api';
 import { Client, TaskStatus } from '../../types';
 import { format, isFuture } from 'date-fns';
@@ -68,9 +68,7 @@ export default function ClientPortal() {
       <header className="bg-white border-b border-slate-100 shadow-sm">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-primary-600 rounded-xl flex items-center justify-center">
-              <Briefcase className="w-5 h-5 text-white" />
-            </div>
+            <img src="/brand/mark.png" alt="יהושע כהן" className="h-9 w-auto flex-shrink-0" />
             <div>
               <p className="font-bold text-slate-900 text-sm">האזור האישי שלי</p>
               <p className="text-xs text-slate-500">{client.fullName}</p>

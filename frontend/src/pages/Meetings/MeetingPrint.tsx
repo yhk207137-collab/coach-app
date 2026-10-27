@@ -43,7 +43,7 @@ export default function MeetingPrint({ meeting, onClose }: Props) {
         </div>
         <button
           onClick={() => window.print()}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 text-sm font-medium"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 text-sm font-medium"
         >
           <Printer className="w-4 h-4" /> הדפס / שמור PDF
         </button>
@@ -55,19 +55,19 @@ export default function MeetingPrint({ meeting, onClose }: Props) {
           style={{ fontFamily: "'Segoe UI', 'Arial Hebrew', Arial, sans-serif" }}
         >
           {/* Header */}
-          <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }} className="rounded-t-2xl print:rounded-none px-10 py-8 text-white">
+          <div style={{ background: 'linear-gradient(135deg, #0a1e3c 0%, #13294d 100%)' }} className="rounded-t-2xl print:rounded-none px-10 py-8 text-white">
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-4">
                 {logo && <img src={logo} alt="לוגו" className="h-12 object-contain rounded-lg bg-white/10 px-2 py-1" />}
                 <div>
                   <div className="text-2xl font-bold tracking-wide">ליוי שיווק ופרסום</div>
-                  <div className="text-purple-200 text-sm mt-1">סוכנות שיווק ופרסום לעמותות</div>
+                  <div className="text-primary-200 text-sm mt-1">סוכנות שיווק ופרסום לעמותות</div>
                 </div>
               </div>
               <div className="text-left">
-                <div className="text-xs text-purple-300 uppercase tracking-widest">סיכום פגישה</div>
+                <div className="text-xs text-primary-300 uppercase tracking-widest">סיכום פגישה</div>
                 <div className="text-lg font-bold mt-1">{meeting.client?.fullName}</div>
-                <div className="text-sm text-purple-200 mt-0.5">{meeting.type}</div>
+                <div className="text-sm text-primary-200 mt-0.5">{meeting.type}</div>
               </div>
             </div>
           </div>
@@ -94,13 +94,13 @@ export default function MeetingPrint({ meeting, onClose }: Props) {
               s.type === 'STRUCTURED' ? (
                 sections.map(sec => (
                   <div key={sec.label}>
-                    <div className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1">{sec.label}</div>
+                    <div className="text-xs font-semibold text-primary-700 uppercase tracking-wide mb-1">{sec.label}</div>
                     <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{sec.value}</div>
                   </div>
                 ))
               ) : (
                 <div>
-                  <div className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1">סיכום</div>
+                  <div className="text-xs font-semibold text-primary-700 uppercase tracking-wide mb-1">סיכום</div>
                   <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{s.freeText}</div>
                 </div>
               )
@@ -112,7 +112,7 @@ export default function MeetingPrint({ meeting, onClose }: Props) {
             {s?.tags && s.tags.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-2">
                 {s.tags.map(t => (
-                  <span key={t.id} className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-medium">#{t.name}</span>
+                  <span key={t.id} className="px-3 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-medium">#{t.name}</span>
                 ))}
               </div>
             )}
@@ -120,7 +120,7 @@ export default function MeetingPrint({ meeting, onClose }: Props) {
             {/* Meeting notes */}
             {meeting.notes && (
               <div>
-                <div className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1">הערות לפגישה</div>
+                <div className="text-xs font-semibold text-primary-700 uppercase tracking-wide mb-1">הערות לפגישה</div>
                 <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-sm text-amber-800 whitespace-pre-wrap">{meeting.notes}</div>
               </div>
             )}

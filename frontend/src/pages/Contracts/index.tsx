@@ -92,7 +92,7 @@ export default function ContractsPage() {
         </div>
         <button
           onClick={() => { setEditContract(null); setShowModal(true); }}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-medium"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-medium"
         >
           <Plus className="w-4 h-4" />
           חוזה חדש
@@ -126,7 +126,7 @@ export default function ContractsPage() {
                 </div>
               </div>
               <div className="flex gap-1 flex-shrink-0">
-                <button onClick={() => setViewContract(c)} className="p-2 rounded-lg hover:bg-purple-50 text-gray-400 hover:text-purple-600" title="צפה / הדפס">
+                <button onClick={() => setViewContract(c)} className="p-2 rounded-lg hover:bg-primary-50 text-gray-400 hover:text-primary-600" title="צפה / הדפס">
                   <Eye className="w-4 h-4" />
                 </button>
                 {c.status !== 'SIGNED' && (
@@ -134,7 +134,7 @@ export default function ContractsPage() {
                     <Send className="w-4 h-4" />
                   </button>
                 )}
-                <button onClick={() => { setEditContract(c); setShowModal(true); }} className="p-2 rounded-lg hover:bg-purple-50 text-gray-400 hover:text-purple-600">
+                <button onClick={() => { setEditContract(c); setShowModal(true); }} className="p-2 rounded-lg hover:bg-primary-50 text-gray-400 hover:text-primary-600">
                   <Edit2 className="w-4 h-4" />
                 </button>
                 <button onClick={() => handleDelete(c.id)} className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500">
@@ -185,7 +185,7 @@ export default function ContractsPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => { copyLink(linkModal.id); }}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 font-medium"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium"
               >
                 <Copy className="w-4 h-4" /> העתק קישור
               </button>

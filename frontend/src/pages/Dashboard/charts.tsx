@@ -2,9 +2,10 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 
 // Validated pair (CVD + contrast on white): collected vs. expected money.
-export const C_COLLECTED = '#7c3aed';
-export const C_EXPECTED = '#0d9488';
-const GRID = '#ebe9f2';
+// Brand teal + brand-family blue; validated with the dataviz palette checker (CVD ΔE 17.7, contrast ≥ 3:1).
+export const C_COLLECTED = '#009cb3';
+export const C_EXPECTED = '#2d5bd0';
+const GRID = '#e8edf1';
 const AXIS = '#94a3b8';
 
 export const ils = (n: number) => `₪${Math.round(n).toLocaleString('he-IL')}`;

@@ -148,6 +148,6 @@ export const RICH_TYPES: BlockType[] = ['heading', 'text', 'quote', 'imageText']
 
 export const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 
-export const COLOR_SWATCHES = ['#1e293b', '#475569', '#6d28d9', '#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777', '#ffffff'];
+export const COLOR_SWATCHES = ['#0a1e3c', '#007f91', '#5ce1e6', '#1e293b', '#475569', '#2563eb', '#059669', '#d97706', '#dc2626', '#ffffff'];
 
 export const HEADING_SIZES = { xl: 30, lg: 24, md: 20 } as const;

@@ -117,7 +117,7 @@ export default function ProjectsPage() {
         </div>
         <button
           onClick={() => { setEditProject(null); setShowModal(true); }}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-medium"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-medium"
         >
           <Plus className="w-4 h-4" />
           פרויקט חדש
@@ -143,7 +143,7 @@ export default function ProjectsPage() {
             return (
               <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-5 flex items-center gap-4">
-                  <button onClick={() => toggle(p.id)} className="text-gray-400 hover:text-purple-600">
+                  <button onClick={() => toggle(p.id)} className="text-gray-400 hover:text-primary-600">
                     {isOpen ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
                   </button>
                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setDetail(p)}>
@@ -158,7 +158,7 @@ export default function ProjectsPage() {
                     {totalTasks > 0 && (
                       <div className="mt-2 flex items-center gap-2">
                         <div className="flex-1 bg-gray-100 rounded-full h-1.5 max-w-32">
-                          <div className="bg-purple-500 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                          <div className="bg-primary-500 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
                         </div>
                         <span className="text-xs text-gray-400">{doneTasks}/{totalTasks} משימות</span>
                       </div>
@@ -169,8 +169,8 @@ export default function ProjectsPage() {
                     <span>{p.subProjects.length} תת-פרויקטים</span>
                   </div>
                   <div className="flex gap-1">
-                    <button onClick={() => setPrintProject(p)} className="p-2 rounded-lg hover:bg-purple-50 text-gray-400 hover:text-purple-600" title="הדפס דוח פרויקט"><Printer className="w-4 h-4" /></button>
-                    <button onClick={() => { setEditProject(p); setShowModal(true); }} className="p-2 rounded-lg hover:bg-purple-50 text-gray-400 hover:text-purple-600"><Edit2 className="w-4 h-4" /></button>
+                    <button onClick={() => setPrintProject(p)} className="p-2 rounded-lg hover:bg-primary-50 text-gray-400 hover:text-primary-600" title="הדפס דוח פרויקט"><Printer className="w-4 h-4" /></button>
+                    <button onClick={() => { setEditProject(p); setShowModal(true); }} className="p-2 rounded-lg hover:bg-primary-50 text-gray-400 hover:text-primary-600"><Edit2 className="w-4 h-4" /></button>
                     <button onClick={() => handleDelete(p.id)} className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
@@ -179,7 +179,7 @@ export default function ProjectsPage() {
                   <div className="border-t border-gray-50 bg-gray-50/50 px-5 py-3 space-y-2">
                     {p.subProjects.map(sp => (
                       <div key={sp.id} className="flex items-center gap-3 py-1.5 px-3 bg-white rounded-xl border border-gray-100">
-                        <div className="w-2 h-2 rounded-full bg-purple-300 flex-shrink-0" />
+                        <div className="w-2 h-2 rounded-full bg-primary-300 flex-shrink-0" />
                         <span className="text-sm font-medium text-gray-800 flex-1">{sp.name}</span>
                         <span className={`text-xs px-2 py-0.5 rounded-full ${statusColor[sp.status]}`}>{statusLabel[sp.status]}</span>
                         <span className="text-xs text-gray-400">{sp.tasks.length} משימות</span>

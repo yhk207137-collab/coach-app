@@ -28,21 +28,21 @@ export default function ContractView({ contract, onClose }: Props) {
             <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ חתום</span>
           )}
         </div>
-        <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 text-sm font-medium">
+        <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 text-sm font-medium">
           <Printer className="w-4 h-4" /> הדפס / שמור PDF
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto py-8 px-4 flex justify-center">
         <div className="bg-white shadow-xl w-full max-w-3xl rounded-2xl print:rounded-none print:shadow-none" style={{ fontFamily: "'Segoe UI', 'Arial Hebrew', Arial, sans-serif" }}>
-          <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }} className="rounded-t-2xl print:rounded-none px-10 py-8 text-white">
+          <div style={{ background: 'linear-gradient(135deg, #0a1e3c 0%, #13294d 100%)' }} className="rounded-t-2xl print:rounded-none px-10 py-8 text-white">
             <div className="flex justify-between items-start">
               <div>
                 <div className="text-2xl font-bold">ליוי שיווק ופרסום</div>
-                <div className="text-purple-200 text-sm mt-1">סוכנות שיווק ופרסום לעמותות</div>
+                <div className="text-primary-200 text-sm mt-1">סוכנות שיווק ופרסום לעמותות</div>
               </div>
               <div className="text-left">
-                <div className="text-xs text-purple-300 uppercase tracking-widest">חוזה</div>
+                <div className="text-xs text-primary-300 uppercase tracking-widest">חוזה</div>
                 <div className="text-sm font-semibold mt-1">{today}</div>
               </div>
             </div>

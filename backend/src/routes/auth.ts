@@ -45,12 +45,12 @@ async function sendCodeEmail(to: string, code: string, link: string) {
         <h2 style="color: #1e293b;">ליוי שיווק ופרסום</h2>
         <p style="color: #475569;">הקוד שלך לכניסה או לאיפוס סיסמה:</p>
         <div style="background:#f1f5f9; border-radius:12px; padding:20px; text-align:center; margin:16px 0;">
-          <span style="font-size:36px; font-weight:bold; letter-spacing:8px; color:#6366f1;">${code}</span>
+          <span style="font-size:36px; font-weight:bold; letter-spacing:8px; color:#0a1e3c;">${code}</span>
         </div>
         <p style="color:#475569; font-size:14px;">הקוד תקף ל-15 דקות. אם לא ביקשת אותו — אפשר להתעלם מהמייל.</p>
         <hr style="border:none; border-top:1px solid #e2e8f0; margin:20px 0;" />
         <p style="color:#94a3b8; font-size:13px;">או כניסה ישירה בלחיצה:</p>
-        <a href="${link}" style="color:#6366f1; font-size:13px;">${link}</a>
+        <a href="${link}" style="color:#007f91; font-size:13px;">${link}</a>
       </div>
     `
   );

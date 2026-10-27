@@ -93,7 +93,7 @@ export default function ReviewQuote() {
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+      <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
     </div>
   );
 
@@ -129,18 +129,18 @@ export default function ReviewQuote() {
               <p className="text-sm text-gray-500">הצעת מחיר #{String(quote.number).padStart(4, '0')}</p>
               <h1 className="text-lg font-bold text-gray-900">{quote.title}</h1>
             </div>
-            <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-xl text-sm font-medium transition-colors print:hidden">
+            <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-2 bg-primary-100 hover:bg-primary-200 text-primary-800 rounded-xl text-sm font-medium transition-colors print:hidden">
               <Printer className="w-4 h-4" /> הדפס / PDF
             </button>
           </div>
         </>
       ) : (
-        <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }} className="px-6 py-6 text-white">
+        <div style={{ background: 'linear-gradient(135deg, #0a1e3c 0%, #13294d 100%)' }} className="px-6 py-6 text-white">
           <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               {logo && <img src={logo} alt="לוגו" className="h-20 w-auto object-contain rounded-lg" />}
               <div>
-                <p className="text-purple-200 text-sm">הצעת מחיר #{String(quote.number).padStart(4, '0')}</p>
+                <p className="text-primary-200 text-sm">הצעת מחיר #{String(quote.number).padStart(4, '0')}</p>
                 <h1 className="text-xl font-bold">{quote.title}</h1>
               </div>
             </div>
@@ -202,9 +202,9 @@ export default function ReviewQuote() {
               </div>
             ))}
           </div>
-          <div className="px-6 py-4 bg-purple-50 border-t border-purple-100 flex items-center justify-between">
+          <div className="px-6 py-4 bg-primary-50 border-t border-primary-100 flex items-center justify-between">
             <p className="font-bold text-gray-900 text-lg">סה״כ לתשלום</p>
-            <p className="text-2xl font-bold text-purple-700">₪{total.toLocaleString('he-IL')}</p>
+            <p className="text-2xl font-bold text-primary-700">₪{total.toLocaleString('he-IL')}</p>
           </div>
         </div>
 
@@ -262,7 +262,7 @@ export default function ReviewQuote() {
                   onChange={e => setRevisionMsg(e.target.value)}
                   rows={4}
                   placeholder="תאר את השינויים המבוקשים..."
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
                 <div className="flex gap-2">
                   <button

@@ -66,7 +66,7 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
     <div className="space-y-1.5">
       {tasks.map(t => (
         <div key={t.id} className="flex items-center gap-2 group">
-          <button onClick={() => toggleTask(t.id, t.status !== 'COMPLETED')} className="text-gray-400 hover:text-purple-600 flex-shrink-0">
+          <button onClick={() => toggleTask(t.id, t.status !== 'COMPLETED')} className="text-gray-400 hover:text-primary-600 flex-shrink-0">
             {t.status === 'COMPLETED' ? <CheckSquare className="w-4 h-4 text-green-500" /> : <Square className="w-4 h-4" />}
           </button>
           <span className={`text-sm flex-1 ${t.status === 'COMPLETED' ? 'line-through text-gray-400' : 'text-gray-700'}`}>{t.title}</span>
@@ -84,13 +84,13 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
             onChange={e => setNewTaskTitle(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') addTask(scopeId); if (e.key === 'Escape') setAddingTask(null); }}
             placeholder="שם המשימה..."
-            className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+            className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           />
-          <button onClick={() => addTask(scopeId)} className="px-3 py-1 bg-purple-600 text-white text-sm rounded-lg">הוסף</button>
+          <button onClick={() => addTask(scopeId)} className="px-3 py-1 bg-primary-600 text-white text-sm rounded-lg">הוסף</button>
           <button onClick={() => setAddingTask(null)} className="px-2 py-1 text-gray-400 text-sm">ביטול</button>
         </div>
       ) : (
-        <button onClick={() => { setAddingTask(scopeId ?? 'root'); setNewTaskTitle(''); }} className="flex items-center gap-1 text-xs text-purple-500 hover:text-purple-700 mt-1">
+        <button onClick={() => { setAddingTask(scopeId ?? 'root'); setNewTaskTitle(''); }} className="flex items-center gap-1 text-xs text-primary-500 hover:text-primary-700 mt-1">
           <Plus className="w-3.5 h-3.5" /> הוסף משימה
         </button>
       )}
@@ -112,7 +112,7 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
             <p className="text-sm text-gray-500 mt-0.5">{project.client.fullName}{project.client.businessName ? ` — ${project.client.businessName}` : ''}</p>
             {project.description && <p className="text-sm text-gray-600 mt-2">{project.description}</p>}
           </div>
-          <span className="text-sm px-3 py-1 bg-purple-100 text-purple-700 rounded-full font-medium">{statusLabel[project.status]}</span>
+          <span className="text-sm px-3 py-1 bg-primary-100 text-primary-700 rounded-full font-medium">{statusLabel[project.status]}</span>
         </div>
         {(project.goals || project.strategy || project.budget) && (
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-50">
@@ -146,7 +146,7 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
         </div>
       )}
       {addingTask !== 'root' && project.tasks.length === 0 && (
-        <button onClick={() => { setAddingTask('root'); setNewTaskTitle(''); }} className="flex items-center gap-1.5 text-sm text-purple-500 hover:text-purple-700 mb-4">
+        <button onClick={() => { setAddingTask('root'); setNewTaskTitle(''); }} className="flex items-center gap-1.5 text-sm text-primary-500 hover:text-primary-700 mb-4">
           <Plus className="w-4 h-4" /> הוסף משימה כללית
         </button>
       )}
@@ -161,21 +161,21 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
         {project.subProjects.map(sp => (
           <div key={sp.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
             <div className="flex items-center gap-3 mb-3">
-              <FolderOpen className="w-4 h-4 text-purple-400 flex-shrink-0" />
+              <FolderOpen className="w-4 h-4 text-primary-400 flex-shrink-0" />
               {editSubId === sp.id ? (
                 <div className="flex gap-2 flex-1">
                   <input autoFocus value={editSubName} onChange={e => setEditSubName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') saveSubName(sp); if (e.key === 'Escape') setEditSubId(null); }}
-                    className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                    className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
                   />
-                  <button onClick={() => saveSubName(sp)} className="text-purple-600 text-sm font-medium">שמור</button>
+                  <button onClick={() => saveSubName(sp)} className="text-primary-600 text-sm font-medium">שמור</button>
                   <button onClick={() => setEditSubId(null)} className="text-gray-400 text-sm">ביטול</button>
                 </div>
               ) : (
                 <>
                   <h3 className="font-semibold text-gray-800 flex-1">{sp.name}</h3>
                   <span className="text-xs text-gray-400">{statusLabel[sp.status]}</span>
-                  <button onClick={() => { setEditSubId(sp.id); setEditSubName(sp.name); }} className="text-gray-300 hover:text-purple-500"><Edit2 className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => { setEditSubId(sp.id); setEditSubName(sp.name); }} className="text-gray-300 hover:text-primary-500"><Edit2 className="w-3.5 h-3.5" /></button>
                   <button onClick={() => deleteSubProject(sp.id)} className="text-gray-300 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
                 </>
               )}
@@ -191,9 +191,9 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
             onChange={e => setNewSubName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addSubProject()}
             placeholder="שם תת-פרויקט חדש..."
-            className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+            className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           />
-          <button onClick={addSubProject} className="px-4 py-2 bg-purple-600 text-white rounded-xl text-sm hover:bg-purple-700">
+          <button onClick={addSubProject} className="px-4 py-2 bg-primary-600 text-white rounded-xl text-sm hover:bg-primary-700">
             <Plus className="w-4 h-4" />
           </button>
         </div>

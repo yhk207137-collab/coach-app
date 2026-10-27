@@ -58,7 +58,7 @@ export default function SignContract() {
     const ctx = canvas.getContext('2d')!;
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
-    ctx.strokeStyle = '#1e1b4b';
+    ctx.strokeStyle = '#0a1e3c';
     const { x, y } = getPos(e, canvas);
     ctx.lineTo(x, y);
     ctx.stroke();
@@ -95,7 +95,7 @@ export default function SignContract() {
   if (!contract) return null;
 
   if (signed) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50" dir="rtl">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-blue-50" dir="rtl">
       <div className="text-center p-8">
         <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
         <h1 className="text-2xl font-bold text-gray-900 mb-2">החוזה נחתם בהצלחה!</h1>
@@ -107,10 +107,10 @@ export default function SignContract() {
 
   return (
     <div className="min-h-screen bg-gray-50" dir="rtl">
-      <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }} className="px-6 py-5 text-white">
+      <div style={{ background: 'linear-gradient(135deg, #0a1e3c 0%, #13294d 100%)' }} className="px-6 py-5 text-white">
         <div className="max-w-3xl mx-auto">
           <div className="text-lg font-bold">ליוי שיווק ופרסום</div>
-          <div className="text-purple-200 text-sm">חתימה דיגיטלית על חוזה</div>
+          <div className="text-primary-200 text-sm">חתימה דיגיטלית על חוזה</div>
         </div>
       </div>
 
@@ -133,7 +133,7 @@ export default function SignContract() {
               value={signerName}
               onChange={e => setSignerName(e.target.value)}
               placeholder="הכנס שם מלא"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
             />
           </div>
 
@@ -163,7 +163,7 @@ export default function SignContract() {
           <button
             onClick={handleSign}
             disabled={saving || !hasDrawn || !signerName.trim()}
-            className="w-full mt-4 py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            className="w-full mt-4 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           >
             {saving ? 'שומר חתימה...' : 'חתום על החוזה'}
           </button>

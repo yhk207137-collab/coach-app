@@ -44,7 +44,7 @@ export default function ProjectPrint({ project, onClose }: Props) {
         </div>
         <button
           onClick={() => window.print()}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 text-sm font-medium"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 text-sm font-medium"
         >
           <Printer className="w-4 h-4" /> הדפס / שמור PDF
         </button>
@@ -56,17 +56,17 @@ export default function ProjectPrint({ project, onClose }: Props) {
           style={{ fontFamily: "'Segoe UI', 'Arial Hebrew', Arial, sans-serif" }}
         >
           {/* Header */}
-          <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }} className="rounded-t-2xl print:rounded-none px-10 py-8 text-white">
+          <div style={{ background: 'linear-gradient(135deg, #0a1e3c 0%, #13294d 100%)' }} className="rounded-t-2xl print:rounded-none px-10 py-8 text-white">
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-4">
                 {logo && <img src={logo} alt="לוגו" className="h-12 object-contain rounded-lg bg-white/10 px-2 py-1" />}
                 <div>
                   <div className="text-2xl font-bold tracking-wide">ליוי שיווק ופרסום</div>
-                  <div className="text-purple-200 text-sm mt-1">סוכנות שיווק ופרסום לעמותות</div>
+                  <div className="text-primary-200 text-sm mt-1">סוכנות שיווק ופרסום לעמותות</div>
                 </div>
               </div>
               <div className="text-left">
-                <div className="text-xs text-purple-300 uppercase tracking-widest">דוח פרויקט</div>
+                <div className="text-xs text-primary-300 uppercase tracking-widest">דוח פרויקט</div>
                 <div className="text-lg font-bold mt-1">{project.name}</div>
                 <div className="mt-1 inline-block px-3 py-0.5 rounded-full text-xs font-medium bg-white/10 text-white/80">
                   {statusLabel[project.status]}
@@ -102,12 +102,12 @@ export default function ProjectPrint({ project, onClose }: Props) {
               <div>
                 <div className="flex justify-between text-sm mb-2">
                   <span className="font-medium text-gray-700">התקדמות כללית</span>
-                  <span className="font-bold text-purple-700">{progress}%</span>
+                  <span className="font-bold text-primary-700">{progress}%</span>
                 </div>
                 <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full"
-                    style={{ width: `${progress}%`, background: 'linear-gradient(90deg, #7c3aed, #4c1d95)' }}
+                    style={{ width: `${progress}%`, background: 'linear-gradient(90deg, #00a4ba, #007f91)' }}
                   />
                 </div>
                 <div className="text-xs text-gray-400 mt-1">{doneCount} מתוך {allTasks.length} משימות הושלמו</div>
@@ -117,7 +117,7 @@ export default function ProjectPrint({ project, onClose }: Props) {
             {/* Description */}
             {project.description && (
               <div>
-                <div className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1">תיאור הפרויקט</div>
+                <div className="text-xs font-semibold text-primary-700 uppercase tracking-wide mb-1">תיאור הפרויקט</div>
                 <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-800 whitespace-pre-wrap">{project.description}</div>
               </div>
             )}
@@ -125,7 +125,7 @@ export default function ProjectPrint({ project, onClose }: Props) {
             {/* Goals */}
             {project.goals && (
               <div>
-                <div className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1">מטרות</div>
+                <div className="text-xs font-semibold text-primary-700 uppercase tracking-wide mb-1">מטרות</div>
                 <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-800 whitespace-pre-wrap">{project.goals}</div>
               </div>
             )}
@@ -133,7 +133,7 @@ export default function ProjectPrint({ project, onClose }: Props) {
             {/* Strategy */}
             {project.strategy && (
               <div>
-                <div className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1">אסטרטגיה ושיווק</div>
+                <div className="text-xs font-semibold text-primary-700 uppercase tracking-wide mb-1">אסטרטגיה ושיווק</div>
                 <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-800 whitespace-pre-wrap">{project.strategy}</div>
               </div>
             )}
@@ -141,12 +141,12 @@ export default function ProjectPrint({ project, onClose }: Props) {
             {/* Project tasks */}
             {project.tasks.length > 0 && (
               <div>
-                <div className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-2">משימות ראשיות</div>
+                <div className="text-xs font-semibold text-primary-700 uppercase tracking-wide mb-2">משימות ראשיות</div>
                 <table className="w-full text-sm">
                   <thead>
                     <tr style={{ background: '#f5f3ff' }}>
-                      <th className="px-3 py-2 text-right text-xs font-semibold text-purple-700 rounded-r-lg">משימה</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold text-purple-700 rounded-l-lg">סטטוס</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-primary-700 rounded-r-lg">משימה</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-primary-700 rounded-l-lg">סטטוס</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -171,8 +171,8 @@ export default function ProjectPrint({ project, onClose }: Props) {
             {project.subProjects.map(sp => (
               <div key={sp.id}>
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="text-xs font-semibold text-purple-700 uppercase tracking-wide">תת-פרויקט: {sp.name}</div>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">{statusLabel[sp.status]}</span>
+                  <div className="text-xs font-semibold text-primary-700 uppercase tracking-wide">תת-פרויקט: {sp.name}</div>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-primary-50 text-primary-600">{statusLabel[sp.status]}</span>
                 </div>
                 {sp.description && <div className="text-xs text-gray-500 mb-2">{sp.description}</div>}
                 {sp.tasks.length > 0 && (

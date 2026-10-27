@@ -290,9 +290,9 @@ export default function ClientDetail() {
               {/* Total budget summary */}
               {projects.some((p: any) => p.budget) && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div className="card border-l-4 border-l-violet-400">
+                  <div className="card border-l-4 border-l-primary-400">
                     <p className="text-xs text-slate-500">סה"כ תקציב פרויקטים</p>
-                    <p className="text-xl font-bold text-violet-700">
+                    <p className="text-xl font-bold text-primary-700">
                       ₪{projects.reduce((s: number, p: any) => s + (p.budget || 0), 0).toLocaleString()}
                     </p>
                   </div>
@@ -311,8 +311,8 @@ export default function ClientDetail() {
                   <div key={p.id} className="card">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <FolderKanban className="w-5 h-5 text-violet-600" />
+                        <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <FolderKanban className="w-5 h-5 text-primary-600" />
                         </div>
                         <div>
                           <p className="font-semibold text-slate-800">{p.name}</p>

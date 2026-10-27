@@ -128,7 +128,7 @@ export default function MeetingsPage() {
                           <>
                             <span className="badge bg-emerald-50 text-emerald-700 text-xs">סוכם</span>
                             <button onClick={() => setPrintMeeting(m)}
-                              className="btn-ghost p-1.5 rounded-lg text-slate-400 hover:text-purple-600" title="הדפס סיכום">
+                              className="btn-ghost p-1.5 rounded-lg text-slate-400 hover:text-primary-600" title="הדפס סיכום">
                               <Printer className="w-4 h-4" />
                             </button>
                           </>

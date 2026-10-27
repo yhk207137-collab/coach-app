@@ -237,7 +237,7 @@ export default function Panel(p: Props) {
         </>
       ) : (
         <div className="space-y-5">
-          <ColorField label="צבע המותג (כפתורים, קישורים, הדגשות)" value={s.brand} onChange={(v) => p.onSettings({ brand: v || '#6d28d9' })} />
+          <ColorField label="צבע המותג (כפתורים, קישורים, הדגשות)" value={s.brand} onChange={(v) => p.onSettings({ brand: v || '#007f91' })} />
           <ColorField label="צבע הרקע" value={s.bg} onChange={(v) => p.onSettings({ bg: v || '#f1f5f9' })} />
           <ColorField label="צבע תוכן המייל" value={s.contentBg} onChange={(v) => p.onSettings({ contentBg: v || '#ffffff' })} />
           <ColorField label="צבע הטקסט" value={s.textColor} onChange={(v) => p.onSettings({ textColor: v || '#1e293b' })} />

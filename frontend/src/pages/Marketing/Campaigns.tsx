@@ -150,7 +150,7 @@ export default function CampaignsPage() {
   };
 
   const kpis = [
-    { label: 'נרשמים פעילים', value: contactStats?.subscribed ?? '…', sub: contactStats ? `+${contactStats.newThisMonth} ב-30 הימים האחרונים` : '', icon: Users2, color: 'bg-violet-100 text-violet-600' },
+    { label: 'נרשמים פעילים', value: contactStats?.subscribed ?? '…', sub: contactStats ? `+${contactStats.newThisMonth} ב-30 הימים האחרונים` : '', icon: Users2, color: 'bg-primary-100 text-primary-600' },
     { label: 'מיילים שנשלחו', value: totals.sent, sub: `${sent.length} קמפיינים`, icon: Mail, color: 'bg-blue-100 text-blue-600' },
     { label: 'שיעור פתיחה ממוצע', value: `${pct(totals.opened, totals.sent)}%`, sub: 'מתוך מי שקיבל', icon: MailOpen, color: 'bg-emerald-100 text-emerald-600' },
     { label: 'שיעור הקלקה ממוצע', value: `${pct(totals.clicked, totals.sent)}%`, sub: 'לחצו על קישור', icon: MousePointerClick, color: 'bg-amber-100 text-amber-600' },
@@ -186,7 +186,7 @@ export default function CampaignsPage() {
 
       {welcome && (
         <div className="card flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center flex-shrink-0">
             <Zap className="w-6 h-6 text-white" />
           </div>
           <div className="flex-1">

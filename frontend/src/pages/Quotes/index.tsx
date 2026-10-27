@@ -134,7 +134,7 @@ const reviewLink = (id: string) => `${window.location.origin}/review-quote/${id}
           </button>
           <button
           onClick={() => { setEditQuote(null); setShowModal(true); }}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-medium"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-medium"
         >
           <Plus className="w-4 h-4" />
           הצעת מחיר חדשה
@@ -176,7 +176,7 @@ const reviewLink = (id: string) => `${window.location.origin}/review-quote/${id}
                 )}
               </div>
               <div className="flex items-center gap-3 flex-wrap justify-end">
-                <span className="text-lg font-bold text-purple-700">₪{total(q).toLocaleString('he-IL')}</span>
+                <span className="text-lg font-bold text-primary-700">₪{total(q).toLocaleString('he-IL')}</span>
                 {(q.status === 'DRAFT' || q.status === 'SENT' || q.status === 'REVISION') && (
                   <button
                     onClick={() => copyReviewLink(q.id)}
@@ -188,10 +188,10 @@ const reviewLink = (id: string) => `${window.location.origin}/review-quote/${id}
                   </button>
                 )}
                 <div className="flex gap-1">
-                  <button onClick={() => setPrintQuote(q)} className="p-2 rounded-lg hover:bg-purple-50 text-gray-400 hover:text-purple-600" title="הדפס / PDF">
+                  <button onClick={() => setPrintQuote(q)} className="p-2 rounded-lg hover:bg-primary-50 text-gray-400 hover:text-primary-600" title="הדפס / PDF">
                     <Printer className="w-4 h-4" />
                   </button>
-                  <button onClick={() => { setEditQuote(q); setShowModal(true); }} className="p-2 rounded-lg hover:bg-purple-50 text-gray-400 hover:text-purple-600" title="ערוך">
+                  <button onClick={() => { setEditQuote(q); setShowModal(true); }} className="p-2 rounded-lg hover:bg-primary-50 text-gray-400 hover:text-primary-600" title="ערוך">
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button onClick={() => handleDelete(q.id)} className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500" title="מחק">

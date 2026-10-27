@@ -4,8 +4,8 @@
   "description": "מערכת ניהול לקוחות ואימון עסקי",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1e1b4b",
-  "theme_color": "#6d28d9",
+  "background_color": "#0a1e3c",
+  "theme_color": "#0a1e3c",
   "orientation": "portrait-primary",
   "lang": "he",
   "dir": "rtl",
@@ -21,12 +21,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
-    },
-    {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
     }
   ]
 }

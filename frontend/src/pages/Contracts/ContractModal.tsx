@@ -75,18 +75,18 @@ export default function ContractModal({ contract, onClose, onSave }: Props) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">לקוח *</label>
-              <select value={clientId} onChange={e => setClientId(e.target.value)} required className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+              <select value={clientId} onChange={e => setClientId(e.target.value)} required className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400">
                 <option value="">בחר לקוח</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.fullName}{c.businessName ? ` — ${c.businessName}` : ''}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">כותרת *</label>
-              <input type="text" value={title} onChange={e => setTitle(e.target.value)} required placeholder="לדוגמה: הסכם שיווק 2026" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+              <input type="text" value={title} onChange={e => setTitle(e.target.value)} required placeholder="לדוגמה: הסכם שיווק 2026" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">סטטוס</label>
-              <select value={status} onChange={e => setStatus(e.target.value as ContractStatus)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+              <select value={status} onChange={e => setStatus(e.target.value as ContractStatus)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400">
                 <option value="DRAFT">טיוטה</option>
                 <option value="SENT">נשלח</option>
                 <option value="SIGNED">חתום</option>
@@ -95,7 +95,7 @@ export default function ContractModal({ contract, onClose, onSave }: Props) {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">בתוקף עד</label>
-              <input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+              <input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400" />
             </div>
           </div>
 
@@ -105,14 +105,14 @@ export default function ContractModal({ contract, onClose, onSave }: Props) {
               value={content}
               onChange={e => setContent(e.target.value)}
               rows={16}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none font-mono"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none font-mono"
             />
           </div>
         </form>
 
         <div className="flex gap-3 px-6 py-4 border-t justify-end">
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">ביטול</button>
-          <button onClick={handleSubmit as unknown as React.MouseEventHandler} disabled={saving} className="px-5 py-2 rounded-xl bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 disabled:opacity-50">
+          <button onClick={handleSubmit as unknown as React.MouseEventHandler} disabled={saving} className="px-5 py-2 rounded-xl bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50">
             {saving ? 'שומר...' : 'שמור'}
           </button>
         </div>

@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { sendEmail, sendingDomainStatus, getResendDeliveryStatus, EmailError } from '../lib/email';
-import { renderEmail, renderSubject, FooterInfo } from './emailRender';
+import { renderEmail, renderSubject, FooterInfo, BRAND_COLOR } from './emailRender';
 import { welcomeDesign } from './emailStarters';
 
 // ── Settings ────────────────────────────────────────────────────────────────
@@ -19,6 +19,8 @@ export interface MarketingSettings {
 }
 
 const SETTINGS_KEY = 'marketing_settings';
+// The purple default before the switch to the logo colors.
+const OLD_BRAND_COLOR = '#6d28d9';
 const BASE_URL_KEY = 'public_base_url';
 
 export async function getMarketingSettings(): Promise<MarketingSettings> {
@@ -34,7 +36,7 @@ export async function getMarketingSettings(): Promise<MarketingSettings> {
     address: saved.address ?? '',
     details: saved.details ?? 'לפרטים: 050-4167903',
     reason: saved.reason ?? 'קיבלת את המייל הזה כי נרשמת לדיוור "המדריך לעמותה מנצחת".',
-    brand: saved.brand ?? '#6d28d9',
+    brand: saved.brand && saved.brand !== OLD_BRAND_COLOR ? saved.brand : BRAND_COLOR,
     logoUrl: saved.logoUrl ?? '',
   };
 }
@@ -254,10 +256,23 @@ export async function refreshDeliveryStatuses() {
   }
 }
 
+// Emails not yet sent (drafts, scheduled, the welcome automation) and saved templates
+// still carry the old purple default; move them to the logo color. Sent ones stay as they were.
+async function adoptBrandColor() {
+  const campaigns = await prisma.$executeRaw`
+    UPDATE "Campaign" SET design = replace(design::text, ${OLD_BRAND_COLOR}, ${BRAND_COLOR})::jsonb
+    WHERE status::text IN ('DRAFT', 'SCHEDULED', 'ACTIVE', 'PAUSED') AND position(${OLD_BRAND_COLOR} in design::text) > 0`;
+  const templates = await prisma.$executeRaw`
+    UPDATE "EmailTemplate" SET design = replace(design::text, ${OLD_BRAND_COLOR}, ${BRAND_COLOR})::jsonb
+    WHERE position(${OLD_BRAND_COLOR} in design::text) > 0`;
+  if (campaigns || templates) console.log(`[MARKETING] brand color updated in ${campaigns} campaigns, ${templates} templates`);
+}
+
 let workerStarted = false;
 export function startMarketingWorker() {
   if (workerStarted) return;
   workerStarted = true;
+  void adoptBrandColor().catch((e) => console.error('[MARKETING] brand color update:', e?.message || e));
   setInterval(() => void processQueue(), 60_000);
   setInterval(() => void refreshDeliveryStatuses().catch((e) => console.error('[MARKETING] status refresh:', e?.message || e)), 10 * 60_000);
   setTimeout(() => void processQueue(), 15_000);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, Eye, EyeOff, Loader2, Mail, KeyRound, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Mail, KeyRound, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -144,20 +144,17 @@ export default function Login() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-primary-900 to-slate-800 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-brand flex items-center justify-center p-4">
       <div className="absolute inset-0 opacity-5"
         style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '32px 32px' }} />
 
       <div className="relative w-full max-w-sm animate-fade-in">
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           <div className="flex flex-col items-center mb-6">
-            <div className="w-14 h-14 bg-primary-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-primary-200">
-              <Briefcase className="w-7 h-7 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-slate-900">
+            <img src="/brand/logo.png" alt="יהושע כהן — אסטרטגיה וליווי לעמותות" className="h-32 w-auto mb-5" />
+            <h1 className="text-xl font-bold text-navy-900">
               {mode === 'forgot' ? 'איפוס סיסמה' : 'כניסה למערכת'}
             </h1>
-            <p className="text-sm text-slate-500 mt-1">ליוי שיווק ופרסום</p>
           </div>
 
           {mode !== 'forgot' && (
@@ -258,8 +255,8 @@ export default function Login() {
           )}
         </div>
 
-        <p className="text-center text-slate-400 text-xs mt-6">
-          © {new Date().getFullYear()} ליוי שיווק ופרסום
+        <p className="text-center text-white/40 text-xs mt-6">
+          © {new Date().getFullYear()} יהושע כהן · אסטרטגיה וליווי לעמותות
         </p>
       </div>
     </div>

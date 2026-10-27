@@ -187,7 +187,7 @@ export default function SettingsPage() {
           ) : (
             <div
               onClick={() => logoInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors"
+              className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-colors"
             >
               <Image className="w-8 h-8 text-gray-300 mx-auto mb-2" />
               <p className="text-sm text-gray-500">לחץ להעלאת לוגו</p>
@@ -205,8 +205,8 @@ export default function SettingsPage() {
         {/* Letterhead Upload */}
         <div className="card">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
-              <Image className="w-5 h-5 text-purple-500" />
+            <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center">
+              <Image className="w-5 h-5 text-primary-500" />
             </div>
             <div>
               <h2 className="font-semibold text-slate-900">בלאנק (נייר מכתבים)</h2>
@@ -228,7 +228,7 @@ export default function SettingsPage() {
           ) : (
             <div
               onClick={() => letterheadInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors"
+              className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-colors"
             >
               <Image className="w-8 h-8 text-gray-300 mx-auto mb-2" />
               <p className="text-sm text-gray-500">לחץ להעלאת בלאנק</p>

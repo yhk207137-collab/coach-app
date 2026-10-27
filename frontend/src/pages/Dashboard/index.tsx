@@ -149,9 +149,9 @@ export default function Dashboard() {
           sub={d.receivables.overdueAmount > 0
             ? <span className="text-red-600 font-medium">{ils(d.receivables.overdueAmount)} באיחור</span>
             : d.receivables.clientsOwing ? count(d.receivables.clientsOwing, 'לקוח אחד', 'לקוחות') : 'אין חובות פתוחים'} />
-        <Tile icon={CalendarClock} label="צפוי ב-30 יום" value={ils(d.forecast.next30)} tone="bg-teal-50 text-teal-700"
+        <Tile icon={CalendarClock} label="צפוי ב-30 יום" value={ils(d.forecast.next30)} tone="bg-primary-50 text-primary-700"
           onClick={() => navigate('/payments')} sub={d.forecast.items.length ? count(d.forecast.items.length, 'תשלום אחד מתוכנן', 'תשלומים מתוכננים') : 'אין תשלומים מתוכננים'} />
-        <Tile icon={Repeat} label="הכנסה חודשית קבועה" value={ils(d.mrr.amount)} tone="bg-violet-50 text-violet-700"
+        <Tile icon={Repeat} label="הכנסה חודשית קבועה" value={ils(d.mrr.amount)} tone="bg-navy-50 text-navy-700"
           onClick={() => navigate('/clients')} sub={d.mrr.clients ? count(d.mrr.clients, 'לקוח ריטיינר אחד', 'לקוחות ריטיינר') : 'עדיין אין לקוחות ריטיינר'} />
         <Tile icon={Target} label="פוטנציאל מכירות" value={ils(d.pipeline.openLeadsValue + d.pipeline.openQuotesValue)} tone="bg-blue-50 text-blue-700"
           onClick={() => navigate('/leads')} sub={`${count(d.pipeline.openLeadsCount, 'ליד אחד', 'לידים')} · ${count(d.pipeline.openQuotesCount, 'הצעה פתוחה אחת', 'הצעות פתוחות')}`} />
@@ -311,7 +311,7 @@ export default function Dashboard() {
                         <span className="text-sm text-slate-800 group-hover:text-slate-900 truncate">{p.name} <span className="text-xs text-slate-400">· {p.client.fullName}</span></span>
                         <span className="text-xs text-slate-500 tabular-nums flex-shrink-0">{p.budget ? ils(p.budget) : ''}</span>
                       </div>
-                      <div className="h-2 rounded-full bg-violet-100 overflow-hidden"><div className="h-full rounded-full" style={{ width: `${pctDone}%`, background: C_COLLECTED }} /></div>
+                      <div className="h-2 rounded-full bg-primary-100 overflow-hidden"><div className="h-full rounded-full" style={{ width: `${pctDone}%`, background: C_COLLECTED }} /></div>
                       <p className="text-[11px] text-slate-400 mt-1">{p.tasksTotal ? `${p.tasksDone}/${p.tasksTotal} משימות הושלמו` : 'אין משימות בפרויקט'}{p.endDate ? ` · יעד ${format(new Date(p.endDate), 'd/M/yy')}` : ''}</p>
                     </button>
                   );

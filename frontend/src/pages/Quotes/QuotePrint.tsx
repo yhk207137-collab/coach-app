@@ -49,7 +49,7 @@ export default function QuotePrint({ quote, onClose }: Props) {
         </div>
         <button
           onClick={handlePrint}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 text-sm font-medium"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 text-sm font-medium"
         >
           <Printer className="w-4 h-4" /> הדפס / שמור PDF
         </button>
@@ -78,17 +78,17 @@ export default function QuotePrint({ quote, onClose }: Props) {
               </div>
             </>
           ) : (
-            <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)' }} className="rounded-t-2xl print:rounded-none px-10 py-8 text-white">
+            <div style={{ background: 'linear-gradient(135deg, #0a1e3c 0%, #13294d 100%)' }} className="rounded-t-2xl print:rounded-none px-10 py-8 text-white">
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-4">
                   {logo && <img src={logo} alt="לוגו" className="h-16 object-contain rounded-lg px-2 py-1" style={{ background: 'rgba(255,255,255,0.1)' }} />}
                   <div>
                     <div className="text-2xl font-bold tracking-wide">ליוי שיווק ופרסום</div>
-                    <div className="text-sm mt-1 text-purple-200">סוכנות שיווק ופרסום לעמותות</div>
+                    <div className="text-sm mt-1 text-primary-200">סוכנות שיווק ופרסום לעמותות</div>
                   </div>
                 </div>
                 <div className="text-left">
-                  <div className="text-xs uppercase tracking-widest text-purple-300">הצעת מחיר</div>
+                  <div className="text-xs uppercase tracking-widest text-primary-300">הצעת מחיר</div>
                   <div className="text-3xl font-bold mt-1">#{String(quote.number).padStart(4, '0')}</div>
                   <div className={`mt-2 inline-block px-3 py-0.5 rounded-full text-xs font-medium ${
                     quote.status === 'ACCEPTED' ? 'bg-green-100 text-green-700' :
@@ -125,7 +125,7 @@ export default function QuotePrint({ quote, onClose }: Props) {
           {/* Title */}
           <div className="px-10 pt-6">
             <h2 className="text-xl font-bold text-gray-900 mb-1">{quote.title}</h2>
-            <div className="h-0.5 bg-gradient-to-l from-purple-500 to-transparent w-24 mb-6" />
+            <div className="h-0.5 bg-gradient-to-l from-primary-500 to-transparent w-24 mb-6" />
           </div>
 
           {/* Items table */}
@@ -133,11 +133,11 @@ export default function QuotePrint({ quote, onClose }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: '#f5f3ff' }} className="text-right">
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-purple-700 rounded-r-lg">תיאור השירות</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-purple-700">משך / תקופה</th>
-                  <th className="px-3 py-2.5 text-center text-xs font-semibold text-purple-700">כמות</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-purple-700">מחיר יחידה</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-purple-700 rounded-l-lg">סה"כ</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-primary-700 rounded-r-lg">תיאור השירות</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-primary-700">משך / תקופה</th>
+                  <th className="px-3 py-2.5 text-center text-xs font-semibold text-primary-700">כמות</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-primary-700">מחיר יחידה</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-primary-700 rounded-l-lg">סה"כ</th>
                 </tr>
               </thead>
               <tbody>
@@ -157,14 +157,14 @@ export default function QuotePrint({ quote, onClose }: Props) {
           {/* Total */}
           <div className="px-10 mt-6">
             <div className="flex justify-end">
-              <div className="min-w-48 border-t-2 border-purple-200 pt-3">
+              <div className="min-w-48 border-t-2 border-primary-200 pt-3">
                 <div className="flex justify-between text-sm text-gray-500 mb-1">
                   <span>סכום ביניים</span>
                   <span>₪{total.toLocaleString('he-IL')}</span>
                 </div>
                 <div className="flex justify-between items-center mt-2">
                   <span className="font-bold text-gray-800">סה"כ לתשלום</span>
-                  <span className="text-2xl font-bold text-purple-700">₪{total.toLocaleString('he-IL')}</span>
+                  <span className="text-2xl font-bold text-primary-700">₪{total.toLocaleString('he-IL')}</span>
                 </div>
               </div>
             </div>

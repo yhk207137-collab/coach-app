@@ -8,7 +8,7 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
 function FileIcon({ mime }: { mime: string }) {
-  if (mime.startsWith('image/')) return <Image className="w-5 h-5 text-purple-500" />;
+  if (mime.startsWith('image/')) return <Image className="w-5 h-5 text-primary-500" />;
   if (mime.includes('excel') || mime.includes('spreadsheet')) return <Table className="w-5 h-5 text-emerald-500" />;
   return <FileText className="w-5 h-5 text-blue-500" />;
 }

@@ -351,7 +351,7 @@ export default function ContactsPage() {
 
   const kpis = [
     { label: 'רשומים פעילים', value: stats?.subscribed, icon: Users2, color: 'bg-emerald-100 text-emerald-600', onClick: () => { setStatus('SUBSCRIBED'); setPage(1); } },
-    { label: 'חדשים ב-30 יום', value: stats?.newThisMonth, icon: UserPlus, color: 'bg-violet-100 text-violet-600' },
+    { label: 'חדשים ב-30 יום', value: stats?.newThisMonth, icon: UserPlus, color: 'bg-primary-100 text-primary-600' },
     { label: 'הסירו את עצמם', value: stats?.unsubscribed, icon: UserMinus, color: 'bg-slate-100 text-slate-500', onClick: () => { setStatus('UNSUBSCRIBED'); setPage(1); } },
     { label: 'סה"כ אנשי קשר', value: stats?.total, icon: Mail, color: 'bg-blue-100 text-blue-600', onClick: () => { setStatus(''); setTag(''); setPage(1); } },
   ];

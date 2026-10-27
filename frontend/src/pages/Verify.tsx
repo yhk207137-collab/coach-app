@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Briefcase, Loader2, XCircle } from 'lucide-react';
+import { Loader2, XCircle } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../store/auth';
 
@@ -25,11 +25,9 @@ export default function Verify() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-primary-900 to-slate-800 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-brand flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center">
-        <div className="w-14 h-14 bg-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <Briefcase className="w-7 h-7 text-white" />
-        </div>
+        <img src="/brand/mark.png" alt="יהושע כהן" className="h-12 w-auto mx-auto mb-5" />
 
         {!error ? (
           <>

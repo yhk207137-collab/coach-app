@@ -104,11 +104,14 @@ export interface RenderedEmail {
   text: string;
 }
 
+// Logo turquoise, darkened so white button text stays readable (4.7:1).
+export const BRAND_COLOR = '#007f91';
+
 export function renderEmail(design: any, ctx: RenderContext): RenderedEmail {
   const s = design?.settings || {};
   const bg = color(s.bg, '#f1f5f9');
   const contentBg = color(s.contentBg, '#ffffff');
-  const brand = color(s.brand, '#6d28d9');
+  const brand = color(s.brand, BRAND_COLOR);
   const textColor = color(s.textColor, '#1e293b');
   const font = s.font === 'heebo' ? "'Heebo', Arial, Helvetica, sans-serif" : 'Arial, Helvetica, sans-serif';
   const WIDTH = 600;

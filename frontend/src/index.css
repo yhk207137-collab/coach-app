@@ -10,7 +10,7 @@
   body {
     @apply antialiased text-slate-800;
     font-family: 'Inter', system-ui, sans-serif;
-    background: linear-gradient(135deg, #f8f4ff 0%, #eff6ff 50%, #f0fdf4 100%);
+    background: linear-gradient(135deg, #f1f7f9 0%, #f4f5f7 50%, #f4f3f1 100%);
     min-height: 100vh;
   }
 
@@ -22,8 +22,8 @@
 
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { @apply bg-transparent; }
-  ::-webkit-scrollbar-thumb { @apply bg-purple-200 rounded-full; }
-  ::-webkit-scrollbar-thumb:hover { @apply bg-purple-300; }
+  ::-webkit-scrollbar-thumb { @apply bg-navy-200 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-navy-300; }
 }
 
 @layer components {
@@ -37,7 +37,7 @@
   }
 
   .btn-primary {
-    @apply btn bg-gradient-to-l from-primary-600 to-primary-500 text-white hover:from-primary-700 hover:to-primary-600 active:scale-95 shadow-md shadow-primary-200;
+    @apply btn bg-gradient-to-l from-primary-700 to-primary-600 text-white hover:from-primary-800 hover:to-primary-700 active:scale-95 shadow-md shadow-primary-200;
   }
 
   .btn-secondary {
@@ -93,11 +93,11 @@
   }
 
   .sidebar-link-active {
-    @apply sidebar-link bg-white/20 text-white shadow-sm backdrop-blur-sm;
+    @apply sidebar-link bg-white/10 text-primary-300 font-semibold shadow-sm;
   }
 
   .sidebar-link-inactive {
-    @apply sidebar-link text-white/65 hover:bg-white/10 hover:text-white;
+    @apply sidebar-link text-white/70 hover:bg-white/[0.06] hover:text-white;
   }
 
   .table-header {
@@ -109,7 +109,7 @@
   }
 
   .table-row {
-    @apply border-b border-slate-50 hover:bg-purple-50/40 transition-colors duration-100;
+    @apply border-b border-slate-50 hover:bg-primary-50/50 transition-colors duration-100;
   }
 
   .status-active { @apply badge bg-emerald-100 text-emerald-700; }
