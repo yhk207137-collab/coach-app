@@ -3,7 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare, CreditCard, FolderOpen, Sparkles, LogOut, CalendarDays,
   BarChart2, X, Settings, FileText, FolderKanban, FileSignature, Target, Package, Mail, BookUser, ChevronDown,
-  Megaphone, Wallet, CalendarClock,
+  Megaphone, Wallet, CalendarClock, Activity,
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import clsx from 'clsx';
@@ -19,6 +19,7 @@ const GROUPS: NavGroup[] = [
       { to: '/quotes', icon: FileText, label: 'הצעות מחיר' },
       { to: '/contracts', icon: FileSignature, label: 'חוזים' },
       { to: '/marketing/campaigns', icon: Mail, label: 'דיוור' },
+      { to: '/marketing/tracking', icon: Activity, label: 'מעקב דיוור' },
       { to: '/marketing/contacts', icon: BookUser, label: 'אנשי קשר לדיוור' },
     ],
   },

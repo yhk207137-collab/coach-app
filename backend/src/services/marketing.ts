@@ -16,6 +16,9 @@ export interface MarketingSettings {
   reason: string;
   brand: string;
   logoUrl: string;
+  // The guide file people download from the emails; clicks on it count as downloads.
+  guideUrl: string;
+  guideName: string;
 }
 
 const SETTINGS_KEY = 'marketing_settings';
@@ -38,6 +41,8 @@ export async function getMarketingSettings(): Promise<MarketingSettings> {
     reason: saved.reason ?? 'קיבלת את המייל הזה כי נרשמת לדיוור "המדריך לעמותה מנצחת".',
     brand: saved.brand && saved.brand !== OLD_BRAND_COLOR ? saved.brand : BRAND_COLOR,
     logoUrl: saved.logoUrl ?? '',
+    guideUrl: saved.guideUrl ?? '',
+    guideName: saved.guideName ?? '',
   };
 }
 
@@ -53,6 +58,8 @@ export async function saveMarketingSettings(patch: Partial<MarketingSettings>) {
     reason: patch.reason !== undefined ? clean(patch.reason, 200) : current.reason,
     brand: patch.brand !== undefined && /^#[0-9a-fA-F]{6}$/.test(String(patch.brand)) ? String(patch.brand) : current.brand,
     logoUrl: patch.logoUrl !== undefined ? clean(patch.logoUrl, 500) : current.logoUrl,
+    guideUrl: patch.guideUrl !== undefined && (!patch.guideUrl || /^https?:\/\//i.test(String(patch.guideUrl))) ? clean(patch.guideUrl, 500) : current.guideUrl,
+    guideName: patch.guideName !== undefined ? clean(patch.guideName, 120) : current.guideName,
   };
   await prisma.setting.upsert({
     where: { key: SETTINGS_KEY },
@@ -91,6 +98,17 @@ export const verifyClick = (sendId: string, url: string, sig: string) => {
   const expected = sign(`${sendId}|${url}`);
   return sig.length === expected.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
 };
+
+// The guide we host is matched by path, so it still counts after the app moves to another domain.
+const linkKey = (u: string) => {
+  try {
+    const x = new URL(u);
+    return x.pathname.startsWith('/uploads/guide/') ? x.pathname : `${x.host}${x.pathname}`.replace(/\/$/, '');
+  } catch {
+    return '';
+  }
+};
+export const isGuideUrl = (url: string, guideUrl: string) => !!guideUrl && !!linkKey(url) && linkKey(url) === linkKey(guideUrl);
 
 export function buildForSend(
   campaign: { design: Prisma.JsonValue; subject: string; preheader: string | null; markAsAd: boolean },
@@ -313,6 +331,7 @@ export interface CampaignStats {
   delivered: number;
   opened: number;
   clicked: number;
+  downloaded: number;
   unsubscribed: number;
   failed: number;
   pending: number;
@@ -326,6 +345,7 @@ export async function statsByCampaign(ids?: string[]) {
       count(*) FILTER (WHERE status = 'DELIVERED')::int AS delivered,
       count("openedAt")::int AS opened,
       count("clickedAt")::int AS clicked,
+      count("downloadedAt")::int AS downloaded,
       count("unsubscribedAt")::int AS unsubscribed,
       count(*) FILTER (WHERE status IN ('BOUNCED','FAILED'))::int AS failed,
       count(*) FILTER (WHERE status IN ('QUEUED','SENDING'))::int AS pending
@@ -340,4 +360,4 @@ export async function statsByCampaign(ids?: string[]) {
   return map;
 }
 
-export const emptyStats: CampaignStats = { recipients: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, unsubscribed: 0, failed: 0, pending: 0 };
+export const emptyStats: CampaignStats = { recipients: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, downloaded: 0, unsubscribed: 0, failed: 0, pending: 0 };

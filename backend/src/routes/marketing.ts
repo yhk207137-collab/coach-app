@@ -109,10 +109,11 @@ router.get('/contacts/:id', async (req, res) => {
         take: 50,
         include: { campaign: { select: { id: true, name: true, kind: true } } },
       },
+      visits: { orderBy: { createdAt: 'desc' }, take: 30 },
     },
   });
   if (!contact) return res.status(404).json({ error: 'איש הקשר לא נמצא' });
-  res.json(contact);
+  res.json({ ...contact, visits: contact.visits.map((v) => ({ ...v, sourceLabel: sourceLabel(v.source, v.referrer) })) });
 });
 
 router.post('/contacts', async (req, res) => {
@@ -271,6 +272,40 @@ router.delete('/media/:id', async (req, res) => {
   await prisma.media.delete({ where: { id: media.id } });
   fs.rm(path.join(MEDIA_DIR, path.basename(media.filename)), { force: true }, () => {});
   res.json({ ok: true });
+});
+
+// ── Guide file (the PDF the emails link to) ─────────────────────────────────
+
+const GUIDE_DIR = path.join(UPLOAD_DIR, 'guide');
+fs.mkdirSync(GUIDE_DIR, { recursive: true });
+const guideUpload = multer({
+  storage: multer.diskStorage({ destination: GUIDE_DIR, filename: (_req, _file, cb) => cb(null, `guide-${uuidv4().slice(0, 8)}.pdf`) }),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => cb(null, file.mimetype === 'application/pdf'),
+});
+
+const removeHostedGuide = (url: string) => {
+  try {
+    const p = new URL(url).pathname;
+    if (p.startsWith('/uploads/guide/')) fs.rm(path.join(GUIDE_DIR, path.basename(p)), { force: true }, () => {});
+  } catch { /* not ours */ }
+};
+
+router.post('/guide', guideUpload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'אפשר להעלות רק קובץ PDF, עד 25MB' });
+  const previous = (await getMarketingSettings()).guideUrl;
+  // multer reads the multipart filename as latin1; Hebrew names need re-decoding.
+  const name = Buffer.from(req.file.originalname, 'latin1').toString('utf8').replace(/\.pdf$/i, '');
+  const settings = await saveMarketingSettings({ guideUrl: `${await getBaseUrl()}/uploads/guide/${req.file.filename}`, guideName: name });
+  if (previous) removeHostedGuide(previous);
+  res.status(201).json({ settings });
+});
+
+router.delete('/guide', async (_req, res) => {
+  const previous = (await getMarketingSettings()).guideUrl;
+  const settings = await saveMarketingSettings({ guideUrl: '', guideName: '' });
+  if (previous) removeHostedGuide(previous);
+  res.json({ settings });
 });
 
 // ── Settings / status ───────────────────────────────────────────────────────
@@ -503,7 +538,7 @@ router.get('/campaigns/:id/report', async (req, res) => {
     prisma.$queryRaw<{ url: string; clicks: number; people: number }[]>`
       SELECT e.url, count(*)::int AS clicks, count(DISTINCT e."sendId")::int AS people
       FROM "CampaignEvent" e JOIN "CampaignSend" s ON s.id = e."sendId"
-      WHERE s."campaignId" = ${campaign.id} AND e.type = 'click' AND e.url IS NOT NULL
+      WHERE s."campaignId" = ${campaign.id} AND e.type IN ('click', 'download') AND e.url IS NOT NULL
       GROUP BY e.url ORDER BY clicks DESC LIMIT 50`,
   ]);
   const [sent24h, domain] = await Promise.all([sentInLast24h(), sendingDomainStatus()]);
@@ -513,9 +548,95 @@ router.get('/campaigns/:id/report', async (req, res) => {
     links,
     recipients: sends.map((s) => ({
       id: s.id, status: s.status, email: s.email, name: s.contact.name, contactId: s.contact.id, contactStatus: s.contact.status,
-      sentAt: s.sentAt, openedAt: s.openedAt, clickedAt: s.clickedAt, unsubscribedAt: s.unsubscribedAt, opens: s.opens, clicks: s.clicks, error: s.error,
+      sentAt: s.sentAt, openedAt: s.openedAt, clickedAt: s.clickedAt, downloadedAt: s.downloadedAt, unsubscribedAt: s.unsubscribedAt, opens: s.opens, clicks: s.clicks, error: s.error,
     })),
     queue: { dailyLimit: DAILY_LIMIT, sentLast24h: sent24h, domainReady: domain.ready },
+  });
+});
+
+// ── Tracking: landing visits → sign-ups → guide email → opens → downloads ───
+
+const SOURCE_NAMES: Record<string, string> = {
+  share: 'שיתוף מהדף', whatsapp: 'וואטסאפ', wa: 'וואטסאפ', email: 'מייל', mail: 'מייל', newsletter: 'מייל',
+  facebook: 'פייסבוק', fb: 'פייסבוק', instagram: 'אינסטגרם', ig: 'אינסטגרם', sms: 'SMS', qr: 'קוד QR', video: 'סרטון', direct: 'כניסה ישירה',
+};
+export function sourceLabel(source: string | null, referrer: string | null) {
+  const s = (source || '').trim();
+  if (s) return SOURCE_NAMES[s.toLowerCase()] || s;
+  const r = (referrer || '').toLowerCase();
+  if (!r) return 'כניסה ישירה';
+  if (r.includes('whatsapp')) return 'וואטסאפ';
+  if (r.includes('facebook') || r === 'fb.com') return 'פייסבוק';
+  if (r.includes('instagram')) return 'אינסטגרם';
+  if (/(^|\.)mail\.|outlook|walla/.test(r)) return 'מייל';
+  if (r.includes('google.')) return 'גוגל';
+  return r.replace(/^www\./, '');
+}
+
+router.get('/tracking', async (req, res) => {
+  const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 0;
+  const from = days ? new Date(Date.now() - days * 24 * 3600_000) : new Date(0);
+  const [settings, welcome] = await Promise.all([getMarketingSettings(), getWelcomeCampaign()]);
+
+  const [visits, signups, welcomeRows, downloadRows, recent, people] = await Promise.all([
+    prisma.pageVisit.findMany({ where: { createdAt: { gte: from } }, select: { visitorId: true, contactId: true, source: true, referrer: true, createdAt: true }, take: 50_000 }),
+    prisma.contact.findMany({ where: { createdAt: { gte: from }, consentMethod: { in: ['checkbox', 'form'] } }, select: { id: true, createdAt: true } }),
+    prisma.$queryRaw<{ sent: number; opened: number }[]>`
+      SELECT count(*) FILTER (WHERE status IN ('SENT','DELIVERED','BOUNCED'))::int AS sent, count("openedAt")::int AS opened
+      FROM "CampaignSend" WHERE "campaignId" = ${welcome.id} AND "createdAt" >= ${from}`,
+    prisma.$queryRaw<{ downloaded: number }[]>`
+      SELECT count(DISTINCT "contactId")::int AS downloaded FROM "CampaignSend" WHERE "downloadedAt" >= ${from}`,
+    prisma.pageVisit.findMany({
+      where: { createdAt: { gte: from } },
+      orderBy: { createdAt: 'desc' },
+      take: 40,
+      include: { contact: { select: { id: true, name: true, email: true } } },
+    }),
+    prisma.$queryRaw<any[]>`
+      SELECT c.id, c.name, c.email, c.status, c.source, c."createdAt",
+        (SELECT count(*)::int FROM "PageVisit" v WHERE v."contactId" = c.id) AS visits,
+        (SELECT max(v."createdAt") FROM "PageVisit" v WHERE v."contactId" = c.id) AS "lastVisit",
+        (SELECT count(*)::int FROM "CampaignSend" s WHERE s."contactId" = c.id AND s.status IN ('SENT','DELIVERED','BOUNCED')) AS "emailsSent",
+        (SELECT count(*)::int FROM "CampaignSend" s WHERE s."contactId" = c.id AND s."openedAt" IS NOT NULL) AS "emailsOpened",
+        (SELECT max(s."openedAt") FROM "CampaignSend" s WHERE s."contactId" = c.id) AS "lastOpened",
+        (SELECT min(s."downloadedAt") FROM "CampaignSend" s WHERE s."contactId" = c.id) AS "downloadedAt"
+      FROM "Contact" c
+      WHERE c."createdAt" >= ${from}
+        OR EXISTS (SELECT 1 FROM "PageVisit" v WHERE v."contactId" = c.id AND v."createdAt" >= ${from})
+        OR EXISTS (SELECT 1 FROM "CampaignSend" s WHERE s."contactId" = c.id AND s."createdAt" >= ${from})
+      ORDER BY c."createdAt" DESC
+      LIMIT 1000`,
+  ]);
+
+  // Sources: unique visitors per channel, and how many signed up after arriving through it.
+  const signedUpAt = new Map(signups.map((s) => [s.id, s.createdAt.getTime()]));
+  const bySource = new Map<string, { visitors: Set<string>; signups: Set<string> }>();
+  for (const v of visits) {
+    const label = sourceLabel(v.source, v.referrer);
+    const row = bySource.get(label) || { visitors: new Set(), signups: new Set() };
+    row.visitors.add(v.visitorId);
+    const signedAt = v.contactId ? signedUpAt.get(v.contactId) : undefined;
+    if (signedAt !== undefined && v.createdAt.getTime() <= signedAt) row.signups.add(v.contactId!);
+    bySource.set(label, row);
+  }
+  const sources = [...bySource.entries()]
+    .map(([source, r]) => ({ source, visitors: r.visitors.size, signups: r.signups.size }))
+    .sort((a, b) => b.visitors - a.visitors);
+
+  res.json({
+    days,
+    funnel: {
+      visitors: new Set(visits.map((v) => v.visitorId)).size,
+      visits: visits.length,
+      signups: signups.length,
+      guideSent: welcomeRows[0]?.sent ?? 0,
+      opened: welcomeRows[0]?.opened ?? 0,
+      downloaded: downloadRows[0]?.downloaded ?? 0,
+    },
+    sources,
+    recent: recent.map((v) => ({ id: v.id, at: v.createdAt, page: v.page, source: sourceLabel(v.source, v.referrer), contact: v.contact })),
+    people,
+    setup: { welcomeId: welcome.id, welcomeActive: welcome.status === 'ACTIVE', guideUrl: settings.guideUrl, guideName: settings.guideName },
   });
 });
 

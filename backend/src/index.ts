@@ -50,6 +50,8 @@ const publicLimiter = rateLimit({
   legacyHeaders: false,
 });
 app.use('/api/public', cors({ origin: true }), publicLimiter, publicRouter);
+// Landing-page views; generous, since one person browsing loads it once per page.
+app.use('/api/t/v.gif', rateLimit({ windowMs: 15 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/t', trackingRouter);
 
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true }));

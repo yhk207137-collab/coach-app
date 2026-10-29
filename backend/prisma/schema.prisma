@@ -402,6 +402,7 @@ model Contact {
   unsubscribedAt DateTime?
   unsubToken     String         @unique @default(cuid())
   sends          CampaignSend[]
+  visits         PageVisit[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -440,6 +441,7 @@ model CampaignSend {
   deliveredAt    DateTime?
   openedAt       DateTime?
   clickedAt      DateTime?
+  downloadedAt   DateTime?
   unsubscribedAt DateTime?
   opens          Int             @default(0)
   clicks         Int             @default(0)
@@ -459,6 +461,23 @@ model CampaignEvent {
   createdAt DateTime     @default(now())
 
   @@index([sendId])
+}
+
+// A landing-page view. visitorId is a random id the page keeps in the browser; it is linked
+// to a contact when that browser signs up, so earlier and later visits show on the contact.
+model PageVisit {
+  id        String   @id @default(cuid())
+  visitorId String
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  page      String
+  source    String?
+  referrer  String?
+  createdAt DateTime @default(now())
+
+  @@index([visitorId])
+  @@index([contactId])
+  @@index([createdAt])
 }
 
 model EmailTemplate {

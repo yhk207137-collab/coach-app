@@ -32,6 +32,7 @@ export interface CampaignStats {
   delivered: number;
   opened: number;
   clicked: number;
+  downloaded: number;
   unsubscribed: number;
   failed: number;
   pending: number;
@@ -85,6 +86,17 @@ export interface MarketingSettings {
   reason: string;
   brand: string;
   logoUrl: string;
+  guideUrl: string;
+  guideName: string;
+}
+
+export interface PageVisit {
+  id: string;
+  page: string;
+  source: string | null;
+  referrer: string | null;
+  sourceLabel: string;
+  createdAt: string;
 }
 
 export interface DomainStatus {

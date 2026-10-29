@@ -4,14 +4,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import { ArrowRight, Send, CheckCircle2, MailOpen, MousePointerClick, UserMinus, AlertTriangle, Clock, Loader2, Search, StopCircle, Copy } from 'lucide-react';
+import { ArrowRight, Send, CheckCircle2, MailOpen, MousePointerClick, UserMinus, AlertTriangle, Clock, Loader2, Search, StopCircle, Copy, FileDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { Campaign, CampaignStats, CAMPAIGN_STATUS, pct } from './shared';
 
 interface Recipient {
   id: string; status: string; email: string; name: string | null; contactId: string; contactStatus: string;
-  sentAt: string | null; openedAt: string | null; clickedAt: string | null; unsubscribedAt: string | null; opens: number; clicks: number; error: string | null;
+  sentAt: string | null; openedAt: string | null; clickedAt: string | null; downloadedAt: string | null; unsubscribedAt: string | null; opens: number; clicks: number; error: string | null;
 }
 interface ReportData {
   campaign: Campaign;
@@ -31,7 +31,7 @@ const SEND_STATUS: Record<string, { label: string; cls: string }> = {
   SKIPPED: { label: 'לא נשלח', cls: 'text-slate-400' },
 };
 
-type Filter = 'all' | 'opened' | 'notOpened' | 'clicked' | 'unsubscribed' | 'failed';
+type Filter = 'all' | 'opened' | 'notOpened' | 'clicked' | 'downloaded' | 'unsubscribed' | 'failed';
 
 export default function CampaignReport() {
   const { id } = useParams<{ id: string }>();
@@ -57,6 +57,7 @@ export default function CampaignReport() {
         case 'opened': return !!r.openedAt;
         case 'notOpened': return !r.openedAt && ['SENT', 'DELIVERED'].includes(r.status);
         case 'clicked': return !!r.clickedAt;
+        case 'downloaded': return !!r.downloadedAt;
         case 'unsubscribed': return !!r.unsubscribedAt;
         case 'failed': return ['FAILED', 'BOUNCED'].includes(r.status);
         default: return true;
@@ -67,6 +68,7 @@ export default function CampaignReport() {
   if (isLoading || !data) return <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
   const { campaign, stats } = data;
   const progress = pct(stats.sent + stats.failed, stats.recipients);
+  const hasDownloads = stats.downloaded > 0;
 
   const stop = async () => {
     if (!confirm('לעצור את השליחה? מי שעוד לא קיבל, לא יקבל.')) return;
@@ -86,6 +88,7 @@ export default function CampaignReport() {
     { label: 'התקבלו', value: stats.delivered, sub: `${pct(stats.delivered, stats.sent)}%`, icon: CheckCircle2, color: 'bg-sky-100 text-sky-600' },
     { label: 'פתחו', value: stats.opened, sub: `${pct(stats.opened, stats.sent)}%`, icon: MailOpen, color: 'bg-emerald-100 text-emerald-600' },
     { label: 'לחצו על קישור', value: stats.clicked, sub: `${pct(stats.clicked, stats.sent)}%`, icon: MousePointerClick, color: 'bg-amber-100 text-amber-600' },
+    ...(hasDownloads ? [{ label: 'הורידו את המדריך', value: stats.downloaded, sub: `${pct(stats.downloaded, stats.sent)}%`, icon: FileDown, color: 'bg-primary-100 text-primary-700' }] : []),
     { label: 'הסירו את עצמם', value: stats.unsubscribed, sub: `${pct(stats.unsubscribed, stats.sent)}%`, icon: UserMinus, color: 'bg-slate-100 text-slate-500' },
     { label: 'נכשלו', value: stats.failed, sub: 'כתובת שגויה או שגיאה', icon: AlertTriangle, color: 'bg-red-100 text-red-500' },
   ];
@@ -95,6 +98,7 @@ export default function CampaignReport() {
     { key: 'opened', label: 'פתחו', count: stats.opened },
     { key: 'notOpened', label: 'לא פתחו', count: data.recipients.filter((r) => !r.openedAt && ['SENT', 'DELIVERED'].includes(r.status)).length },
     { key: 'clicked', label: 'לחצו', count: stats.clicked },
+    ...(hasDownloads ? [{ key: 'downloaded' as Filter, label: 'הורידו את המדריך', count: stats.downloaded }] : []),
     { key: 'unsubscribed', label: 'הסירו', count: stats.unsubscribed },
     { key: 'failed', label: 'נכשלו', count: stats.failed },
   ];
@@ -139,7 +143,7 @@ export default function CampaignReport() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className={clsx('grid grid-cols-2 md:grid-cols-3 gap-4', hasDownloads ? 'xl:grid-cols-7' : 'xl:grid-cols-6')}>
         {kpis.map((k) => (
           <div key={k.label} className="card py-4">
             <div className={clsx('w-9 h-9 rounded-xl flex items-center justify-center mb-2', k.color)}><k.icon className="w-4.5 h-4.5" size={18} /></div>
@@ -189,7 +193,10 @@ export default function CampaignReport() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50">
-              <tr><th className="table-header">נמען</th><th className="table-header">סטטוס</th><th className="table-header">נפתח</th><th className="table-header">לחץ</th></tr>
+              <tr>
+                <th className="table-header">נמען</th><th className="table-header">סטטוס</th><th className="table-header">נפתח</th><th className="table-header">לחץ</th>
+                {hasDownloads && <th className="table-header">הוריד את המדריך</th>}
+              </tr>
             </thead>
             <tbody>
               {recipients.slice(0, 500).map((r) => (
@@ -205,9 +212,10 @@ export default function CampaignReport() {
                   </td>
                   <td className="table-cell text-sm">{r.openedAt ? <>{format(new Date(r.openedAt), 'd/M HH:mm')}{r.opens > 1 && <span className="text-xs text-slate-400"> ({r.opens} פעמים)</span>}</> : '—'}</td>
                   <td className="table-cell text-sm">{r.clickedAt ? <>{format(new Date(r.clickedAt), 'd/M HH:mm')}{r.clicks > 1 && <span className="text-xs text-slate-400"> ({r.clicks})</span>}</> : '—'}</td>
+                  {hasDownloads && <td className="table-cell text-sm">{r.downloadedAt ? format(new Date(r.downloadedAt), 'd/M HH:mm') : '—'}</td>}
                 </tr>
               ))}
-              {recipients.length === 0 && <tr><td colSpan={4} className="text-center text-slate-400 py-10 text-sm">אין נמענים להצגה</td></tr>}
+              {recipients.length === 0 && <tr><td colSpan={hasDownloads ? 5 : 4} className="text-center text-slate-400 py-10 text-sm">אין נמענים להצגה</td></tr>}
             </tbody>
           </table>
         </div>

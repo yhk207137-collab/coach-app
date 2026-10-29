@@ -6,7 +6,7 @@ import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import {
   Plus, Settings2, Mail, Users2, MailOpen, MousePointerClick, Copy, Trash2, BarChart3, Pencil, Loader2, X,
-  Sparkles, Newspaper, Megaphone, PenLine, FileText, Zap, BookUser,
+  Sparkles, Newspaper, Megaphone, PenLine, FileText, Zap, BookUser, Activity,
 } from 'lucide-react';
 import api from '../../services/api';
 import { Campaign, CAMPAIGN_STATUS, DomainStatus, MarketingSettings, pct } from './shared';
@@ -163,7 +163,8 @@ export default function CampaignsPage() {
           <h1 className="page-title">דיוור</h1>
           <p className="page-subtitle">עיצוב ושליחה של מיילים לנרשמים, עם מעקב פתיחות והקלקות</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Link to="/marketing/tracking" className="btn-secondary"><Activity className="w-4 h-4" /> מעקב</Link>
           <button onClick={() => setShowSettings(true)} className="btn-secondary"><Settings2 className="w-4 h-4" /> הגדרות דיוור</button>
           <button onClick={() => setShowNew(true)} className="btn-primary"><Plus className="w-4 h-4" /> קמפיין חדש</button>
         </div>

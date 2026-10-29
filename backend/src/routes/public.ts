@@ -1,13 +1,17 @@
 import { prisma } from '../lib/prisma';
 import { asyncRouter } from '../lib/asyncRouter';
 import { normalizeEmail } from './marketing';
-import { enqueueWelcome, rememberBaseUrl, verifyClick } from '../services/marketing';
+import { enqueueWelcome, rememberBaseUrl, verifyClick, getMarketingSettings, isGuideUrl } from '../services/marketing';
 import { safeUrl } from '../services/emailRender';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/;
 const str = (v: unknown, max: number) => {
   const s = String(v ?? '').replace(/[​-‏‪-‮⁦-⁩﻿]/g, '').trim();
   return s ? s.slice(0, max) : null;
+};
+const visitorId = (v: unknown) => {
+  const s = String(v ?? '');
+  return /^[A-Za-z0-9_-]{8,40}$/.test(s) ? s : null;
 };
 const maskEmail = (e: string) => {
   const [user, domain] = e.split('@');
@@ -58,6 +62,8 @@ publicRouter.post('/subscribe', async (req, res) => {
     contactId = existing.id;
     shouldWelcome = resubscribed;
   }
+  const vid = visitorId(b.vid);
+  if (vid) await prisma.pageVisit.updateMany({ where: { visitorId: vid, contactId: null }, data: { contactId } });
   if (shouldWelcome) void enqueueWelcome(contactId, email).catch((e) => console.error('[MARKETING] welcome enqueue:', e?.message || e));
   res.json({ ok: true });
 });
@@ -103,16 +109,63 @@ publicRouter.post('/resubscribe/:token', async (req, res) => {
   res.json({ ok: true });
 });
 
-// ── /api/t (open pixel, click redirect) ─────────────────────────────────────
+// ── /api/t (open pixel, click redirect, landing-page visits) ────────────────
 
 export const trackingRouter = asyncRouter();
 
 const PIXEL = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+const sendPixel = (res: import('express').Response) => {
+  res.set({ 'Content-Type': 'image/gif', 'Cache-Control': 'no-store, no-cache, must-revalidate, private', 'Content-Length': String(PIXEL.length) });
+  res.end(PIXEL);
+};
+
+// Hosts that report landing-page visits. Email links to them carry the send id (ys=), so the
+// page can say who arrived from which email.
+let landingHosts: { hosts: Set<string>; at: number } | null = null;
+async function isLandingHost(host: string) {
+  if (!landingHosts || Date.now() - landingHosts.at > 10 * 60_000) {
+    const rows = await prisma.$queryRaw<{ host: string }[]>`
+      SELECT DISTINCT split_part(page, '/', 1) AS host FROM "PageVisit" WHERE "createdAt" > now() - interval '90 days'`;
+    landingHosts = { hosts: new Set(rows.map((r) => r.host)), at: Date.now() };
+  }
+  return landingHosts.hosts.has(host);
+}
+
+// The landing page loads this image once per view: v = the browser's visitor id, p = host + path,
+// s = ?src= campaign source, r = referring site, e = send id when arriving from an email link.
+trackingRouter.get('/v.gif', async (req, res) => {
+  sendPixel(res);
+  const vid = visitorId(req.query.v);
+  const page = str(req.query.p, 200);
+  if (!vid || !page || /bot|crawl|spider|preview|headless/i.test(String(req.get('user-agent') || ''))) return;
+
+  let contactId: string | null = null;
+  const fromEmail = str(req.query.e, 40);
+  if (fromEmail) {
+    const send = await prisma.campaignSend.findUnique({ where: { id: fromEmail }, select: { contactId: true } });
+    if (send) {
+      contactId = send.contactId;
+      await prisma.pageVisit.updateMany({ where: { visitorId: vid, contactId: null }, data: { contactId } });
+    }
+  }
+  // A refresh or a quick return is the same visit.
+  const recent = await prisma.pageVisit.findFirst({
+    where: { visitorId: vid, page, createdAt: { gte: new Date(Date.now() - 30 * 60_000) } },
+    select: { id: true },
+  });
+  if (recent) return;
+  if (!contactId) {
+    const known = await prisma.pageVisit.findFirst({ where: { visitorId: vid, contactId: { not: null } }, select: { contactId: true } });
+    contactId = known?.contactId ?? null;
+  }
+  await prisma.pageVisit.create({
+    data: { visitorId: vid, contactId, page, source: str(req.query.s, 60), referrer: str(req.query.r, 120) },
+  });
+});
 
 trackingRouter.get('/o/:file', async (req, res) => {
   const sendId = req.params.file.replace(/\.gif$/, '');
-  res.set({ 'Content-Type': 'image/gif', 'Cache-Control': 'no-store, no-cache, must-revalidate, private', 'Content-Length': String(PIXEL.length) });
-  res.end(PIXEL);
+  sendPixel(res);
   const send = await prisma.campaignSend.findUnique({ where: { id: sendId }, select: { id: true, openedAt: true, status: true } });
   if (!send) return;
   await prisma.campaignSend.update({
@@ -133,18 +186,29 @@ trackingRouter.get('/c/:sendId', async (req, res) => {
   if (!target || !/^https?:/i.test(target) || !verifyClick(req.params.sendId, url, sig)) {
     return res.status(400).send('קישור לא תקין');
   }
-  res.redirect(302, target);
-  const send = await prisma.campaignSend.findUnique({ where: { id: req.params.sendId }, select: { id: true, openedAt: true, clickedAt: true, status: true } });
+  let location = target;
+  try {
+    const u = new URL(target);
+    if (await isLandingHost(u.host)) {
+      if (!u.searchParams.has('src') && !u.searchParams.has('utm_source')) u.searchParams.set('src', 'email');
+      u.searchParams.set('ys', req.params.sendId);
+      location = u.toString();
+    }
+  } catch { /* plain redirect */ }
+  res.redirect(302, location);
+  const send = await prisma.campaignSend.findUnique({ where: { id: req.params.sendId }, select: { id: true, openedAt: true, clickedAt: true, downloadedAt: true, status: true } });
   if (!send) return;
   const now = new Date();
+  const guide = isGuideUrl(target, (await getMarketingSettings()).guideUrl);
   await prisma.campaignSend.update({
     where: { id: send.id },
     data: {
       clicks: { increment: 1 },
       clickedAt: send.clickedAt ?? now,
       openedAt: send.openedAt ?? now,
+      ...(guide && !send.downloadedAt ? { downloadedAt: now } : {}),
       ...(send.status === 'SENT' ? { status: 'DELIVERED', deliveredAt: now } : {}),
     },
   });
-  await prisma.campaignEvent.create({ data: { sendId: send.id, type: 'click', url: target.slice(0, 1000) } });
+  await prisma.campaignEvent.create({ data: { sendId: send.id, type: guide ? 'download' : 'click', url: target.slice(0, 1000) } });
 });

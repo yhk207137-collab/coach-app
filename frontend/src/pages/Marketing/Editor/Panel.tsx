@@ -1,8 +1,28 @@
 import { useState } from 'react';
 import clsx from 'clsx';
-import { ArrowRight, AlignRight, AlignCenter, AlignLeft, ImagePlus, Trash2, Palette, LayoutTemplate } from 'lucide-react';
-import { BLOCKS, Block, Design, DesignSettings, blockLabel, COLOR_SWATCHES } from '../shared';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowRight, AlignRight, AlignCenter, AlignLeft, ImagePlus, Trash2, Palette, LayoutTemplate, FileDown, CheckCircle2 } from 'lucide-react';
+import api from '../../../services/api';
+import { BLOCKS, Block, Design, DesignSettings, MarketingSettings, blockLabel, COLOR_SWATCHES } from '../shared';
 import { DRAG_NEW } from './Canvas';
+
+// Points a button at the uploaded guide; clicks on that link count as downloads in the tracking page.
+function GuideLink({ url, onPick }: { url: string; onPick: (url: string) => void }) {
+  const { data } = useQuery<{ settings: MarketingSettings }>({
+    queryKey: ['marketing-settings'],
+    queryFn: () => api.get('/marketing/settings').then((r) => r.data),
+  });
+  const guideUrl = data?.settings.guideUrl;
+  if (!guideUrl) return null;
+  if (url === guideUrl) {
+    return <p className="flex items-center gap-1 text-xs text-emerald-600 mt-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> הכפתור מוביל למדריך, וכל הורדה נספרת במעקב</p>;
+  }
+  return (
+    <button type="button" onClick={() => onPick(guideUrl)} className="btn-ghost text-xs mt-1.5 px-2 py-1">
+      <FileDown className="w-3.5 h-3.5" /> קישור להורדת המדריך
+    </button>
+  );
+}
 
 interface Props {
   design: Design;
@@ -154,6 +174,7 @@ function BlockSettings({ b, onUpdate, onPickImage }: { b: Block; onUpdate: Props
           </Field>
           <Field label="לאן הכפתור מוביל" hint="כתובת אתר, או mailto: למייל, או tel: לטלפון">
             <input className={clsx('input', !b.url && 'border-amber-300')} dir="ltr" value={b.url || ''} onChange={(e) => up({ url: e.target.value })} placeholder="https://..." />
+            <GuideLink url={b.url || ''} onPick={(url) => up({ url })} />
           </Field>
           <AlignField value={b.align} onChange={(v) => up({ align: v })} />
           <label className="flex items-center gap-2 text-sm text-slate-700">

@@ -6,11 +6,11 @@ import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import {
   Search, Plus, Upload, Download, Tag, Trash2, UserMinus, X, Loader2, Users2, UserPlus, MailOpen, MousePointerClick,
-  CheckCircle2, FileSpreadsheet, ChevronLeft, ChevronRight, Mail, ShieldCheck,
+  CheckCircle2, FileSpreadsheet, ChevronLeft, ChevronRight, Mail, ShieldCheck, Eye, FileDown,
 } from 'lucide-react';
 import api from '../../services/api';
 import { cleanEmail, EMAIL_PATTERN } from '../../utils/text';
-import { Contact, CONTACT_STATUS, ContactStatus, CONSENT_METHOD } from './shared';
+import { Contact, CONTACT_STATUS, ContactStatus, CONSENT_METHOD, PageVisit } from './shared';
 import { parseTable, rowsToContacts } from './importParser';
 
 interface Stats {
@@ -196,9 +196,9 @@ function ImportModal({ tags, onClose, onDone }: { tags: string[]; onClose: () =>
   );
 }
 
-function ContactDrawer({ id, tags, onClose, onChanged }: { id: string; tags: string[]; onClose: () => void; onChanged: () => void }) {
+export function ContactDrawer({ id, tags, onClose, onChanged }: { id: string; tags: string[]; onClose: () => void; onChanged: () => void }) {
   const qc = useQueryClient();
-  const { data: c, isLoading } = useQuery<Contact & { sends: any[] }>({
+  const { data: c, isLoading } = useQuery<Contact & { sends: any[]; visits: PageVisit[] }>({
     queryKey: ['contact', id],
     queryFn: () => api.get(`/marketing/contacts/${id}`).then((r) => r.data),
   });
@@ -265,6 +265,21 @@ function ContactDrawer({ id, tags, onClose, onChanged }: { id: string; tags: str
             </div>
 
             <div>
+              <h3 className="text-sm font-semibold text-slate-800 mb-2">כניסות לדף הנחיתה</h3>
+              {c.visits.length === 0 ? <p className="text-sm text-slate-400">עדיין אין כניסות מזוהות</p> : (
+                <div className="space-y-1.5">
+                  {c.visits.map((v) => (
+                    <div key={v.id} className="flex items-center gap-2 text-sm">
+                      <Eye className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                      <span>{format(new Date(v.createdAt), 'd/M/yyyy HH:mm')}</span>
+                      <span className="text-slate-400">· {v.sourceLabel}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
               <h3 className="text-sm font-semibold text-slate-800 mb-2">היסטוריית מיילים</h3>
               {c.sends.length === 0 ? <p className="text-sm text-slate-400">עדיין לא נשלחו מיילים</p> : (
                 <div className="space-y-2">
@@ -272,7 +287,10 @@ function ContactDrawer({ id, tags, onClose, onChanged }: { id: string; tags: str
                     <Link key={s.id} to={`/marketing/campaigns/${s.campaign.id}/report`} className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50 text-sm">
                       <Mail className="w-4 h-4 text-slate-400 flex-shrink-0" />
                       <span className="flex-1 truncate">{s.campaign.name}</span>
-                      {s.clickedAt ? <MousePointerClick className="w-4 h-4 text-amber-500" /> : s.openedAt ? <MailOpen className="w-4 h-4 text-emerald-500" /> : <span className="text-xs text-slate-400">{s.sentAt ? 'לא נפתח' : 'בתור'}</span>}
+                      {s.downloadedAt ? <span className="flex items-center gap-1 text-xs text-primary-700"><FileDown className="w-4 h-4" /> הוריד את המדריך</span>
+                        : s.clickedAt ? <span className="flex items-center gap-1 text-xs text-amber-600"><MousePointerClick className="w-4 h-4" /> לחץ</span>
+                        : s.openedAt ? <span className="flex items-center gap-1 text-xs text-emerald-600"><MailOpen className="w-4 h-4" /> פתח</span>
+                        : <span className="text-xs text-slate-400">{s.sentAt ? 'לא נפתח' : 'בתור'}</span>}
                     </Link>
                   ))}
                 </div>
