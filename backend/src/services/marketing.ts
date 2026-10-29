@@ -286,11 +286,21 @@ async function adoptBrandColor() {
   if (campaigns || templates) console.log(`[MARKETING] brand color updated in ${campaigns} campaigns, ${templates} templates`);
 }
 
+// The "פרסומת:" subject prefix became opt-in; drafts made while it was on by default get it switched off once.
+async function adoptAdOptIn() {
+  const KEY = 'ad_prefix_opt_in';
+  if (await prisma.setting.findUnique({ where: { key: KEY } })) return;
+  const { count } = await prisma.campaign.updateMany({ where: { kind: 'BROADCAST', status: 'DRAFT', markAsAd: true }, data: { markAsAd: false } });
+  await prisma.setting.create({ data: { key: KEY, value: new Date().toISOString() } });
+  console.log(`[MARKETING] ad prefix now opt-in; switched off in ${count} drafts`);
+}
+
 let workerStarted = false;
 export function startMarketingWorker() {
   if (workerStarted) return;
   workerStarted = true;
   void adoptBrandColor().catch((e) => console.error('[MARKETING] brand color update:', e?.message || e));
+  void adoptAdOptIn().catch((e) => console.error('[MARKETING] ad opt-in update:', e?.message || e));
   setInterval(() => void processQueue(), 60_000);
   setInterval(() => void refreshDeliveryStatuses().catch((e) => console.error('[MARKETING] status refresh:', e?.message || e)), 10 * 60_000);
   setTimeout(() => void processQueue(), 15_000);

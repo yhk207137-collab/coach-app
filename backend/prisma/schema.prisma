@@ -414,7 +414,7 @@ model Campaign {
   subject      String         @default("")
   preheader    String?
   fromName     String?
-  markAsAd     Boolean        @default(true)
+  markAsAd     Boolean        @default(false)
   design       Json
   audienceTags String[]       @default([])
   status       CampaignStatus @default(DRAFT)

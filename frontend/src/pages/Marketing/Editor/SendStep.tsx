@@ -140,8 +140,8 @@ export default function SendStep({ campaign, meta, onMeta, flush, settings, doma
           <label className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 cursor-pointer">
             <input type="checkbox" checked={meta.markAsAd} onChange={(e) => onMeta({ markAsAd: e.target.checked })} className="mt-1 accent-primary-600" />
             <span className="text-sm text-slate-700">
-              <strong>להוסיף "פרסומת:" בתחילת הנושא</strong>
-              <span className="block text-xs text-slate-500 mt-0.5">החוק בישראל מחייב את זה כשהמייל מקדם שירות, מוצר, אירוע או גיוס. בניוזלטר תוכן בלבד אפשר לכבות.</span>
+              <strong>לסמן כפרסומת (להוסיף "פרסומת:" בתחילת הנושא)</strong>
+              <span className="block text-xs text-slate-500 mt-0.5">כבוי, אלא אם מסמנים. החוק מחייב לסמן כשהמייל מוכר שירות, מוצר, אירוע או גיוס. במייל תוכן אפשר להשאיר כבוי.</span>
             </span>
           </label>
         </div>
