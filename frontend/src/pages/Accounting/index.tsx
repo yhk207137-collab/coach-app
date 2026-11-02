@@ -71,7 +71,7 @@ export default function AccountingPage() {
             rel="noopener noreferrer"
             className="btn-primary flex items-center gap-2 no-underline"
           >
-            <ExternalLink className="w-4 h-4" /> פתח ישרכארט עסקים
+            <ExternalLink className="w-4 h-4" /> פתח ישראכרט עסקים
           </a>
         )}
       </div>
@@ -253,12 +253,12 @@ export default function AccountingPage() {
                 <Receipt className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="font-bold text-slate-900 text-lg">ישרכארט עסקים</h2>
+                <h2 className="font-bold text-slate-900 text-lg">ישראכרט עסקים</h2>
                 <p className="text-sm text-slate-500">פלטפורמת החשבוניות והקבלות שלך</p>
               </div>
             </div>
             <p className="text-sm text-slate-600 mb-5 leading-relaxed">
-              הנפקת חשבוניות וקבלות מנוהלת דרך ישרכארט עסקים — כלי עצמאי המוסמך על ידי רשות המסים.
+              הנפקת חשבוניות וקבלות נעשית אצל ישראכרט עסקים — כלי עצמאי המוסמך על ידי רשות המסים.
               לחץ כדי לפתוח את האפליקציה ולהנפיק מסמכים.
             </p>
             <a
@@ -268,7 +268,7 @@ export default function AccountingPage() {
               className="btn-primary w-full justify-center py-3 flex items-center gap-2 no-underline text-base"
             >
               <ExternalLink className="w-5 h-5" />
-              פתח ישרכארט עסקים
+              פתח ישראכרט עסקים
             </a>
             <p className="text-xs text-slate-400 text-center mt-3">
               ניתן לשנות את אפליקציית החשבוניות בהגדרות

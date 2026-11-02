@@ -172,7 +172,7 @@ export default function Dashboard() {
           {nothingThisMonth && d.revenue.ytd > 0 && <p className="text-xs text-slate-400 mt-2">החודש עוד לא נכנסו תשלומים ואין תשלומים מתוכננים. כדאי לתזמן גבייה בכרטיסי הלקוחות.</p>}
         </Panel>
 
-        <Panel title="דורש טיפול" icon={AlertTriangle} action={d.attentionTotal > d.attention.length ? <span className="text-xs text-slate-400">עוד {d.attentionTotal - d.attention.length}</span> : undefined}>
+        <Panel title="דורש טיפול" icon={AlertTriangle} action={<MoreLink to="/alerts" label={d.attentionTotal > d.attention.length ? `עוד ${d.attentionTotal - d.attention.length}` : 'להתראות'} />}>
           {d.attention.length === 0 ? (
             <div className="text-center py-8">
               <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />

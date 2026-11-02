@@ -9,7 +9,7 @@ export async function buildFullBackup() {
   const [
     users, clients, meetings, meetingSummaries, tags, tasks, payments, paymentRecords, documents,
     quotes, quoteItems, projects, subProjects, contracts, leads, leadActivities, invoices, invoiceItems,
-    services, settings, contacts, campaigns, campaignSends, emailTemplates, media,
+    services, settings, contacts, campaigns, campaignSends, emailTemplates, media, pageVisits,
   ] = await Promise.all([
     prisma.user.findMany({ select: { id: true, email: true, name: true, role: true, clientId: true, createdAt: true } }),
     prisma.client.findMany({ orderBy: { fullName: 'asc' } }),
@@ -36,12 +36,13 @@ export async function buildFullBackup() {
     prisma.campaignSend.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.emailTemplate.findMany(),
     prisma.media.findMany(),
+    prisma.pageVisit.findMany(),
   ]);
 
   const data = {
     users, clients, meetings, meetingSummaries, tags, tasks, payments, paymentRecords, documents,
     quotes, quoteItems, projects, subProjects, contracts, leads, leadActivities, invoices, invoiceItems,
-    services, settings, contacts, campaigns, campaignSends, emailTemplates, media,
+    services, settings, contacts, campaigns, campaignSends, emailTemplates, media, pageVisits,
   };
   const counts = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v.length]));
   return { exportedAt: new Date().toISOString(), version: 2, counts, ...data };

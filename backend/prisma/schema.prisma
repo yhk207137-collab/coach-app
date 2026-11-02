@@ -480,6 +480,19 @@ model PageVisit {
   @@index([createdAt])
 }
 
+// A reminder the owner postponed ("remind me tomorrow"); hidden until then.
+model AlertSnooze {
+  key       String   @id
+  until     DateTime
+  createdAt DateTime @default(now())
+}
+
+// One-time reminders already sent (e.g. "meeting in an hour"), so a restart never repeats them.
+model AlertSent {
+  key    String   @id
+  sentAt DateTime @default(now())
+}
+
 model EmailTemplate {
   id        String   @id @default(cuid())
   name      String

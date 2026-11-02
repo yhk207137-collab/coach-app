@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, X, Menu } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
+import AlertsBell from './AlertsBell';
 
 interface Props {
   onMenuClick: () => void;
@@ -31,7 +32,7 @@ export default function Header({ onMenuClick }: Props) {
   const hasResults = data && (data.clients?.length || data.tasks?.length || data.summaries?.length);
 
   return (
-    <header className="h-16 bg-white/70 backdrop-blur-md border-b border-white/60 flex items-center px-4 lg:px-8 gap-3 shadow-sm flex-shrink-0">
+    <header className="relative z-20 h-16 bg-white/70 backdrop-blur-md border-b border-white/60 flex items-center px-4 lg:px-8 gap-3 shadow-sm flex-shrink-0">
       {/* Hamburger — mobile only */}
       <button
         onClick={onMenuClick}
@@ -89,6 +90,8 @@ export default function Header({ onMenuClick }: Props) {
           </div>
         )}
       </div>
+
+      <div className="mr-auto"><AlertsBell /></div>
     </header>
   );
 }

@@ -10,7 +10,9 @@ import multer from 'multer';
 import { runNightlyBackup } from './services/backup';
 import { UPLOAD_DIR } from './lib/uploads';
 import { startMarketingWorker } from './services/marketing';
+import { alertsTick } from './services/alerts';
 import marketingRoutes from './routes/marketing';
+import alertRoutes from './routes/alerts';
 import { publicRouter, trackingRouter } from './routes/public';
 
 import authRoutes from './routes/auth';
@@ -132,6 +134,7 @@ app.use('/api/leads', leadRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/marketing', marketingRoutes);
+app.use('/api/alerts', alertRoutes);
 
 app.get('/api/health', (_, res) =>
   res.json({ ok: true, version: (process.env.RAILWAY_GIT_COMMIT_SHA || 'dev').slice(0, 7) })
@@ -196,6 +199,7 @@ async function bootstrap() {
   app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 
   startMarketingWorker();
+  cron.schedule('* * * * *', () => void alertsTick(), { timezone: 'Asia/Jerusalem' });
   cron.schedule('0 3 * * *', runNightlyBackup, { timezone: 'Asia/Jerusalem' });
   console.log('[STARTUP] Nightly backup (email + Google Sheets) scheduled at 03:00 Asia/Jerusalem');
 }

@@ -245,12 +245,12 @@ export default function SettingsPage() {
               <Receipt className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="font-semibold text-slate-900">ישרכארט עסקים — חשבוניות וקבלות</h2>
-              <p className="text-sm text-slate-500">הנפקת חשבוניות וקבלות מנוהלת דרך ישרכארט עסקים</p>
+              <h2 className="font-semibold text-slate-900">ישראכרט עסקים — חשבוניות וקבלות</h2>
+              <p className="text-sm text-slate-500">הנפקת חשבוניות וקבלות נעשית אצל ישראכרט עסקים</p>
             </div>
           </div>
           <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-sm text-amber-800 mb-4">
-            המערכת מחוברת לישרכארט עסקים להנפקת חשבוניות וקבלות. לחץ על הכפתור למטה כדי לפתוח את האפליקציה ולהנפיק מסמכים.
+            המערכת עדיין לא מקבלת נתונים מישראכרט. הכפתור למטה פותח את האתר שלהם, ושם מנפיקים חשבוניות וקבלות.
           </div>
           <a
             href="https://www.isracard.co.il/business"
@@ -259,7 +259,7 @@ export default function SettingsPage() {
             className="btn-primary w-full justify-center py-2.5 flex items-center gap-2 no-underline"
           >
             <ExternalLink className="w-4 h-4" />
-            פתח ישרכארט עסקים
+            פתח ישראכרט עסקים
           </a>
         </div>
 

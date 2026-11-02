@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { asyncRouter } from '../lib/asyncRouter';
 import { requireAuth, requireCoach, AuthRequest } from '../middleware/auth';
 import { getMarketingSettings, statsByCampaign } from '../services/marketing';
+import { Alert, collectAlerts } from '../services/alerts';
 
 const router = asyncRouter();
 
@@ -18,10 +19,6 @@ function shiftMonth(key: string, delta: number) {
   const idx = y * 12 + (m - 1) + delta;
   return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, '0')}`;
 }
-
-const daysBetween = (from: Date, to: Date) => Math.floor((to.getTime() - from.getTime()) / DAY);
-const ago = (n: number) => (n <= 0 ? 'היום' : n === 1 ? 'אתמול' : n === 2 ? 'לפני יומיים' : `לפני ${n} ימים`);
-const forDays = (n: number) => (n <= 1 ? 'יום אחד' : n === 2 ? 'יומיים' : `${n} ימים`);
 
 const STAGES = [
   { key: 'COLD', label: 'קר' },
@@ -42,8 +39,8 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   const in7 = new Date(now.getTime() + 7 * DAY);
 
   const [
-    user, mkt, paidRecords, unpaidRecords, payments, clients, leads, quotes, contracts,
-    meetings, futureMeetingClientIds, lastMeetings, projects, openTasks, subscribers, newSubscribers, lastCampaign,
+    user, mkt, paidRecords, unpaidRecords, payments, clients, leads, quotes,
+    meetings, projects, openTasks, subscribers, newSubscribers, lastCampaign,
   ] = await Promise.all([
     prisma.user.findUnique({ where: { id: req.user!.id }, select: { name: true } }),
     getMarketingSettings(),
@@ -64,17 +61,11 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
     prisma.quote.findMany({
       select: { id: true, title: true, status: true, updatedAt: true, client: { select: { id: true, fullName: true } }, items: { select: { price: true, quantity: true } } },
     }),
-    prisma.contract.findMany({
-      where: { status: 'SENT' },
-      select: { id: true, title: true, updatedAt: true, client: { select: { id: true, fullName: true } } },
-    }),
     prisma.meeting.findMany({
       where: { date: { gte: new Date(now.getTime() - 62 * DAY), lt: in7 } },
       select: { id: true, date: true, duration: true, type: true, clientId: true, client: { select: { fullName: true } } },
       orderBy: { date: 'asc' },
     }),
-    prisma.meeting.findMany({ where: { date: { gte: now } }, select: { clientId: true }, distinct: ['clientId'] }),
-    prisma.meeting.groupBy({ by: ['clientId'], _max: { date: true } }),
     prisma.project.findMany({
       where: { status: 'ACTIVE' },
       select: { id: true, name: true, budget: true, endDate: true, client: { select: { id: true, fullName: true } }, tasks: { select: { status: true } } },
@@ -209,55 +200,15 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   });
 
   // ── Needs attention ───────────────────────────────────────────────────────
-  type Attention = { kind: string; severity: 'critical' | 'warning' | 'info'; title: string; detail: string; amount?: number; href: string };
-  const attention: Attention[] = [];
-  for (const r of overdueRecords) {
-    attention.push({
-      kind: 'payment', severity: 'critical', amount: r.amount, href: `/clients/${r.payment.clientId}`,
-      title: `תשלום באיחור · ${r.payment.client.fullName}`,
-      detail: `היה אמור להיכנס ${ago(daysBetween(r.scheduledDate!, now))}`,
-    });
-  }
-  for (const p of overduePlans) {
-    attention.push({
-      kind: 'payment', severity: 'critical', amount: p.balance, href: `/clients/${p.clientId}`,
-      title: `יתרה פתוחה · ${p.name}`, detail: `מועד התשלום עבר ${ago(daysBetween(p.nextPaymentDate!, now))}`,
-    });
-  }
-  for (const q of quotes.filter((q) => q.status === 'SENT' && daysBetween(q.updatedAt, now) >= 5)) {
-    attention.push({
-      kind: 'quote', severity: 'warning', amount: Math.round(quoteValue(q)) || undefined, href: '/quotes',
-      title: `הצעת מחיר בלי תשובה · ${q.client.fullName}`, detail: `"${q.title}" נשלחה ${ago(daysBetween(q.updatedAt, now))}. כדאי לעשות פולואפ`,
-    });
-  }
-  for (const c of contracts.filter((c) => daysBetween(c.updatedAt, now) >= 3)) {
-    attention.push({
-      kind: 'contract', severity: 'warning', href: '/contracts',
-      title: `חוזה לא נחתם · ${c.client.fullName}`, detail: `"${c.title}" ממתין לחתימה ${forDays(daysBetween(c.updatedAt, now))}`,
-    });
-  }
-  for (const l of leads.filter((l) => ['HOT', 'PROPOSAL'].includes(l.stage) && daysBetween(l.updatedAt, now) >= 7)) {
-    attention.push({
-      kind: 'lead', severity: 'warning', amount: l.estimatedValue || undefined, href: '/leads',
-      title: `ליד ${l.stage === 'HOT' ? 'חם' : 'בשלב הצעה'} מתקרר · ${l.fullName}`, detail: `אין עדכון כבר ${forDays(daysBetween(l.updatedAt, now))}`,
-    });
-  }
-  if (overdueTasks.length) {
+  // Same engine as the bell and the morning email. Coming-up items stay out of this panel, and late tasks show as one line.
+  const alerts = await collectAlerts(now);
+  const lateTasks = alerts.filter((a) => a.kind === 'task' && !a.soon);
+  const attention: Pick<Alert, 'kind' | 'severity' | 'title' | 'detail' | 'amount' | 'href'>[] = alerts.filter((a) => a.kind !== 'meeting' && a.kind !== 'task' && !a.soon);
+  if (lateTasks.length) {
     attention.push({
       kind: 'task', severity: 'warning', href: '/tasks',
-      title: overdueTasks.length === 1 ? 'משימה אחת באיחור' : `${overdueTasks.length} משימות באיחור`,
-      detail: overdueTasks.slice(0, 2).map((t) => t.title.trim()).join(' · '),
-    });
-  }
-  const hasFuture = new Set(futureMeetingClientIds.map((m) => m.clientId));
-  const lastMeetingAt = new Map(lastMeetings.map((m) => [m.clientId, m._max.date]));
-  for (const c of activeClients.filter((c) => !hasFuture.has(c.id))) {
-    const last = lastMeetingAt.get(c.id);
-    const days = last ? daysBetween(last, now) : null;
-    if (days !== null && days < 10) continue;
-    attention.push({
-      kind: 'client', severity: 'info', href: `/clients/${c.id}`,
-      title: `אין פגישה מתוכננת · ${c.fullName}`, detail: days === null ? 'עוד לא נקבעה פגישה ראשונה' : `הפגישה האחרונה הייתה ${ago(days)}`,
+      title: lateTasks.length === 1 ? 'משימה אחת באיחור' : `${lateTasks.length} משימות באיחור`,
+      detail: lateTasks.slice(0, 2).map((a) => a.title.replace('משימה באיחור · ', '')).join(' · '),
     });
   }
   const rank = { critical: 0, warning: 1, info: 2 };
