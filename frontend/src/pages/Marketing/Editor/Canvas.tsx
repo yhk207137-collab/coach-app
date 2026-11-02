@@ -198,8 +198,7 @@ export default function Canvas(p: Props) {
           {(p.settings.address || p.settings.details) && <div>{[p.settings.address, p.settings.details].filter(Boolean).join(' · ')}</div>}
           {!p.settings.address && <div className="text-amber-600">⚠ חסרה כתובת העסק (בהגדרות הדיוור)</div>}
           {p.settings.reason && <div>{p.settings.reason}</div>}
-          <div className="inline-block mt-3 mb-1 px-5 py-2 rounded-lg border border-slate-400 bg-white text-[13px] font-bold text-slate-700">הסרה מרשימת התפוצה</div>
-          <div className="text-[11px] text-slate-400">אפשר גם להשיב למייל הזה עם המילה "הסר". ההסרה מיידית.</div>
+          <div className="mt-2.5"><span className="underline">הסרה מרשימת התפוצה</span> | או להשיב למייל במילה "הסר"</div>
           <div className="mt-2 text-[11px] text-slate-400 no-underline">(התחתית מתווספת אוטומטית לכל מייל, ונערכת בהגדרות הדיוור)</div>
         </div>
       )}
