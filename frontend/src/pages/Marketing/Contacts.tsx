@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -196,13 +196,46 @@ function ImportModal({ tags, onClose, onDone }: { tags: string[]; onClose: () =>
   );
 }
 
+// How this person is addressed in emails. Gray is the automatic guess, typing over it replaces it.
+const firstWord = (name: string | null) => (name || '').trim().split(/\s+/)[0] || '';
+
+function FirstNameCell({ contact, onSaved }: { contact: Contact; onSaved: () => void }) {
+  const [value, setValue] = useState(contact.firstName || '');
+  useEffect(() => { setValue(contact.firstName || ''); }, [contact.firstName]);
+  const save = async () => {
+    const clean = value.trim();
+    if (clean === (contact.firstName || '')) return;
+    try {
+      await api.put(`/marketing/contacts/${contact.id}`, { firstName: clean });
+      toast.success(clean ? `במיילים ייכתב: ${clean}` : `במיילים ייכתב: ${firstWord(contact.name) || 'בלי שם'}`);
+      onSaved();
+    } catch {
+      toast.error('השמירה נכשלה');
+      setValue(contact.firstName || '');
+    }
+  };
+  return (
+    <input
+      aria-label={`שם פרטי של ${contact.name || contact.email}`}
+      className="input py-1 px-2 text-sm w-28 placeholder:text-slate-500"
+      value={value}
+      placeholder={firstWord(contact.name) || 'בלי שם'}
+      maxLength={40}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+    />
+  );
+}
+
 export function ContactDrawer({ id, tags, onClose, onChanged }: { id: string; tags: string[]; onClose: () => void; onChanged: () => void }) {
   const qc = useQueryClient();
   const { data: c, isLoading } = useQuery<Contact & { sends: any[]; visits: PageVisit[] }>({
     queryKey: ['contact', id],
     queryFn: () => api.get(`/marketing/contacts/${id}`).then((r) => r.data),
   });
-  const [edit, setEdit] = useState<{ name: string; phone: string; notes: string; tags: string[] } | null>(null);
+  const [edit, setEdit] = useState<{ name: string; firstName: string; phone: string; notes: string; tags: string[] } | null>(null);
   const save = async (patch: Record<string, unknown>, msg = 'נשמר') => {
     try {
       await api.put(`/marketing/contacts/${id}`, patch);
@@ -236,6 +269,7 @@ export function ContactDrawer({ id, tags, onClose, onChanged }: { id: string; ta
             {edit ? (
               <div className="space-y-3">
                 <div><label className="label">שם</label><input className="input" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></div>
+                <div><label className="label">שם פרטי במייל</label><input className="input placeholder:text-slate-500" maxLength={40} value={edit.firstName} placeholder={firstWord(edit.name)} onChange={(e) => setEdit({ ...edit, firstName: e.target.value })} /></div>
                 <div><label className="label">טלפון</label><input className="input" dir="ltr" value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} /></div>
                 <div><label className="label">תגיות</label><TagInput value={edit.tags} onChange={(t) => setEdit({ ...edit, tags: t })} suggestions={tags} /></div>
                 <div><label className="label">הערות</label><textarea className="input min-h-[70px]" value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></div>
@@ -243,6 +277,7 @@ export function ContactDrawer({ id, tags, onClose, onChanged }: { id: string; ta
               </div>
             ) : (
               <div className="space-y-3 text-sm">
+                <div className="flex justify-between"><span className="text-slate-500">שם פרטי במייל</span><span>{c.firstName || firstWord(c.name) || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">טלפון</span><span dir="ltr">{c.phone || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">מקור</span><span>{c.source || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">הצטרף</span><span>{format(new Date(c.createdAt), 'd/M/yyyy HH:mm')}</span></div>
@@ -251,7 +286,7 @@ export function ContactDrawer({ id, tags, onClose, onChanged }: { id: string; ta
                   <div className="flex flex-wrap gap-1.5 mt-1.5">{c.tags.length ? c.tags.map((t) => <span key={t} className="px-2.5 py-0.5 rounded-full bg-primary-50 text-primary-700 text-xs">{t}</span>) : <span className="text-slate-400">אין</span>}</div>
                 </div>
                 {c.notes && <div><span className="text-slate-500">הערות</span><p className="mt-1 whitespace-pre-wrap">{c.notes}</p></div>}
-                <button onClick={() => setEdit({ name: c.name || '', phone: c.phone || '', notes: c.notes || '', tags: c.tags })} className="btn-secondary text-sm w-full justify-center">עריכת פרטים</button>
+                <button onClick={() => setEdit({ name: c.name || '', firstName: c.firstName || '', phone: c.phone || '', notes: c.notes || '', tags: c.tags })} className="btn-secondary text-sm w-full justify-center">עריכת פרטים</button>
               </div>
             )}
 
@@ -445,6 +480,7 @@ export default function ContactsPage() {
                 <tr>
                   <th className="table-header w-10"><input type="checkbox" checked={allChecked} onChange={toggleAll} className="accent-primary-600" /></th>
                   <th className="table-header">איש קשר</th>
+                  <th className="table-header" title="השם שמופיע בפתיחת המייל. אם הוא לא נכון, כותבים מעליו">שם פרטי במייל</th>
                   <th className="table-header">סטטוס</th>
                   <th className="table-header">תגיות</th>
                   <th className="table-header">מקור</th>
@@ -459,6 +495,7 @@ export default function ContactsPage() {
                       <p className="font-medium text-slate-800">{c.name || '—'}</p>
                       <p className="text-xs text-slate-400" dir="ltr">{c.email}</p>
                     </td>
+                    <td className="table-cell" onClick={(e) => e.stopPropagation()}><FirstNameCell contact={c} onSaved={refresh} /></td>
                     <td className="table-cell"><span className={clsx('badge', CONTACT_STATUS[c.status].cls)}>{CONTACT_STATUS[c.status].label}</span></td>
                     <td className="table-cell"><div className="flex flex-wrap gap-1 max-w-xs">{c.tags.map((t) => <span key={t} className="px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 text-xs">{t}</span>)}</div></td>
                     <td className="table-cell text-sm text-slate-500">{c.source || '—'}</td>

@@ -63,6 +63,7 @@ export interface Contact {
   id: string;
   email: string;
   name: string | null;
+  firstName: string | null;
   phone: string | null;
   status: ContactStatus;
   source: string | null;

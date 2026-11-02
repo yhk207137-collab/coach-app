@@ -110,12 +110,12 @@ export const isGuideUrl = (url: string, guideUrl: string) => !!guideUrl && !!lin
 
 export function buildForSend(
   campaign: { design: Prisma.JsonValue; subject: string; preheader: string | null; markAsAd: boolean },
-  contact: { name: string | null; email: string; unsubToken: string },
+  contact: { name: string | null; firstName?: string | null; email: string; unsubToken: string },
   sendId: string | null,
   base: string,
   settings: MarketingSettings
 ) {
-  const merge = { name: contact.name, email: contact.email };
+  const merge = { name: contact.name, firstName: contact.firstName, email: contact.email };
   const unsubscribeUrl = sendId
     ? `${base}/unsubscribe/${contact.unsubToken}?s=${sendId}`
     : `${base}/unsubscribe/preview`;

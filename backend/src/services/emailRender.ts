@@ -2,6 +2,7 @@ import sanitizeHtml from 'sanitize-html';
 
 export interface MergeData {
   name?: string | null;
+  firstName?: string | null;
   email?: string;
 }
 
@@ -54,7 +55,7 @@ const firstName = (name?: string | null) => (name || '').trim().split(/\s+/)[0] 
 export function applyMerge(text: string, merge: MergeData) {
   return text
     .replace(/\{\{\s*שם_מלא\s*\}\}/g, (merge.name || '').trim())
-    .replace(/\{\{\s*שם\s*\}\}/g, firstName(merge.name))
+    .replace(/\{\{\s*שם\s*\}\}/g, merge.firstName?.trim() || firstName(merge.name))
     .replace(/\{\{\s*מייל\s*\}\}/g, merge.email || '')
     .replace(/\s+([,.!?])/g, '$1')
     .replace(/^[,\s]+/, '');

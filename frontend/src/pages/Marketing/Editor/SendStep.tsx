@@ -122,7 +122,7 @@ export default function SendStep({ campaign, meta, onMeta, flush, settings, doma
           <div>
             <div className="flex items-center justify-between">
               <label className="label">נושא המייל</label>
-              <button type="button" onClick={insertName} className="text-xs text-primary-600 hover:underline flex items-center gap-1 mb-1.5"><UserPlus className="w-3.5 h-3.5" /> הוספת שם הנמען</button>
+              <button type="button" onClick={insertName} className="text-xs text-primary-600 hover:underline flex items-center gap-1 mb-1.5"><UserPlus className="w-3.5 h-3.5" /> הוספת שם פרטי</button>
             </div>
             <input className="input" value={meta.subject} onChange={(e) => onMeta({ subject: e.target.value })} placeholder="למשל: 3 דרכים להגדיל תרומות עוד החודש" maxLength={200} />
             <p className={clsx('text-xs mt-1', subjectLen > 60 ? 'text-amber-600' : 'text-slate-400')}>

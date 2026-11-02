@@ -1,6 +1,8 @@
 export interface ParsedRow {
   email: string;
   name?: string;
+  firstName?: string;
+  lastName?: string;
   phone?: string;
   date?: string;
 }
@@ -43,7 +45,9 @@ export function parseTable(text: string): string[][] {
 
 const HEADER_MATCH: Record<keyof ParsedRow, RegExp> = {
   email: /^(e-?mail|מייל|אימייל|דוא"?ל|כתובת מייל|דואר אלקטרוני)$/i,
-  name: /^(name|full ?name|שם|שם מלא|שם פרטי)$/i,
+  name: /^(name|full ?name|שם|שם מלא)$/i,
+  firstName: /^(first ?name|שם פרטי)$/i,
+  lastName: /^(last ?name|שם משפחה)$/i,
   phone: /^(phone|mobile|טלפון|נייד|מספר טלפון|פלאפון)$/i,
   date: /^(date|תאריך|תאריך הרשמה|נרשם ב)$/i,
 };
@@ -66,14 +70,15 @@ export function rowsToContacts(table: string[][]): { rows: ParsedRow[]; columns:
     const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
     if (best) columns.email = best[0];
   }
-  if (columns.name === undefined && columns.email !== undefined) {
+  if (columns.name === undefined && columns.firstName === undefined && columns.email !== undefined) {
     const candidate = body[0]?.findIndex((c, i) => i !== columns.email && c && !looksLikeEmail(c) && !/^[\d\s\-+()./:]+$/.test(c));
     if (candidate !== undefined && candidate >= 0) columns.name = candidate;
   }
   const rows = body
     .map((r) => ({
       email: columns.email !== undefined ? r[columns.email] || '' : '',
-      name: columns.name !== undefined ? r[columns.name] : undefined,
+      name: columns.name !== undefined ? r[columns.name] : [columns.firstName, columns.lastName].map((c) => (c !== undefined ? r[c]?.trim() : '')).filter(Boolean).join(' ') || undefined,
+      firstName: columns.firstName !== undefined ? r[columns.firstName] : undefined,
       phone: columns.phone !== undefined ? r[columns.phone] : undefined,
       date: columns.date !== undefined ? r[columns.date] : undefined,
     }))

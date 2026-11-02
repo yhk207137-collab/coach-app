@@ -123,7 +123,7 @@ export function FormatToolbar() {
         className="p-2 rounded-lg hover:bg-slate-100 flex items-center">
         <span className="w-4 h-4 rounded-full border border-slate-300" style={{ background: 'conic-gradient(#dc2626,#d97706,#059669,#2563eb,#6d28d9,#db2777,#dc2626)' }} />
       </button>
-      {btn('הוספת שם הנמען', UserPlus, () => exec('insertText', '{{שם}}'))}
+      {btn('הוספת השם הפרטי של הנמען', UserPlus, () => exec('insertText', '{{שם}}'))}
       {btn('ניקוי עיצוב', RemoveFormatting, () => { exec('removeFormat'); exec('unlink'); })}
       {showColors && (
         <div className="absolute top-full mt-2 right-0 z-30 flex gap-1.5 p-2 bg-white rounded-xl border border-slate-200 shadow-lg">

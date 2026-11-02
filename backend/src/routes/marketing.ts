@@ -84,9 +84,9 @@ router.get('/contacts/export.csv', async (req, res) => {
   const statusHe: Record<string, string> = { SUBSCRIBED: 'רשום', UNSUBSCRIBED: 'הוסר', BOUNCED: 'כתובת שגויה', COMPLAINED: 'דיווח ספאם', NO_CONSENT: 'בלי הסכמה' };
   const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [
-    ['שם', 'מייל', 'טלפון', 'סטטוס', 'תגיות', 'מקור', 'תאריך הרשמה', 'הערות', 'מועד ההסכמה', 'אופן ההסכמה', 'נוסח ההסכמה', 'דף ההרשמה', 'כתובת IP', 'מועד הסרה'].map(q).join(','),
+    ['שם', 'שם פרטי', 'מייל', 'טלפון', 'סטטוס', 'תגיות', 'מקור', 'תאריך הרשמה', 'הערות', 'מועד ההסכמה', 'אופן ההסכמה', 'נוסח ההסכמה', 'דף ההרשמה', 'כתובת IP', 'מועד הסרה'].map(q).join(','),
     ...contacts.map((c) => [
-      c.name, c.email, c.phone, statusHe[c.status], c.tags.join(' | '), c.source,
+      c.name, c.firstName || (c.name || '').trim().split(/\s+/)[0], c.email, c.phone, statusHe[c.status], c.tags.join(' | '), c.source,
       c.createdAt.toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' }), c.notes,
       fmtDateTime(c.consentAt), CONSENT_METHOD_HE[c.consentMethod || ''] || c.consentMethod, c.consentText, c.consentPage, c.consentIp, fmtDateTime(c.unsubscribedAt),
     ].map(q).join(',')),
@@ -121,6 +121,7 @@ router.post('/contacts', async (req, res) => {
       data: {
         email,
         name: str(req.body.name, 80),
+        firstName: str(req.body.firstName, 40),
         phone: str(req.body.phone, 30),
         notes: str(req.body.notes, 1000),
         tags: cleanTags(req.body.tags),
@@ -140,6 +141,7 @@ router.post('/contacts', async (req, res) => {
 router.put('/contacts/:id', async (req, res) => {
   const data: Prisma.ContactUpdateInput = {};
   if (req.body.name !== undefined) data.name = str(req.body.name, 80);
+  if (req.body.firstName !== undefined) data.firstName = str(req.body.firstName, 40);
   if (req.body.phone !== undefined) data.phone = str(req.body.phone, 30);
   if (req.body.notes !== undefined) data.notes = str(req.body.notes, 1000);
   if (req.body.tags !== undefined) data.tags = cleanTags(req.body.tags);
@@ -198,12 +200,13 @@ router.post('/contacts/import', async (req, res) => {
     const email = normalizeEmail(row.email);
     if (!EMAIL_RE.test(email)) { invalid++; continue; }
     const name = str(row.name, 80);
+    const firstName = str(row.firstName, 40);
     const phone = str(row.phone, 30);
     const existing = await prisma.contact.findUnique({ where: { email } });
     if (!existing) {
       await prisma.contact.create({
         data: {
-          email, name, phone, tags, source,
+          email, name, firstName, phone, tags, source,
           consentAt: row.date && !isNaN(Date.parse(row.date)) ? new Date(row.date) : new Date(),
           consentText: str(req.body.consentText, 300) || 'יובא ברשימה שאושרה כרשימת נרשמים',
           consentMethod: 'import',
@@ -216,6 +219,7 @@ router.post('/contacts/import', async (req, res) => {
         where: { email },
         data: {
           name: existing.name || name,
+          firstName: existing.firstName || firstName,
           phone: existing.phone || phone,
           tags: [...new Set([...existing.tags, ...tags])],
         },

@@ -400,6 +400,8 @@ model Contact {
   id             String         @id @default(cuid())
   email          String         @unique
   name           String?
+  // How to address them in emails; when empty, the first word of the name
+  firstName      String?
   phone          String?
   status         ContactStatus  @default(SUBSCRIBED)
   source         String?
