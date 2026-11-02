@@ -175,7 +175,7 @@ export async function collectAlerts(now = new Date()): Promise<Alert[]> {
       select: { id: true, notes: true, dueDate: true, lead: { select: { fullName: true, phone: true } } },
     }),
     prisma.project.findMany({
-      where: { status: { in: ['PLANNING', 'ACTIVE'] }, OR: [{ startDate: { not: null } }, { endDate: { not: null } }] },
+      where: { status: { in: ['PLANNING', 'ACTIVE'] } },
       select: { id: true, name: true, status: true, startDate: true, endDate: true, client: { select: { fullName: true } }, tasks: { select: { status: true, dueDate: true } } },
     }),
     prisma.client.findMany({ where: { status: 'ACTIVE' }, select: { id: true, fullName: true, clientType: true, monthlyFee: true, phone: true, startDate: true } }),
@@ -351,6 +351,11 @@ export async function collectAlerts(now = new Date()): Promise<Alert[]> {
       if (timePct >= 25 && timePct - workPct >= 25) {
         alerts.push({ ...base, key: `project-behind:${p.id}`, severity: 'warning', title: `פרויקט מאחור בלוח הזמנים · ${p.name}`, detail: `${p.client.fullName} · עברו ${timePct}% מהזמן והושלמו ${workPct}% מהמשימות` });
       }
+    }
+
+    // With no end date there is nothing to remind about, so the project asks for one.
+    if (left === null) {
+      alerts.push({ kind: 'project', href, key: `project-no-end:${p.id}`, severity: 'info', title: `פרויקט בלי תאריך סיום · ${p.name}`, detail: `${p.client.fullName} · בלי תאריך סיום אין תזכורות. קובעים אותו בעריכת הפרויקט` });
     }
 
     // A task with no date gets no reminder, so the project asks for one.
