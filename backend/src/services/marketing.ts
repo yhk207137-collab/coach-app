@@ -24,7 +24,6 @@ export interface MarketingSettings {
 const SETTINGS_KEY = 'marketing_settings';
 // The purple default before the switch to the logo colors.
 const OLD_BRAND_COLOR = '#6d28d9';
-const BASE_URL_KEY = 'public_base_url';
 
 export async function getMarketingSettings(): Promise<MarketingSettings> {
   const [row, coach] = await Promise.all([
@@ -71,22 +70,21 @@ export async function saveMarketingSettings(patch: Partial<MarketingSettings>) {
 
 const footerFrom = (s: MarketingSettings): FooterInfo => ({ businessName: s.businessName, address: s.address, details: s.details, reason: s.reason });
 
-// ── Public URL used inside emails (links, pixel, unsubscribe) ────────────────
+// ── Public URL used inside emails (links, pixel, images, unsubscribe) ───────
 
-let cachedBaseUrl: string | null = null;
-
-export async function rememberBaseUrl(origin: string) {
-  if (!/^https:\/\//.test(origin) || origin === cachedBaseUrl) return;
-  cachedBaseUrl = origin;
-  await prisma.setting.upsert({ where: { key: BASE_URL_KEY }, create: { key: BASE_URL_KEY, value: origin }, update: { value: origin } });
-}
+// Kosher filters block domains they don't know yet, app.yehoshua.co.il among them, and a recipient
+// who can't reach the unsubscribe page is a legal problem. Everything inside emails uses the address
+// the filters let through; once they open the domain, set EMAIL_BASE_URL to it.
+const FILTER_SAFE_URL = 'https://coach-app-production-908f.up.railway.app';
 
 export async function getBaseUrl() {
-  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, '');
-  if (cachedBaseUrl) return cachedBaseUrl;
-  const row = await prisma.setting.findUnique({ where: { key: BASE_URL_KEY } });
-  cachedBaseUrl = row?.value || 'http://localhost:4000';
-  return cachedBaseUrl;
+  return (process.env.EMAIL_BASE_URL || FILTER_SAFE_URL).replace(/\/$/, '');
+}
+
+// Images and buttons saved in a design while the app ran on another address.
+function onEmailAddress<T>(design: T, base: string): T {
+  const old = process.env.PUBLIC_URL?.replace(/\/$/, '');
+  return old && old !== base ? JSON.parse(JSON.stringify(design).split(old).join(base)) : design;
 }
 
 // ── Tracking links ──────────────────────────────────────────────────────────
@@ -121,7 +119,7 @@ export function buildForSend(
   const unsubscribeUrl = sendId
     ? `${base}/unsubscribe/${contact.unsubToken}?s=${sendId}`
     : `${base}/unsubscribe/preview`;
-  const { html, text } = renderEmail(campaign.design, {
+  const { html, text } = renderEmail(onEmailAddress(campaign.design, base), {
     merge,
     footer: footerFrom(settings),
     unsubscribeUrl,
@@ -195,6 +193,10 @@ export async function processQueue() {
     if (remaining <= 0) return;
 
     const settings = await getMarketingSettings();
+    if (!settings.address.trim()) {
+      console.error('[MARKETING] no business address in the settings; nothing is sent until there is one');
+      return;
+    }
     const base = await getBaseUrl();
     const sends = await prisma.campaignSend.findMany({
       where: { status: 'QUEUED', campaign: { status: { in: ['SENDING', 'ACTIVE'] } } },
@@ -217,7 +219,7 @@ export async function processQueue() {
           text: built.text,
           idempotencyKey: `send-${send.id}`,
           headers: {
-            'List-Unsubscribe': `<${built.oneClickUrl}>`,
+            'List-Unsubscribe': `<${built.oneClickUrl}>${settings.replyTo ? `, <mailto:${settings.replyTo}?subject=unsubscribe>` : ''}`,
             'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
           },
         });

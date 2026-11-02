@@ -1,7 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { asyncRouter } from '../lib/asyncRouter';
 import { normalizeEmail } from './marketing';
-import { enqueueWelcome, rememberBaseUrl, verifyClick, getMarketingSettings, isGuideUrl } from '../services/marketing';
+import { enqueueWelcome, verifyClick, getMarketingSettings, isGuideUrl } from '../services/marketing';
 import { safeUrl } from '../services/emailRender';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/;
@@ -27,7 +27,6 @@ publicRouter.post('/subscribe', async (req, res) => {
   if (b.website) return res.json({ ok: true }); // honeypot
   const email = normalizeEmail(b.email);
   if (!EMAIL_RE.test(email) || email.length > 120) return res.status(400).json({ ok: false, error: 'invalid-email' });
-  void rememberBaseUrl(`${req.protocol}://${req.get('host')}`).catch(() => {});
 
   const name = str(b.name, 80);
   const list = str(b.list, 40);

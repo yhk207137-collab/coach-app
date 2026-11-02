@@ -235,7 +235,7 @@ export function renderEmail(design: any, ctx: RenderContext): RenderedEmail {
     `<td align="center" style="border:1px solid #94a3b8;border-radius:8px;background:#ffffff;">` +
     `<a href="${esc(ctx.unsubscribeUrl)}" target="_blank" style="display:inline-block;padding:9px 20px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;color:#334155;text-decoration:none;border-radius:8px;">הסרה מרשימת התפוצה</a>` +
     `</td></tr></table>` +
-    `<div style="font-size:11px;color:#94a3b8;">אפשר גם להשיב למייל הזה עם המילה "הסר". ההסרה מיידית.</div>`;
+    `<div style="font-size:11px;color:#94a3b8;">אפשר גם להשיב למייל הזה עם המילה "הסר".</div>`;
 
   const preheader = ctx.preheader ? merge(ctx.preheader) : '';
   const fontLink = s.font === 'heebo'

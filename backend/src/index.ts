@@ -51,6 +51,8 @@ const publicLimiter = rateLimit({
   message: { ok: false, error: 'rate-limited' },
   standardHeaders: true,
   legacyHeaders: false,
+  // Removal is never refused: one-click requests from a mail provider all come from its few addresses.
+  skip: (req) => /^\/(un|re)subscribe\//.test(req.path),
 });
 app.use('/api/public', cors({ origin: true }), publicLimiter, publicRouter);
 // Landing-page views; generous, since one person browsing loads it once per page.

@@ -11,16 +11,12 @@ import { UPLOAD_DIR } from '../lib/uploads';
 import { sendEmail, sendingDomainStatus, EmailError, fromEmailAddress } from '../lib/email';
 import { STARTERS, StarterKey } from '../services/emailStarters';
 import {
-  getMarketingSettings, saveMarketingSettings, rememberBaseUrl, getBaseUrl, buildForSend, audienceWhere,
+  getMarketingSettings, saveMarketingSettings, getBaseUrl, buildForSend, audienceWhere,
   startCampaign, statsByCampaign, emptyStats, getWelcomeCampaign, DAILY_LIMIT, sentInLast24h, processQueue,
 } from '../services/marketing';
 
 const router = asyncRouter();
 router.use(requireAuth, requireCoach);
-router.use((req, _res, next) => {
-  void rememberBaseUrl(`${req.protocol}://${req.get('host')}`).catch(() => {});
-  next();
-});
 
 const INVISIBLE = /[​-‏‪-‮⁦-⁩﻿\s]/g;
 export const normalizeEmail = (v: unknown) => String(v ?? '').replace(INVISIBLE, '').toLowerCase();
