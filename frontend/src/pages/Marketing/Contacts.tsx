@@ -300,7 +300,7 @@ export function ContactDrawer({ id, tags, onClose, onChanged }: { id: string; ta
             {c.status === 'SUBSCRIBED' ? (
               <button onClick={() => confirm('להסיר את איש הקשר מרשימת התפוצה?') && save({ status: 'UNSUBSCRIBED' }, 'הוסר מהרשימה')} className="btn-secondary w-full justify-center text-sm"><UserMinus className="w-4 h-4" /> הסרה מרשימת התפוצה</button>
             ) : (
-              <button onClick={() => confirm('איש הקשר ביקש במפורש לחזור לרשימה?') && save({ status: 'SUBSCRIBED', consentConfirmed: true }, 'הוחזר לרשימה')} className="btn-secondary w-full justify-center text-sm"><UserPlus className="w-4 h-4" /> החזרה לרשימה (לבקשתו)</button>
+              <button onClick={() => confirm(c.status === 'NO_CONSENT' ? 'איש הקשר הסכים במפורש לקבל ממך דיוור?' : 'איש הקשר ביקש במפורש לחזור לרשימה?') && save({ status: 'SUBSCRIBED', consentConfirmed: true }, 'נוסף לרשימה')} className="btn-secondary w-full justify-center text-sm"><UserPlus className="w-4 h-4" /> {c.status === 'NO_CONSENT' ? 'הוספה לרשימה (רק אחרי שהסכים)' : 'החזרה לרשימה (לבקשתו)'}</button>
             )}
           </div>
         )}
@@ -346,6 +346,7 @@ export default function ContactsPage() {
     const ids = [...selected];
     if (action === 'delete' && !confirm(`למחוק לצמיתות ${ids.length} אנשי קשר? כולל היסטוריית המיילים שלהם.`)) return;
     if (action === 'unsubscribe' && !confirm(`להסיר ${ids.length} אנשי קשר מרשימת התפוצה?`)) return;
+    if (action === 'noConsent' && !confirm(`לסמן ש-${ids.length} אנשי קשר לא הסכימו לדיוור? הם יישארו ברשימה, אבל לא יקבלו מיילים.`)) return;
     try {
       await api.post('/marketing/contacts/bulk', { ids, action, ...extra });
       toast.success('בוצע');
@@ -423,6 +424,7 @@ export default function ContactsPage() {
               <button disabled={!bulkTag.trim()} onClick={() => bulk('removeTag', { tag: bulkTag })} className="btn-ghost py-1.5 text-xs">הסרת תגית</button>
             </div>
             <button onClick={() => bulk('unsubscribe')} className="btn-ghost py-1.5 text-xs"><UserMinus className="w-3.5 h-3.5" /> הסרה מהרשימה</button>
+            <button onClick={() => bulk('noConsent')} className="btn-ghost py-1.5 text-xs"><ShieldCheck className="w-3.5 h-3.5" /> לא הסכים לדיוור</button>
             <button onClick={() => bulk('delete')} className="btn-ghost py-1.5 text-xs text-red-500"><Trash2 className="w-3.5 h-3.5" /> מחיקה</button>
             <button onClick={() => setSelected(new Set())} className="mr-auto text-xs text-slate-500 hover:underline">ניקוי בחירה</button>
           </div>

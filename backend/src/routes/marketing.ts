@@ -41,7 +41,7 @@ function contactFilter(q: Request['query']): Prisma.ContactWhereInput {
       { phone: { contains: search } },
     ];
   }
-  if (q.status && ['SUBSCRIBED', 'UNSUBSCRIBED', 'BOUNCED', 'COMPLAINED'].includes(String(q.status))) {
+  if (q.status && ['SUBSCRIBED', 'UNSUBSCRIBED', 'BOUNCED', 'COMPLAINED', 'NO_CONSENT'].includes(String(q.status))) {
     where.status = String(q.status) as any;
   }
   if (q.tag) where.tags = { has: String(q.tag) };
@@ -81,7 +81,7 @@ const fmtDateTime = (d: Date | null) => (d ? d.toLocaleString('he-IL', { timeZon
 
 router.get('/contacts/export.csv', async (req, res) => {
   const contacts = await prisma.contact.findMany({ where: contactFilter(req.query), orderBy: { createdAt: 'desc' } });
-  const statusHe: Record<string, string> = { SUBSCRIBED: 'רשום', UNSUBSCRIBED: 'הוסר', BOUNCED: 'כתובת שגויה', COMPLAINED: 'דיווח ספאם' };
+  const statusHe: Record<string, string> = { SUBSCRIBED: 'רשום', UNSUBSCRIBED: 'הוסר', BOUNCED: 'כתובת שגויה', COMPLAINED: 'דיווח ספאם', NO_CONSENT: 'בלי הסכמה' };
   const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [
     ['שם', 'מייל', 'טלפון', 'סטטוס', 'תגיות', 'מקור', 'תאריך הרשמה', 'הערות', 'מועד ההסכמה', 'אופן ההסכמה', 'נוסח ההסכמה', 'דף ההרשמה', 'כתובת IP', 'מועד הסרה'].map(q).join(','),
@@ -175,6 +175,9 @@ router.post('/contacts/bulk', async (req, res) => {
       break;
     case 'unsubscribe':
       await prisma.contact.updateMany({ where: { id: { in: ids } }, data: { status: 'UNSUBSCRIBED', unsubscribedAt: new Date() } });
+      break;
+    case 'noConsent':
+      await prisma.contact.updateMany({ where: { id: { in: ids } }, data: { status: 'NO_CONSENT', consentAt: null, consentMethod: null, consentText: 'לא ניתנה הסכמה לקבלת דיוור' } });
       break;
     case 'delete':
       await prisma.contact.deleteMany({ where: { id: { in: ids } } });

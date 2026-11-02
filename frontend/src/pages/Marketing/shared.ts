@@ -57,7 +57,7 @@ export interface Campaign {
   stats?: CampaignStats;
 }
 
-export type ContactStatus = 'SUBSCRIBED' | 'UNSUBSCRIBED' | 'BOUNCED' | 'COMPLAINED';
+export type ContactStatus = 'SUBSCRIBED' | 'UNSUBSCRIBED' | 'BOUNCED' | 'COMPLAINED' | 'NO_CONSENT';
 
 export interface Contact {
   id: string;
@@ -120,6 +120,7 @@ export const CONTACT_STATUS: Record<ContactStatus, { label: string; cls: string 
   UNSUBSCRIBED: { label: 'הוסר', cls: 'bg-slate-100 text-slate-500' },
   BOUNCED: { label: 'כתובת שגויה', cls: 'bg-amber-100 text-amber-700' },
   COMPLAINED: { label: 'דיווח ספאם', cls: 'bg-red-100 text-red-600' },
+  NO_CONSENT: { label: 'בלי הסכמה', cls: 'bg-amber-100 text-amber-700' },
 };
 
 export const CONSENT_METHOD: Record<string, string> = {

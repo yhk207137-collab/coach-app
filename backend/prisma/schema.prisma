@@ -369,6 +369,7 @@ enum ContactStatus {
   UNSUBSCRIBED
   BOUNCED
   COMPLAINED
+  NO_CONSENT
 }
 
 enum CampaignKind {
