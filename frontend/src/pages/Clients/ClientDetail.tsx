@@ -17,6 +17,7 @@ import MeetingModal from '../Meetings/MeetingModal';
 import SummaryModal from '../Meetings/SummaryModal';
 import TaskModal from '../Tasks/TaskModal';
 import PaymentPanel from '../Payments/PaymentPanel';
+import MeetingBilling, { ChargeBadge } from './MeetingBilling';
 import { useMutation } from '@tanstack/react-query';
 
 const statusLabel: Record<ClientStatus, string> = { ACTIVE: 'פעיל', FROZEN: 'מוקפא', ENDED: 'הסתיים' };
@@ -67,7 +68,12 @@ export default function ClientDetail() {
     queryFn: () => api.get(`/clients/${id}`).then(r => r.data),
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['client', id] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['client', id] });
+    qc.invalidateQueries({ queryKey: ['payment', id] });
+    qc.invalidateQueries({ queryKey: ['alerts'] });
+    qc.invalidateQueries({ queryKey: ['dashboard'] });
+  };
 
   if (isLoading) return <div className="flex justify-center py-16"><div className="w-7 h-7 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
   if (!client) return <div className="text-center py-16 text-slate-400">לקוח לא נמצא</div>;
@@ -140,6 +146,8 @@ export default function ClientDetail() {
         )}
       </div>
 
+      {client.clientType === 'SESSION' && <MeetingBilling client={client} onChanged={invalidate} />}
+
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
         {tabs.map(({ key, label, icon: Icon }) => (
@@ -168,6 +176,7 @@ export default function ClientDetail() {
                     {format(new Date(m.date), "EEEE, d בMMMM yyyy · HH:mm", { locale: he })}
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">{m.type} · {m.duration} דקות</p>
+                  {client.clientType === 'SESSION' && <ChargeBadge meeting={m} hasPrice={!!client.sessionPrice} onChanged={invalidate} />}
                   {m.notes && <p className="text-sm text-slate-600 mt-2">{m.notes}</p>}
                 </div>
                 <div className="flex items-center gap-2">

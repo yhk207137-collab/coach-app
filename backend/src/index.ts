@@ -11,6 +11,7 @@ import { runNightlyBackup } from './services/backup';
 import { UPLOAD_DIR } from './lib/uploads';
 import { startMarketingWorker } from './services/marketing';
 import { alertsTick } from './services/alerts';
+import { chargeDueMeetings } from './services/meetingBilling';
 import marketingRoutes from './routes/marketing';
 import alertRoutes from './routes/alerts';
 import { publicRouter, trackingRouter } from './routes/public';
@@ -199,7 +200,10 @@ async function bootstrap() {
   app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 
   startMarketingWorker();
-  cron.schedule('* * * * *', () => void alertsTick(), { timezone: 'Asia/Jerusalem' });
+  cron.schedule('* * * * *', () => {
+    void alertsTick();
+    chargeDueMeetings().catch((e) => console.error('[BILLING] charging due meetings failed:', e?.message || e));
+  }, { timezone: 'Asia/Jerusalem' });
   cron.schedule('0 3 * * *', runNightlyBackup, { timezone: 'Asia/Jerusalem' });
   console.log('[STARTUP] Nightly backup (email + Google Sheets) scheduled at 03:00 Asia/Jerusalem');
 }

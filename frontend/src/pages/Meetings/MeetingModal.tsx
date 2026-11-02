@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { X, Loader2 } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Client, Meeting } from '../../types';
 
 const MEETING_TYPES = ['אימון עסקי', 'סקירת ביצועים', 'תכנון אסטרטגי', 'פגישת מעקב', 'פגישת היכרות', 'אחר'];
@@ -17,6 +17,31 @@ interface Props {
 
 export default function MeetingModal({ clientId, meeting, onClose, onSaved }: Props) {
   const isEdit = !!meeting;
+  const qc = useQueryClient();
+  const [ask, setAsk] = useState<{ id: string; clientId: string; amount: string } | null>(null);
+  const [answering, setAnswering] = useState(false);
+
+  const moneyChanged = (id: string) => {
+    qc.invalidateQueries({ queryKey: ['payment', id] });
+    qc.invalidateQueries({ queryKey: ['alerts'] });
+    qc.invalidateQueries({ queryKey: ['dashboard'] });
+  };
+  const answer = async (charge: boolean) => {
+    if (!ask) return;
+    const amount = parseFloat(ask.amount);
+    if (charge && !(amount > 0)) return toast.error('הכנס סכום');
+    setAnswering(true);
+    try {
+      if (charge) await api.post(`/meetings/${ask.id}/charge`, { amount });
+      else await api.post(`/meetings/${ask.id}/skip-charge`);
+      toast.success(charge ? `נוספו ₪${amount.toLocaleString()} ליתרה` : 'פגישת ההיכרות נרשמה בלי חיוב');
+      moneyChanged(ask.clientId);
+      onSaved();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'שגיאה');
+      setAnswering(false);
+    }
+  };
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ['clients'],
@@ -60,14 +85,50 @@ export default function MeetingModal({ clientId, meeting, onClose, onSaved }: Pr
         await api.put(`/meetings/${meeting!.id}`, payload);
         toast.success('הפגישה עודכנה בהצלחה');
       } else {
-        await api.post('/meetings', payload);
-        toast.success('הפגישה נקבעה בהצלחה');
+        const { data: created } = await api.post('/meetings', payload);
+        const b = created.billing;
+        if (b?.outcome === 'ask') {
+          toast.success('הפגישה נקבעה בהצלחה');
+          setAsk({ id: created.id, clientId: created.clientId, amount: b.price ? String(b.price) : '' });
+          return;
+        }
+        toast.success(
+          b?.outcome === 'charged' ? `הפגישה נרשמה ונוספו ₪${b.amount.toLocaleString()} ליתרה`
+            : b?.outcome === 'pending' ? `הפגישה נקבעה. ₪${b.amount.toLocaleString()} יתווספו ליתרה כשהיא תתקיים`
+            : b?.outcome === 'needs-price' ? 'הפגישה נרשמה. כדי שתחויב, צריך להכניס מחיר לפגישה בדף הלקוח'
+            : 'הפגישה נקבעה בהצלחה'
+        );
+        moneyChanged(created.clientId);
       }
       onSaved();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'שגיאה');
     }
   };
+
+  if (ask) {
+    return (
+      <div className="modal-overlay">
+        <div className="modal animate-fade-in">
+          <div className="modal-header">
+            <h2 className="font-semibold text-slate-900">לחייב על פגישת ההיכרות?</h2>
+          </div>
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-slate-600">הפגישה נקבעה. אם תחייב, הסכום יתווסף למה שהלקוח צריך לשלם כבר עכשיו.</p>
+            <div>
+              <label className="label">סכום (₪)</label>
+              <input type="number" min="1" className="input" value={ask.amount} onChange={e => setAsk({ ...ask, amount: e.target.value })} placeholder="0" />
+            </div>
+            <div className="flex gap-3">
+              <button type="button" disabled={answering} onClick={() => answer(true)} className="btn-primary flex-1 justify-center py-2.5">לחייב</button>
+              <button type="button" disabled={answering} onClick={() => answer(false)} className="btn-secondary flex-1 justify-center py-2.5">בלי חיוב, חינם</button>
+            </div>
+            <button type="button" disabled={answering} onClick={onSaved} className="text-xs text-slate-400 hover:underline">אחליט אחר כך (יישאר ברשימת הפגישות שלא חויבו)</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>

@@ -127,7 +127,7 @@ const RANK: Record<Severity, number> = { critical: 0, warning: 1, info: 2 };
 export async function collectAlerts(now = new Date()): Promise<Alert[]> {
   const today = dayKey(now);
   const in3 = new Date(startOfDay(now).getTime() + 4 * DAY);
-  const [mkt, unpaid, paidThisPeriod, payments, invoices, tasks, meetings, futureMeetings, lastMeetings, quotes, contracts, leads, activities, projects, clients, snoozed] = await Promise.all([
+  const [mkt, unpaid, paidThisPeriod, payments, invoices, tasks, meetings, futureMeetings, lastMeetings, quotes, contracts, leads, activities, projects, clients, snoozed, unbilled] = await Promise.all([
     getMarketingSettings(),
     prisma.paymentRecord.findMany({
       where: { isPaid: false, scheduledDate: { not: null, lt: in3 } },
@@ -180,6 +180,10 @@ export async function collectAlerts(now = new Date()): Promise<Alert[]> {
     }),
     prisma.client.findMany({ where: { status: 'ACTIVE' }, select: { id: true, fullName: true, clientType: true, monthlyFee: true, phone: true, startDate: true } }),
     prisma.alertSnooze.findMany({ where: { until: { gt: now } }, select: { key: true } }),
+    prisma.meeting.findMany({
+      where: { chargeStatus: null, date: { lte: now }, client: { status: 'ACTIVE', clientType: 'SESSION', sessionPrice: { not: null } } },
+      select: { clientId: true, client: { select: { fullName: true } } },
+    }),
   ]);
 
   const signature = mkt.senderName ? firstName(mkt.senderName) : '';
@@ -234,6 +238,20 @@ export async function collectAlerts(now = new Date()): Promise<Alert[]> {
         title: `ריטיינר בלי תשלום החודש · ${c.fullName}`, detail: 'לא נרשם ולא תוזמן תשלום לחודש הזה',
       });
     }
+  }
+
+  // Meetings that took place and were neither charged nor marked free
+  const unbilledByClient = new Map<string, { name: string; count: number }>();
+  for (const m of unbilled) {
+    const row = unbilledByClient.get(m.clientId) || { name: m.client.fullName, count: 0 };
+    row.count++;
+    unbilledByClient.set(m.clientId, row);
+  }
+  for (const [clientId, { name, count: n }] of unbilledByClient) {
+    alerts.push({
+      kind: 'payment', key: `unbilled:${clientId}:${n}`, severity: 'warning', href: `/clients/${clientId}`,
+      title: `${n === 1 ? 'פגישה שעוד לא חויבה' : `${n} פגישות שעוד לא חויבו`} · ${name}`, detail: 'בדף הלקוח בוחרים אם לחייב',
+    });
   }
 
   // Invoices past due

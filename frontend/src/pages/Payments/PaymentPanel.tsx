@@ -195,7 +195,7 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
           {/* Actions */}
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => { setAddCharge(true); setAddRecord(false); }} className="btn-primary text-sm">
-              <Plus className="w-4 h-4" /> הוספת סכום לעסקה (פגישה נוספת)
+              <Plus className="w-4 h-4" /> הוספת סכום לעסקה
             </button>
             <button onClick={() => { setAddRecord(true); setAddCharge(false); setRecordType('paid'); }} className="btn-secondary text-sm">
               <Plus className="w-4 h-4" /> רישום תשלום שהתקבל
@@ -206,7 +206,7 @@ export default function PaymentPanel({ clientId, onUpdated }: Props) {
           {addCharge && (
             <div className="card border border-primary-100">
               <h3 className="font-semibold text-slate-900 mb-1">הוספת סכום לעסקה</h3>
-              <p className="text-sm text-slate-500 mb-3">למשל פגישה נוספת. הסכום יתווסף למה שהלקוח צריך לשלם.</p>
+              <p className="text-sm text-slate-500 mb-3">לתוספת שאינה פגישה. פגישות מתווספות לבד לפי המחיר בראש דף הלקוח.</p>
               <form onSubmit={saveCharge} className="space-y-3">
                 <div>
                   <label className="label">סכום להוספה (₪)</label>

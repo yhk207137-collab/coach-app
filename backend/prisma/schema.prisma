@@ -25,6 +25,12 @@ enum ClientType {
   PROJECT
 }
 
+enum MeetingCharge {
+  PENDING
+  CHARGED
+  SKIPPED
+}
+
 enum LeadStage {
   COLD
   WARM
@@ -75,6 +81,7 @@ model Client {
   status        ClientStatus @default(ACTIVE)
   clientType    ClientType   @default(SESSION)
   monthlyFee    Float?
+  sessionPrice  Float?
   notes         String?
   user          User?
   meetings      Meeting[]
@@ -98,6 +105,9 @@ model Meeting {
   type          String
   notes         String?
   googleEventId String?
+  // null = not decided yet (older meetings, intro meetings, clients with no price)
+  chargeStatus  MeetingCharge?
+  chargedAmount Float?
   summary       MeetingSummary?
   tasks         Task[]
   createdAt     DateTime        @default(now())

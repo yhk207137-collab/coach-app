@@ -20,6 +20,8 @@ export interface Client {
   businessField?: string;
   startDate: string;
   status: ClientStatus;
+  clientType?: string;
+  sessionPrice?: number | null;
   notes?: string;
   meetings?: Meeting[];
   tasks?: Task[];
@@ -39,6 +41,8 @@ export interface Meeting {
   type: string;
   notes?: string;
   googleEventId?: string;
+  chargeStatus?: 'PENDING' | 'CHARGED' | 'SKIPPED' | null;
+  chargedAmount?: number | null;
   summary?: MeetingSummary;
   tasks?: Task[];
   createdAt: string;
