@@ -240,7 +240,7 @@ export async function collectAlerts(now = new Date()): Promise<Alert[]> {
     }
   }
 
-  // Meetings that took place and were neither charged nor marked free
+  // Meetings that took place with no decision yet on adding them to the balance
   const unbilledByClient = new Map<string, { name: string; count: number }>();
   for (const m of unbilled) {
     const row = unbilledByClient.get(m.clientId) || { name: m.client.fullName, count: 0 };
@@ -250,7 +250,7 @@ export async function collectAlerts(now = new Date()): Promise<Alert[]> {
   for (const [clientId, { name, count: n }] of unbilledByClient) {
     alerts.push({
       kind: 'payment', key: `unbilled:${clientId}:${n}`, severity: 'warning', href: `/clients/${clientId}`,
-      title: `${n === 1 ? 'פגישה שעוד לא חויבה' : `${n} פגישות שעוד לא חויבו`} · ${name}`, detail: 'בדף הלקוח בוחרים אם לחייב',
+      title: `${n === 1 ? 'פגישה מחכה להחלטה על חיוב' : `${n} פגישות מחכות להחלטה על חיוב`} · ${name}`, detail: 'בדף הלקוח בוחרים על כל אחת אם להוסיף אותה ליתרה',
     });
   }
 
