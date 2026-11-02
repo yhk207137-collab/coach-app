@@ -147,8 +147,8 @@ export async function collectAlerts(now = new Date()): Promise<Alert[]> {
       select: { id: true, number: true, dueDate: true, client: { select: { id: true, fullName: true, phone: true } }, items: { select: { price: true, quantity: true } } },
     }),
     prisma.task.findMany({
-      where: { status: { not: 'COMPLETED' }, dueDate: { not: null, lt: new Date(startOfDay(now).getTime() + 2 * DAY) } },
-      select: { id: true, title: true, dueDate: true, client: { select: { fullName: true } } },
+      where: { status: { not: 'COMPLETED' }, dueDate: { not: null, lt: in3 } },
+      select: { id: true, title: true, dueDate: true, projectId: true, client: { select: { fullName: true } }, project: { select: { name: true } } },
       orderBy: { dueDate: 'asc' },
     }),
     prisma.meeting.findMany({
@@ -175,8 +175,8 @@ export async function collectAlerts(now = new Date()): Promise<Alert[]> {
       select: { id: true, notes: true, dueDate: true, lead: { select: { fullName: true, phone: true } } },
     }),
     prisma.project.findMany({
-      where: { status: 'ACTIVE', endDate: { not: null, lt: startOfDay(now) } },
-      select: { id: true, name: true, endDate: true, client: { select: { fullName: true } } },
+      where: { status: { in: ['PLANNING', 'ACTIVE'] }, OR: [{ startDate: { not: null } }, { endDate: { not: null } }] },
+      select: { id: true, name: true, status: true, startDate: true, endDate: true, client: { select: { fullName: true } }, tasks: { select: { status: true, dueDate: true } } },
     }),
     prisma.client.findMany({ where: { status: 'ACTIVE' }, select: { id: true, fullName: true, clientType: true, monthlyFee: true, phone: true, startDate: true } }),
     prisma.alertSnooze.findMany({ where: { until: { gt: now } }, select: { key: true } }),
@@ -266,10 +266,11 @@ export async function collectAlerts(now = new Date()): Promise<Alert[]> {
   // Tasks
   for (const t of tasks) {
     const late = dayDiff(t.dueDate!, now);
-    const base = { kind: 'task' as const, key: `task:${t.id}`, href: '/tasks', at: t.dueDate!, action: { type: 'task-done' as const, id: t.id } };
-    if (late > 0) alerts.push({ ...base, severity: 'warning', title: `משימה באיחור · ${t.title.trim()}`, detail: `${t.client.fullName} · הייתה לתאריך ${shortDate(t.dueDate!)}` });
-    else if (late === 0) alerts.push({ ...base, severity: 'warning', soon: true, title: `משימה להיום · ${t.title.trim()}`, detail: t.client.fullName });
-    else alerts.push({ ...base, severity: 'info', soon: true, title: `משימה למחר · ${t.title.trim()}`, detail: t.client.fullName });
+    const where = t.project ? `${t.client.fullName} · ${t.project.name}` : t.client.fullName;
+    const base = { kind: 'task' as const, key: `task:${t.id}`, href: t.projectId ? `/projects?open=${t.projectId}` : '/tasks', at: t.dueDate!, action: { type: 'task-done' as const, id: t.id } };
+    if (late > 0) alerts.push({ ...base, severity: 'warning', title: `משימה באיחור · ${t.title.trim()}`, detail: `${where} · הייתה לתאריך ${shortDate(t.dueDate!)}` });
+    else if (late === 0) alerts.push({ ...base, severity: 'warning', soon: true, title: `משימה להיום · ${t.title.trim()}`, detail: where });
+    else alerts.push({ ...base, severity: 'info', soon: true, title: `משימה ${late === -1 ? 'למחר' : inDays(-late)} · ${t.title.trim()}`, detail: `${where} · ${shortDate(t.dueDate!)}` });
   }
 
   // Meetings left today
@@ -317,9 +318,46 @@ export async function collectAlerts(now = new Date()): Promise<Alert[]> {
     alerts.push({ kind: 'lead', key: `activity:${a.id}`, severity: 'warning', soon: late === 0, href: '/leads', at: a.dueDate!, title: `${late > 0 ? 'מעקב ליד באיחור' : 'מעקב ליד להיום'} · ${a.lead.fullName}`, detail: a.notes.slice(0, 90) });
   }
 
-  // Projects past their end date
+  // Projects: reminders grow stronger as the end date comes closer. The key changes with each stage,
+  // so snoozing an early reminder never hides a later, more urgent one.
   for (const p of projects) {
-    alerts.push({ kind: 'project', key: `project:${p.id}`, severity: 'warning', href: `/projects`, at: p.endDate!, title: `פרויקט עבר את תאריך הסיום · ${p.name}`, detail: `${p.client.fullName} · היה אמור להסתיים ב-${shortDate(p.endDate!)}` });
+    const href = `/projects?open=${p.id}`;
+    const total = p.tasks.length;
+    const done = p.tasks.filter((t) => t.status === 'COMPLETED').length;
+    const open = total - done;
+    const left = p.endDate ? dayDiff(now, p.endDate) : null;
+    const progress = !total ? 'עדיין אין בו משימות' : open === 0 ? 'כל המשימות הושלמו. אפשר לסמן אותו כהושלם' : `${count(open, 'נשארה משימה אחת פתוחה', 'משימות פתוחות')} מתוך ${total}`;
+    const base = { kind: 'project' as const, href, at: p.endDate ?? undefined };
+
+    if (p.status === 'PLANNING' && p.startDate) {
+      const toStart = dayDiff(now, p.startDate);
+      if (toStart < 0) alerts.push({ kind: 'project', href, key: `project-start:${p.id}`, severity: 'warning', title: `פרויקט היה אמור להתחיל · ${p.name}`, detail: `${p.client.fullName} · מועד ההתחלה היה ${shortDate(p.startDate)}, והוא עדיין מסומן בתכנון` });
+      else if (toStart <= 3) alerts.push({ kind: 'project', href, key: `project-start:${p.id}`, severity: toStart === 0 ? 'warning' : 'info', soon: true, title: `פרויקט מתחיל ${inDays(toStart)} · ${p.name}`, detail: `${p.client.fullName} · ${shortDate(p.startDate)}` });
+    }
+
+    if (left !== null) {
+      const who = `${p.client.fullName} · ${progress}`;
+      if (left < 0) alerts.push({ ...base, key: `project-end:${p.id}:late`, severity: 'critical', title: `פרויקט עבר את תאריך הסיום · ${p.name}`, detail: `היה אמור להסתיים ${ago(-left)} (${shortDate(p.endDate!)}) · ${who}` });
+      else if (left <= 2) alerts.push({ ...base, key: `project-end:${p.id}:${left}`, severity: 'critical', title: `פרויקט מסתיים ${inDays(left)} · ${p.name}`, detail: who });
+      else if (left <= 7) alerts.push({ ...base, key: `project-end:${p.id}:week`, severity: 'warning', title: `פרויקט מסתיים ${inDays(left)} · ${p.name}`, detail: who });
+      else if (left <= 14) alerts.push({ ...base, key: `project-end:${p.id}:two-weeks`, severity: 'info', soon: true, title: `פרויקט מסתיים ${inDays(left)} · ${p.name}`, detail: who });
+    }
+
+    // More of the time has gone than of the work: say so while there is still time to catch up.
+    if (p.startDate && p.endDate && left !== null && left > 7 && total > 0) {
+      const span = dayDiff(p.startDate, p.endDate);
+      const timePct = span > 0 ? Math.round((dayDiff(p.startDate, now) / span) * 100) : 0;
+      const workPct = Math.round((done / total) * 100);
+      if (timePct >= 25 && timePct - workPct >= 25) {
+        alerts.push({ ...base, key: `project-behind:${p.id}`, severity: 'warning', title: `פרויקט מאחור בלוח הזמנים · ${p.name}`, detail: `${p.client.fullName} · עברו ${timePct}% מהזמן והושלמו ${workPct}% מהמשימות` });
+      }
+    }
+
+    // A task with no date gets no reminder, so the project asks for one.
+    const undated = p.tasks.filter((t) => t.status !== 'COMPLETED' && !t.dueDate).length;
+    if (p.endDate && undated > 0) {
+      alerts.push({ kind: 'project', href, key: `project-undated:${p.id}:${undated}`, severity: 'info', title: `${undated === 1 ? 'משימה בלי תאריך' : `${undated} משימות בלי תאריך`} · ${p.name}`, detail: 'בלי תאריך אין תזכורת. כדאי לקבוע לכל משימה מתי היא צריכה להסתיים' });
+    }
   }
 
   // Active clients with nothing on the calendar
@@ -401,13 +439,16 @@ export async function buildBrief(now = new Date()) {
   const tasks = alerts.filter((a) => a.kind === 'task');
   const lateTasks = tasks.filter((a) => !a.soon);
   const todayTasks = tasks.filter((a) => a.soon && a.severity === 'warning');
-  const followUps = alerts.filter((a) => ['quote', 'contract', 'lead', 'project'].includes(a.kind));
+  const followUps = alerts.filter((a) => ['quote', 'contract', 'lead'].includes(a.kind));
+  const projectAlerts = alerts.filter((a) => a.kind === 'project');
+  const urgentProjects = projectAlerts.filter((a) => a.severity === 'critical');
   const lateSum = late.reduce((s, a) => s + (a.amount || 0), 0);
 
   const parts = [
     late.length ? `${count(late.length, 'תשלום אחד באיחור', 'תשלומים באיחור')}${lateSum ? ` (${money(lateSum)})` : ''}` : '',
     allMeetings.length ? count(allMeetings.length, 'פגישה אחת היום', 'פגישות היום') : '',
     lateTasks.length + todayTasks.length ? count(lateTasks.length + todayTasks.length, 'משימה אחת לטפל בה', 'משימות לטפל בהן') : '',
+    urgentProjects.length ? count(urgentProjects.length, 'פרויקט אחד דחוף', 'פרויקטים דחופים') : '',
     !late.length && followUps.length ? count(followUps.length, 'דבר אחד למעקב', 'דברים למעקב') : '',
   ].filter(Boolean);
 
@@ -429,6 +470,7 @@ export async function buildBrief(now = new Date()) {
     section('פגישות היום', meetingRows),
     section('תשלומים', rows(moneyAlerts, 8) + more(moneyAlerts, 8)),
     section('משימות', rows(tasks, 8) + more(tasks, 8)),
+    section('פרויקטים', rows(projectAlerts, 6) + more(projectAlerts, 6)),
     section('למעקב', rows(followUps, 6) + more(followUps, 6)),
     news.length ? `<tr><td style="padding:20px 24px 0;"><div style="background:#ecfdf5;border-radius:10px;padding:12px 14px;font-size:14px;color:#065f46;text-align:right;"><b>מאתמול:</b> ${esc(news.join(' · '))}</div></td></tr>` : '',
   ].join('');

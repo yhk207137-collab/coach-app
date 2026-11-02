@@ -50,7 +50,7 @@ router.put('/:id', requireAuth, async (req: AuthRequest, res) => {
     const { title, description, dueDate, status } = req.body;
     const updated = await prisma.task.update({
       where: { id: req.params.id },
-      data: { title, description, dueDate: dueDate ? new Date(dueDate) : undefined, status },
+      data: { title, description, dueDate: dueDate === undefined ? undefined : dueDate ? new Date(dueDate) : null, status },
     });
     res.json(updated);
   } catch {

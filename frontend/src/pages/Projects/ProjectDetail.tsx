@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { ArrowRight, Plus, Trash2, Edit2, CheckSquare, Square, FolderOpen } from 'lucide-react';
 import api from '../../services/api';
 import type { Project, SubProject, ProjectStatusType } from './index';
+import ProjectSchedule from './ProjectSchedule';
+import { calendarDaysLeft } from './ProjectSchedule';
 
 const statusLabel: Record<ProjectStatusType, string> = {
   PLANNING: 'תכנון', ACTIVE: 'פעיל', ON_HOLD: 'מושהה', COMPLETED: 'הושלם', CANCELLED: 'בוטל',
@@ -17,6 +19,7 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
   const [newSubName, setNewSubName] = useState('');
   const [addingTask, setAddingTask] = useState<string | null>(null); // subId or 'root'
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDate, setNewTaskDate] = useState('');
   const [editSubId, setEditSubId] = useState<string | null>(null);
   const [editSubName, setEditSubName] = useState('');
 
@@ -46,8 +49,9 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
 
   const addTask = async (subProjectId: string | null) => {
     if (!newTaskTitle.trim()) return;
-    await api.post('/tasks', { clientId: project.client.id, projectId: project.id, subProjectId, title: newTaskTitle });
+    await api.post('/tasks', { clientId: project.client.id, projectId: project.id, subProjectId, title: newTaskTitle, dueDate: newTaskDate || undefined });
     setNewTaskTitle('');
+    setNewTaskDate('');
     setAddingTask(null);
     await reload();
   };
@@ -57,26 +61,40 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
     await reload();
   };
 
+  const setTaskDate = async (taskId: string, dueDate: string) => {
+    await api.put(`/tasks/${taskId}`, { dueDate });
+    await reload();
+  };
+
   const deleteTask = async (taskId: string) => {
     await api.delete(`/tasks/${taskId}`);
     await reload();
   };
 
-  const TaskList = ({ tasks, scopeId }: { tasks: Project['tasks']; scopeId: string | null }) => (
+  // A plain render function, not a component, so the inputs keep their focus while typing.
+  const taskList = (tasks: Project['tasks'], scopeId: string | null) => (
     <div className="space-y-1.5">
       {tasks.map(t => (
         <div key={t.id} className="flex items-center gap-2 group">
           <button onClick={() => toggleTask(t.id, t.status !== 'COMPLETED')} className="text-gray-400 hover:text-primary-600 flex-shrink-0">
             {t.status === 'COMPLETED' ? <CheckSquare className="w-4 h-4 text-green-500" /> : <Square className="w-4 h-4" />}
           </button>
-          <span className={`text-sm flex-1 ${t.status === 'COMPLETED' ? 'line-through text-gray-400' : 'text-gray-700'}`}>{t.title}</span>
+          <span className={`text-sm flex-1 min-w-0 ${t.status === 'COMPLETED' ? 'line-through text-gray-400' : 'text-gray-700'}`}>{t.title}</span>
+          {t.status !== 'COMPLETED' && t.dueDate && calendarDaysLeft(t.dueDate) < 0 && <span className="text-xs font-medium text-red-600 flex-shrink-0">באיחור</span>}
+          <input
+            type="date" aria-label="תאריך יעד למשימה" title="עד מתי המשימה צריכה להסתיים"
+            value={t.dueDate ? t.dueDate.slice(0, 10) : ''}
+            disabled={t.status === 'COMPLETED'}
+            onChange={e => setTaskDate(t.id, e.target.value)}
+            className={`border rounded-lg px-1.5 py-0.5 text-xs flex-shrink-0 w-32 disabled:opacity-50 ${t.dueDate || t.status === 'COMPLETED' ? 'border-gray-200 text-gray-600' : 'border-amber-300 text-gray-400'}`}
+          />
           <button onClick={() => deleteTask(t.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       ))}
       {addingTask === (scopeId ?? 'root') ? (
-        <div className="flex gap-2 mt-2">
+        <div className="flex flex-wrap gap-2 mt-2">
           <input
             autoFocus
             type="text"
@@ -84,8 +102,9 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
             onChange={e => setNewTaskTitle(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') addTask(scopeId); if (e.key === 'Escape') setAddingTask(null); }}
             placeholder="שם המשימה..."
-            className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+            className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           />
+          <input type="date" aria-label="תאריך יעד למשימה חדשה" value={newTaskDate} onChange={e => setNewTaskDate(e.target.value)} className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs flex-shrink-0 w-32" />
           <button onClick={() => addTask(scopeId)} className="px-3 py-1 bg-primary-600 text-white text-sm rounded-lg">הוסף</button>
           <button onClick={() => setAddingTask(null)} className="px-2 py-1 text-gray-400 text-sm">ביטול</button>
         </div>
@@ -114,6 +133,7 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
           </div>
           <span className="text-sm px-3 py-1 bg-primary-100 text-primary-700 rounded-full font-medium">{statusLabel[project.status]}</span>
         </div>
+        <ProjectSchedule project={project} />
         {(project.goals || project.strategy || project.budget) && (
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-50">
             {project.budget && (
@@ -142,7 +162,7 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
       {(project.tasks.length > 0 || addingTask === 'root') && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
           <h3 className="font-semibold text-gray-700 mb-3 text-sm">משימות כלליות</h3>
-          <TaskList tasks={project.tasks} scopeId={null} />
+          {taskList(project.tasks, null)}
         </div>
       )}
       {addingTask !== 'root' && project.tasks.length === 0 && (
@@ -180,7 +200,7 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
                 </>
               )}
             </div>
-            <TaskList tasks={sp.tasks} scopeId={sp.id} />
+            {taskList(sp.tasks, sp.id)}
           </div>
         ))}
 

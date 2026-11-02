@@ -9,8 +9,8 @@ router.get('/', requireAuth, requireCoach, async (_req, res) => {
     const projects = await prisma.project.findMany({
       include: {
         client: true,
-        subProjects: { include: { tasks: true } },
-        tasks: { where: { subProjectId: null } },
+        subProjects: { include: { tasks: { orderBy: { createdAt: 'asc' } } } },
+        tasks: { where: { subProjectId: null }, orderBy: { createdAt: 'asc' } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -26,8 +26,8 @@ router.get('/:id', requireAuth, requireCoach, async (req, res) => {
       where: { id: req.params.id },
       include: {
         client: true,
-        subProjects: { include: { tasks: true } },
-        tasks: true,
+        subProjects: { include: { tasks: { orderBy: { createdAt: 'asc' } } } },
+        tasks: { where: { subProjectId: null }, orderBy: { createdAt: 'asc' } },
       },
     });
     if (!project) return res.status(404).json({ error: 'לא נמצא' });
@@ -52,7 +52,7 @@ router.post('/', requireAuth, requireCoach, async (req, res) => {
         strategy,
         goals,
       },
-      include: { client: true, subProjects: true, tasks: true },
+      include: { client: true, subProjects: { include: { tasks: { orderBy: { createdAt: 'asc' } } } }, tasks: { where: { subProjectId: null }, orderBy: { createdAt: 'asc' } } },
     });
     res.json(project);
   } catch {
@@ -75,7 +75,7 @@ router.put('/:id', requireAuth, requireCoach, async (req, res) => {
         strategy,
         goals,
       },
-      include: { client: true, subProjects: true, tasks: true },
+      include: { client: true, subProjects: { include: { tasks: { orderBy: { createdAt: 'asc' } } } }, tasks: { where: { subProjectId: null }, orderBy: { createdAt: 'asc' } } },
     });
     res.json(project);
   } catch {

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, FolderKanban, ChevronDown, ChevronRight, Trash2, Edit2, CheckCircle, Clock, PauseCircle, XCircle, BarChart3, Printer } from 'lucide-react';
 import api from '../../services/api';
 import ProjectModal from './ProjectModal';
 import ProjectDetail from './ProjectDetail';
 import ProjectPrint from './ProjectPrint';
+import ProjectSchedule from './ProjectSchedule';
 
 export interface SubProject {
   id: string;
@@ -16,6 +18,7 @@ export interface SubProject {
 export interface Task {
   id: string;
   title: string;
+  dueDate?: string | null;
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
 }
 
@@ -68,6 +71,7 @@ export default function ProjectsPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<Project | null>(null);
   const [printProject, setPrintProject] = useState<Project | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const load = async () => {
     try {
@@ -103,6 +107,15 @@ export default function ProjectsPage() {
       return next;
     });
   };
+
+  // A link from an alert or an email opens the project directly.
+  const openId = searchParams.get('open');
+  useEffect(() => {
+    if (!openId || !projects.length) return;
+    const target = projects.find(p => p.id === openId);
+    if (target) setDetail(target);
+    setSearchParams({}, { replace: true });
+  }, [openId, projects]);
 
   if (detail) return <ProjectDetail project={detail} onBack={() => { setDetail(null); load(); }} />;
 
@@ -163,6 +176,7 @@ export default function ProjectsPage() {
                         <span className="text-xs text-gray-400">{doneTasks}/{totalTasks} משימות</span>
                       </div>
                     )}
+                    <ProjectSchedule project={p} compact />
                   </div>
                   <div className="flex items-center gap-3 text-sm text-gray-500">
                     {p.budget && <span className="font-medium text-gray-700">₪{p.budget.toLocaleString('he-IL')}</span>}

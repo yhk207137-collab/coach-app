@@ -24,6 +24,7 @@ export default function ProjectModal({ project, onClose, onSave, preselectedClie
   const [strategy, setStrategy] = useState(project?.strategy ?? '');
   const [goals, setGoals] = useState(project?.goals ?? '');
   const [saving, setSaving] = useState(false);
+  const [dateError, setDateError] = useState('');
 
   useEffect(() => {
     api.get('/clients').then((r: { data: Client[] }) => setClients(r.data));
@@ -32,6 +33,11 @@ export default function ProjectModal({ project, onClose, onSave, preselectedClie
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientId || !name) return;
+    if (startDate && endDate && endDate < startDate) {
+      setDateError('תאריך הסיום לא יכול להיות לפני תאריך ההתחלה');
+      return;
+    }
+    setDateError('');
     setSaving(true);
     try {
       const payload = { clientId, name, description, status, startDate: startDate || null, endDate: endDate || null, budget: budget || null, strategy, goals };
@@ -85,8 +91,11 @@ export default function ProjectModal({ project, onClose, onSave, preselectedClie
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">תאריך סיום</label>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400" />
+              <input type="date" value={endDate} min={startDate || undefined} onChange={e => setEndDate(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400" />
             </div>
+            <p className={`sm:col-span-2 text-xs -mt-2 ${dateError ? 'text-red-600' : 'text-gray-500'}`}>
+              {dateError || 'ככל שתאריך הסיום מתקרב תקבל תזכורות: שבועיים לפני, שבוע לפני ויומיים לפני.'}
+            </p>
           </div>
 
           <div>
