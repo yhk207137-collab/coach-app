@@ -580,9 +580,11 @@ router.get('/tracking', async (req, res) => {
   const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 0;
   const from = days ? new Date(Date.now() - days * 24 * 3600_000) : new Date(0);
   const [settings, welcome] = await Promise.all([getMarketingSettings(), getWelcomeCampaign()]);
+  // Local copies of the page opened while working on it don't count as visitors.
+  const realPages = process.env.NODE_ENV === 'production' ? { NOT: { page: { startsWith: 'localhost' } } } : {};
 
   const [visits, signups, welcomeRows, downloadRows, recent, people] = await Promise.all([
-    prisma.pageVisit.findMany({ where: { createdAt: { gte: from } }, select: { visitorId: true, contactId: true, source: true, referrer: true, createdAt: true }, take: 50_000 }),
+    prisma.pageVisit.findMany({ where: { createdAt: { gte: from }, ...realPages }, select: { visitorId: true, contactId: true, source: true, referrer: true, createdAt: true }, take: 50_000 }),
     prisma.contact.findMany({ where: { createdAt: { gte: from }, consentMethod: { in: ['checkbox', 'form'] } }, select: { id: true, createdAt: true } }),
     prisma.$queryRaw<{ sent: number; opened: number }[]>`
       SELECT count(*) FILTER (WHERE status IN ('SENT','DELIVERED','BOUNCED'))::int AS sent, count("openedAt")::int AS opened
@@ -590,7 +592,7 @@ router.get('/tracking', async (req, res) => {
     prisma.$queryRaw<{ downloaded: number }[]>`
       SELECT count(DISTINCT "contactId")::int AS downloaded FROM "CampaignSend" WHERE "downloadedAt" >= ${from}`,
     prisma.pageVisit.findMany({
-      where: { createdAt: { gte: from } },
+      where: { createdAt: { gte: from }, ...realPages },
       orderBy: { createdAt: 'desc' },
       take: 40,
       include: { contact: { select: { id: true, name: true, email: true } } },

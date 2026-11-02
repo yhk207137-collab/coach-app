@@ -137,6 +137,8 @@ trackingRouter.get('/v.gif', async (req, res) => {
   const vid = visitorId(req.query.v);
   const page = str(req.query.p, 200);
   if (!vid || !page || /bot|crawl|spider|preview|headless/i.test(String(req.get('user-agent') || ''))) return;
+  // A local copy of the page opened while working on it is not a visitor.
+  if (process.env.NODE_ENV === 'production' && page.startsWith('localhost')) return;
 
   let contactId: string | null = null;
   const fromEmail = str(req.query.e, 40);
