@@ -16,6 +16,7 @@ import CalendarPage from './pages/Calendar';
 import AccountingPage from './pages/Accounting';
 import ClientPortal from './pages/ClientPortal';
 import Verify from './pages/Verify';
+import Install from './pages/Install';
 import SettingsPage from './pages/Settings';
 import QuotesPage from './pages/Quotes';
 import ProjectsPage from './pages/Projects';
@@ -78,6 +79,7 @@ export default function App() {
           element={user ? <Navigate to={user.role === 'COACH' ? '/' : '/portal'} replace /> : <Login />}
         />
         <Route path="/verify" element={<Verify />} />
+        <Route path="/install" element={<Install />} />
 
         <Route element={<RequireCoach><Layout /></RequireCoach>}>
           <Route path="/" element={<Dashboard />} />

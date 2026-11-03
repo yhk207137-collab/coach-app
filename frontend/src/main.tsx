@@ -5,6 +5,10 @@ import { Toaster } from 'react-hot-toast';
 import App from './App';
 import './index.css';
 
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); });
+}
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30000 } },
 });

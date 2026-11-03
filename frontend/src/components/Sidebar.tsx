@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare, CreditCard, FolderOpen, Sparkles, LogOut, CalendarDays,
-  BarChart2, X, Settings, FileText, FolderKanban, FileSignature, Target, Package, Mail, BookUser, ChevronDown,
+  BarChart2, X, Settings, Smartphone, FileText, FolderKanban, FileSignature, Target, Package, Mail, BookUser, ChevronDown,
   Megaphone, Wallet, CalendarClock, Activity, Bell,
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import clsx from 'clsx';
+import { runsFromHomeScreen } from '../pages/Install';
 
 interface NavItem { to: string; icon: any; label: string }
 interface NavGroup { key: string; label: string; icon: any; items: NavItem[] }
@@ -166,6 +167,14 @@ export default function Sidebar({ open, onClose }: Props) {
         </nav>
 
         <div className="px-3 py-4 border-t border-white/10 space-y-0.5">
+          {!runsFromHomeScreen() && (
+            <div className="lg:hidden">
+              <NavLink to="/install" onClick={handleNav} className={linkClass}>
+                <Smartphone size={18} />
+                <span>הוספה למסך הבית</span>
+              </NavLink>
+            </div>
+          )}
           <NavLink to="/settings" onClick={handleNav} className={linkClass}>
             <Settings size={18} />
             <span>הגדרות</span>
