@@ -12,7 +12,7 @@ export interface AlertItem {
   amount?: number;
   soon?: boolean;
   whatsapp?: string;
-  action?: { type: 'task-done' | 'payment-paid'; id: string };
+  action?: { type: 'task-done' | 'payment-paid' | 'receipt-issued'; id: string };
 }
 export interface AlertsData {
   alerts: AlertItem[];

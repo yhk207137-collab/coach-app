@@ -4,6 +4,14 @@ import { requireAuth, requireCoach, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
+// What must be said about money that came in: how it came, and whether a receipt was issued.
+function receivedDetails(body: any): { paymentMethod: string; receiptIssued: boolean } | string {
+  const paymentMethod = String(body.paymentMethod || '').trim();
+  if (!paymentMethod) return 'חובה לבחור באיזו דרך התקבל הכסף';
+  if (typeof body.receiptIssued !== 'boolean') return 'חובה לסמן אם הופקה קבלה';
+  return { paymentMethod, receiptIssued: body.receiptIssued };
+}
+
 // Accounting summary — monthly income
 router.get('/accounting/summary', requireAuth, requireCoach, async (_req, res) => {
   try {
@@ -45,6 +53,24 @@ router.get('/accounting/summary', requireAuth, requireCoach, async (_req, res) =
       expectedThisMonth: scheduledThisMonth._sum.amount ?? 0,
       expectedNextMonth: scheduledNext._sum.amount ?? 0,
     });
+  } catch {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// All the money that came in, newest first
+router.get('/accounting/received', requireAuth, requireCoach, async (_req, res) => {
+  try {
+    const records = await prisma.paymentRecord.findMany({
+      where: { isPaid: true },
+      select: {
+        id: true, amount: true, date: true, note: true, isPaid: true, paymentMethod: true, receiptIssued: true,
+        payment: { select: { clientId: true, client: { select: { fullName: true } } } },
+      },
+      orderBy: { date: 'desc' },
+      take: 500,
+    });
+    res.json(records);
   } catch {
     res.status(500).json({ error: 'Server error' });
   }
@@ -104,11 +130,16 @@ router.post('/:clientId/charge', requireAuth, requireCoach, async (req: AuthRequ
 
 router.post('/:clientId/record', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   try {
-    const { amount, note, date, isPaid = true, scheduledDate, paymentMethod } = req.body;
+    const { amount, note, date, isPaid = true, scheduledDate } = req.body;
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) return res.status(400).json({ error: 'סכום לא תקין' });
 
-    const payment = await prisma.payment.findUnique({ where: { clientId: req.params.clientId } });
+    const details = isPaid ? receivedDetails(req.body) : null;
+    if (typeof details === 'string') return res.status(400).json({ error: details });
+
+    // Money can arrive before there is a plan; it then stands as credit against later charges.
+    const payment = await prisma.payment.findUnique({ where: { clientId: req.params.clientId } })
+      ?? (isPaid ? await prisma.payment.create({ data: { clientId: req.params.clientId, totalAmount: 0 } }) : null);
     if (!payment) return res.status(404).json({ error: 'Payment plan not found' });
 
     const record = await prisma.paymentRecord.create({
@@ -119,7 +150,8 @@ router.post('/:clientId/record', requireAuth, requireCoach, async (req: AuthRequ
         date: date ? new Date(date) : new Date(),
         isPaid,
         scheduledDate: scheduledDate ? new Date(scheduledDate) : undefined,
-        paymentMethod: paymentMethod || null,
+        paymentMethod: details?.paymentMethod ?? null,
+        receiptIssued: details?.receiptIssued ?? null,
       },
     });
 
@@ -140,9 +172,11 @@ router.post('/:clientId/record', requireAuth, requireCoach, async (req: AuthRequ
 router.put('/record/:recordId', requireAuth, requireCoach, async (req, res) => {
   try {
     const { recordId } = req.params;
-    const { amount, note, date, paymentMethod } = req.body;
+    const { amount, note, date, paymentMethod, receiptIssued } = req.body;
     const record = await prisma.paymentRecord.findUnique({ where: { id: recordId } });
     if (!record) return res.status(404).json({ error: 'Record not found' });
+    if (record.isPaid && paymentMethod !== undefined && !String(paymentMethod).trim()) return res.status(400).json({ error: 'חובה לבחור באיזו דרך התקבל הכסף' });
+    if (receiptIssued !== undefined && (!record.isPaid || typeof receiptIssued !== 'boolean')) return res.status(400).json({ error: 'סימון קבלה לא תקין' });
 
     const parsedAmount = amount !== undefined ? parseFloat(amount) : undefined;
 
@@ -162,6 +196,7 @@ router.put('/record/:recordId', requireAuth, requireCoach, async (req, res) => {
         ...(note !== undefined ? { note } : {}),
         ...(date ? { date: new Date(date) } : {}),
         ...(paymentMethod !== undefined ? { paymentMethod } : {}),
+        ...(receiptIssued !== undefined ? { receiptIssued } : {}),
       },
     });
     res.json(updated);
@@ -198,8 +233,10 @@ router.post('/record/:recordId/pay', requireAuth, requireCoach, async (_req, res
     const record = await prisma.paymentRecord.findUnique({ where: { id: recordId } });
     if (!record) return res.status(404).json({ error: 'Record not found' });
     if (record.isPaid) return res.status(400).json({ error: 'Already paid' });
+    const details = receivedDetails(_req.body);
+    if (typeof details === 'string') return res.status(400).json({ error: details });
 
-    await prisma.paymentRecord.update({ where: { id: recordId }, data: { isPaid: true, date: new Date() } });
+    await prisma.paymentRecord.update({ where: { id: recordId }, data: { isPaid: true, date: _req.body.date ? new Date(_req.body.date) : new Date(), ...details } });
     await prisma.payment.update({
       where: { id: record.paymentId },
       data: { paidAmount: { increment: record.amount } },

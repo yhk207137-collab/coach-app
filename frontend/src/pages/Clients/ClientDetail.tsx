@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight, Phone, Mail, Building2, Calendar, CheckSquare,
@@ -31,7 +31,8 @@ export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [tab, setTab] = useState<Tab>('timeline');
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(params.get('tab') === 'payments' ? 'payments' : 'timeline');
   const [editClient, setEditClient] = useState(false);
   const [newProject, setNewProject] = useState(false);
   const [newMeeting, setNewMeeting] = useState(false);

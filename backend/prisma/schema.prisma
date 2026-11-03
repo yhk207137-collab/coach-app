@@ -172,6 +172,8 @@ model PaymentRecord {
   isPaid        Boolean   @default(true)
   scheduledDate DateTime?
   paymentMethod String?
+  // Was a receipt issued in Isracard? Empty on payments recorded before this was asked.
+  receiptIssued Boolean?
 }
 
 model Document {

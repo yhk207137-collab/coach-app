@@ -98,6 +98,7 @@ export interface PaymentRecord {
   isPaid: boolean;
   scheduledDate?: string;
   paymentMethod?: string;
+  receiptIssued?: boolean | null;
 }
 
 export interface Document {

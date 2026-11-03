@@ -7,6 +7,7 @@ import { AlertTriangle, CheckCircle2, Clock, Info, CalendarClock, Loader2, Mail,
 import api from '../../services/api';
 import { AlertItem, useAlerts } from '../../hooks/useAlerts';
 import { ils } from '../Dashboard/charts';
+import { MarkPaidModal } from '../Payments/received';
 
 interface AlertSettings { brief: boolean; briefTime: string; email: string; meetingMinutes: number }
 
@@ -19,6 +20,7 @@ const GROUPS = [
 
 function AlertRow({ alert, onChanged }: { alert: AlertItem; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
+  const [markingPaid, setMarkingPaid] = useState(false);
   const run = async (fn: () => Promise<unknown>, message: string) => {
     setBusy(true);
     try {
@@ -33,7 +35,8 @@ function AlertRow({ alert, onChanged }: { alert: AlertItem; onChanged: () => voi
   const { action } = alert;
   const done = () => {
     if (action?.type === 'task-done') return run(() => api.put(`/tasks/${action.id}`, { status: 'COMPLETED' }), 'המשימה סומנה כבוצעה');
-    if (action?.type === 'payment-paid' && confirm('לסמן שהתשלום התקבל?')) return run(() => api.post(`/payments/record/${action.id}/pay`), 'התשלום נרשם');
+    if (action?.type === 'payment-paid') return setMarkingPaid(true);
+    if (action?.type === 'receipt-issued') return run(() => api.put(`/payments/record/${action.id}`, { receiptIssued: true }), 'סומן שהופקה קבלה');
   };
   const snooze = (days: number, message: string) => run(() => api.post('/alerts/snooze', { key: alert.key, days }), message);
 
@@ -53,7 +56,7 @@ function AlertRow({ alert, onChanged }: { alert: AlertItem; onChanged: () => voi
         )}
         {action && (
           <button type="button" onClick={done} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-primary-50 text-primary-700 hover:bg-primary-100">
-            <Check className="w-3.5 h-3.5" /> {action.type === 'task-done' ? 'בוצע' : 'שולם'}
+            <Check className="w-3.5 h-3.5" /> {action.type === 'task-done' ? 'בוצע' : action.type === 'receipt-issued' ? 'הופקה קבלה' : 'שולם'}
           </button>
         )}
         {alert.kind !== 'meeting' && (
@@ -63,6 +66,9 @@ function AlertRow({ alert, onChanged }: { alert: AlertItem; onChanged: () => voi
           </>
         )}
       </div>
+      {markingPaid && action && (
+        <MarkPaidModal recordId={action.id} amount={alert.amount} onClose={() => setMarkingPaid(false)} onSaved={() => { setMarkingPaid(false); onChanged(); }} />
+      )}
     </div>
   );
 }

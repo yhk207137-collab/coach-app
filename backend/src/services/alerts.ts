@@ -119,7 +119,7 @@ export interface Alert {
   // Coming up, not late yet; the dashboard's "needs attention" panel leaves these out.
   soon?: boolean;
   whatsapp?: string;
-  action?: { type: 'task-done' | 'payment-paid'; id: string };
+  action?: { type: 'task-done' | 'payment-paid' | 'receipt-issued'; id: string };
 }
 
 const RANK: Record<Severity, number> = { critical: 0, warning: 1, info: 2 };
@@ -127,7 +127,7 @@ const RANK: Record<Severity, number> = { critical: 0, warning: 1, info: 2 };
 export async function collectAlerts(now = new Date()): Promise<Alert[]> {
   const today = dayKey(now);
   const in3 = new Date(startOfDay(now).getTime() + 4 * DAY);
-  const [mkt, unpaid, paidThisPeriod, payments, invoices, tasks, meetings, futureMeetings, lastMeetings, quotes, contracts, leads, activities, projects, clients, snoozed, unbilled] = await Promise.all([
+  const [mkt, unpaid, paidThisPeriod, payments, invoices, tasks, meetings, futureMeetings, lastMeetings, quotes, contracts, leads, activities, projects, clients, snoozed, unbilled, noReceipt, receiptUnknown] = await Promise.all([
     getMarketingSettings(),
     prisma.paymentRecord.findMany({
       where: { isPaid: false, scheduledDate: { not: null, lt: in3 } },
@@ -184,6 +184,12 @@ export async function collectAlerts(now = new Date()): Promise<Alert[]> {
       where: { chargeStatus: null, date: { lte: now }, client: { status: 'ACTIVE', clientType: 'SESSION', sessionPrice: { not: null } } },
       select: { clientId: true, client: { select: { fullName: true } } },
     }),
+    prisma.paymentRecord.findMany({
+      where: { isPaid: true, receiptIssued: false },
+      select: { id: true, amount: true, date: true, payment: { select: { client: { select: { fullName: true } } } } },
+      orderBy: { date: 'asc' },
+    }),
+    prisma.paymentRecord.count({ where: { isPaid: true, receiptIssued: null } }),
   ]);
 
   const signature = mkt.senderName ? firstName(mkt.senderName) : '';
@@ -251,6 +257,23 @@ export async function collectAlerts(now = new Date()): Promise<Alert[]> {
     alerts.push({
       kind: 'payment', key: `unbilled:${clientId}:${n}`, severity: 'warning', href: `/clients/${clientId}`,
       title: `${n === 1 ? 'פגישה מחכה להחלטה על חיוב' : `${n} פגישות מחכות להחלטה על חיוב`} · ${name}`, detail: 'בדף הלקוח בוחרים על כל אחת אם להוסיף אותה ליתרה',
+    });
+  }
+
+  // Money that came in with no receipt issued yet
+  for (const r of noReceipt) {
+    const late = dayDiff(r.date, now);
+    alerts.push({
+      kind: 'payment', key: `receipt:${r.id}`, severity: late >= 3 ? 'critical' : 'warning', amount: r.amount, href: '/payments?tab=received', at: r.date,
+      action: { type: 'receipt-issued', id: r.id },
+      title: `חסרה קבלה · ${r.payment.client.fullName}`, detail: `הכסף התקבל ${ago(late)}. מפיקים קבלה בישראכרט ומסמנים כאן`,
+    });
+  }
+  // Payments recorded before the receipt question existed
+  if (receiptUnknown > 0) {
+    alerts.push({
+      kind: 'payment', key: `receipt-unknown:${receiptUnknown}`, severity: 'info', href: '/payments?tab=received',
+      title: receiptUnknown === 1 ? 'תשלום ישן בלי סימון קבלה' : `${receiptUnknown} תשלומים ישנים בלי סימון קבלה`, detail: 'ברשימה מסמנים על כל אחד אם הופקה קבלה',
     });
   }
 
