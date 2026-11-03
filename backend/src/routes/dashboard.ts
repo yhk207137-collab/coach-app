@@ -209,6 +209,24 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
     return { id: p.id, name: p.name.trim(), status: p.status, client: p.client, budget: p.budget, endDate: p.endDate, daysLeft, behind, tasksTotal: total, tasksDone: done };
   }).sort((a, b) => (a.daysLeft ?? 1e9) - (b.daysLeft ?? 1e9));
 
+  // ── Money in work ─────────────────────────────────────────────────────────
+  // Per active client, the largest of what was charged, the budgets of their open projects and what they paid,
+  // so a project already charged never counts twice. A settled client with no open project is left out.
+  const budgetByClient = new Map<string, number>();
+  for (const p of projects) budgetByClient.set(p.client.id, (budgetByClient.get(p.client.id) || 0) + (p.budget || 0));
+  const planByClient = new Map(payments.map((p) => [p.clientId, p]));
+  const inWork = activeClients
+    .map((c) => {
+      const charged = planByClient.get(c.id)?.totalAmount || 0;
+      const paid = planByClient.get(c.id)?.paidAmount || 0;
+      const total = Math.max(charged, budgetByClient.get(c.id) || 0, paid);
+      const owed = Math.max(0, charged - paid);
+      return { id: c.id, name: c.fullName, total: Math.round(total), paid: Math.round(paid), owed: Math.round(owed), notCharged: Math.round(total - paid - owed) };
+    })
+    .filter((x) => x.owed + x.notCharged > 0 || (x.total > 0 && budgetByClient.has(x.id)))
+    .sort((a, b) => b.owed + b.notCharged - (a.owed + a.notCharged));
+  const sumInWork = (key: 'total' | 'paid' | 'owed' | 'notCharged') => inWork.reduce((s, x) => s + x[key], 0);
+
   // ── Deadlines ─────────────────────────────────────────────────────────────
   // Anything late, and whatever falls due in the next 30 days. Scheduled payments stay with the money panels.
   const dated = <T,>(list: T[], date: (x: T) => Date | null | undefined) =>
@@ -280,6 +298,7 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
       planning: openProjects.filter((p) => p.status === 'PLANNING').length,
       budget: Math.round(openProjects.reduce((s, p) => s + (p.budget || 0), 0)),
     },
+    moneyInWork: { total: sumInWork('total'), paid: sumInWork('paid'), owed: sumInWork('owed'), notCharged: sumInWork('notCharged'), clients: inWork },
     deadlines: {
       items: deadlines,
       late: deadlines.filter((x) => x.daysLeft < 0).length,

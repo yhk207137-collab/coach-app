@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { CreditCard, AlertCircle, Plus, Pencil, Wallet } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../../services/api';
 import { Client } from '../../types';
 import { format } from 'date-fns';
-import { EditRecordModal, ReceiptStatus, RecordReceivedModal } from './received';
+import { EditRecordModal, ReceiptStatus, RecordReceivedModal, balanceOf, useMoneyRefresh } from './received';
 
 interface ReceivedRow {
   id: string;
@@ -21,7 +21,6 @@ interface ReceivedRow {
 
 export default function PaymentsPage() {
   const navigate = useNavigate();
-  const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab') === 'received' ? 'received' : 'balances';
   const [recording, setRecording] = useState(false);
@@ -45,10 +44,7 @@ export default function PaymentsPage() {
   const noReceipt = received.filter(r => r.receiptIssued !== true);
   const shownReceived = onlyMissing ? noReceipt : received;
 
-  const refresh = (clientId?: string) => {
-    for (const queryKey of [['received-payments'], ['clients-with-payments'], ['alerts'], ['accounting']]) qc.invalidateQueries({ queryKey });
-    if (clientId) qc.invalidateQueries({ queryKey: ['payment', clientId] });
-  };
+  const refresh = useMoneyRefresh();
 
   return (
     <div>
@@ -143,7 +139,7 @@ export default function PaymentsPage() {
             <div className="text-center py-16 text-slate-400">
               <CreditCard className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p>אין נתוני תשלום</p>
-              <p className="text-sm mt-1">הגדר תכנית תשלום בתיק הלקוח</p>
+              <p className="text-sm mt-1">אפשר להתחיל מ"רישום כסף שהתקבל" או מדף הלקוח</p>
             </div>
           )}
         </div>
@@ -242,6 +238,7 @@ export default function PaymentsPage() {
       {editing && (
         <EditRecordModal
           record={editing}
+          balance={balanceOf(clients.find((c) => c.id === editing.payment.clientId))}
           onClose={() => setEditing(null)}
           onSaved={() => { const clientId = editing.payment.clientId; setEditing(null); refresh(clientId); }}
         />

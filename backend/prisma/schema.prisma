@@ -158,8 +158,20 @@ model Payment {
   paidAmount      Float           @default(0)
   nextPaymentDate DateTime?
   history         PaymentRecord[]
+  charges         PaymentCharge[]
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+}
+
+// A line saying what part of the total is for. Meeting charges live on the meeting itself.
+model PaymentCharge {
+  id        String   @id @default(cuid())
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  amount    Float
+  date      DateTime @default(now())
+  note      String?
+  createdAt DateTime @default(now())
 }
 
 model PaymentRecord {

@@ -6,7 +6,7 @@ import { he } from 'date-fns/locale';
 import clsx from 'clsx';
 import {
   TrendingUp, TrendingDown, Wallet, CalendarClock, Repeat, Target, AlertTriangle, Clock, Info, ArrowLeft,
-  Calendar, FolderKanban, Users, Mail, CheckCircle2, Plus, Table2, BarChart3, ChevronLeft, MailOpen,
+  Calendar, FolderKanban, Users, Mail, CheckCircle2, Plus, Table2, BarChart3, ChevronLeft, MailOpen, Briefcase,
 } from 'lucide-react';
 import api from '../../services/api';
 import { C_COLLECTED, C_EXPECTED, HBar, Legend, MonthPoint, RevenueChart, RevenueTable, Sparkline, StackedHBar, ils } from './charts';
@@ -33,6 +33,7 @@ interface DashboardData {
   meetings: { today: MeetingItem[]; week: MeetingItem[]; thisMonth: number; lastMonth: number };
   tasks: { open: number; overdue: number; week: { id: string; title: string; dueDate: string; clientId: string; name: string }[] };
   projects: { active: ProjectItem[]; count: number; planning: number; budget: number };
+  moneyInWork: { total: number; paid: number; owed: number; notCharged: number; clients: { id: string; name: string; total: number; paid: number; owed: number; notCharged: number }[] };
   deadlines: { items: DeadlineItem[]; late: number; week: number; month: number; undatedProjects: number; undatedTasks: number };
   attention: Attention[];
   attentionTotal: number;
@@ -53,6 +54,8 @@ const DEADLINE_KIND = {
   contract: 'סיום חוזה',
 };
 const DEADLINES_SHOWN = 6;
+const IN_WORK_SHOWN = 5;
+const C_NOT_CHARGED = '#cbd5e1';
 
 const dueLabel = (n: number) => (n < 0 ? lateBy(-n) : n === 0 ? 'היום' : n === 1 ? 'מחר' : n === 2 ? 'בעוד יומיים' : `בעוד ${n} ימים`);
 
@@ -158,10 +161,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* The top shows what is going on and not only the money. Phone: income, projects, deadlines, other money.
-          Computer: all the money in one row, projects and deadlines side by side right under it. */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-10 gap-4">
-        <button type="button" onClick={() => navigate('/accounting')} className="card col-span-2 lg:col-span-4 xl:col-span-2 order-1 p-5 text-right hover:shadow-card-hover transition-all flex flex-col">
+      {/* The top shows what is going on and not only the money. Phone: income, projects, deadlines, money in work, other money.
+          Computer: all the money figures in one row, the work panels right under it. */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-10 2xl:grid-cols-[repeat(15,minmax(0,1fr))] gap-4">
+        <button type="button" onClick={() => navigate('/accounting')} className="card col-span-2 lg:col-span-4 xl:col-span-2 2xl:col-[span_3] order-1 p-5 text-right hover:shadow-card-hover transition-all flex flex-col">
           <div className="flex items-center gap-2 mb-3">
             <span className="w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-50 text-emerald-700"><Wallet className="w-4 h-4" /></span>
             <span className="text-sm text-slate-600">הכנסות החודש</span>
@@ -179,7 +182,7 @@ export default function Dashboard() {
           </div>
         </button>
 
-        <Panel title="פרויקטים פעילים" icon={FolderKanban} className="col-span-2 xl:col-span-5 order-2 xl:order-3" action={<MoreLink to="/projects" label={d.projects.count > d.projects.active.length ? `עוד ${d.projects.count - d.projects.active.length}` : 'הכל'} />}>
+        <Panel title="פרויקטים פעילים" icon={FolderKanban} className="col-span-2 xl:col-span-5 order-2 xl:order-3 2xl:col-[span_5]" action={<MoreLink to="/projects" label={d.projects.count > d.projects.active.length ? `עוד ${d.projects.count - d.projects.active.length}` : 'הכל'} />}>
           {d.projects.active.length === 0 ? <Empty>אין פרויקטים פעילים</Empty> : (
             <>
               <div className="space-y-4">
@@ -213,7 +216,7 @@ export default function Dashboard() {
           )}
         </Panel>
 
-        <Panel title="דדליינים" icon={CalendarClock} className="col-span-2 xl:col-span-5 order-2 xl:order-3" action={<MoreLink to="/tasks" label="למשימות" />}>
+        <Panel title="דדליינים" icon={CalendarClock} className="col-span-2 xl:col-span-5 order-2 xl:order-3 2xl:col-[span_5]" action={<MoreLink to="/tasks" label="למשימות" />}>
           {d.deadlines.items.length === 0 ? <Empty>אין דדליינים ב-30 הימים הקרובים</Empty> : (
             <>
               <div className="space-y-1 -mx-1">
@@ -242,16 +245,39 @@ export default function Dashboard() {
           {undated && <p className="text-xs text-slate-500 mt-2">לא מופיעים כאן כי אין להם תאריך: {undated}</p>}
         </Panel>
 
-        <Tile className="xl:col-span-2 order-3 xl:order-2" icon={AlertTriangle} label="לגבייה" value={ils(d.receivables.outstanding)} tone="bg-red-50 text-red-600"
+        <Panel title="כסף בעבודה" icon={Briefcase} className="col-span-2 lg:col-span-4 xl:col-span-10 2xl:col-[span_5] order-3 xl:order-4 2xl:order-3" action={<MoreLink to="/payments" label="לתשלומים" />}>
+          {d.moneyInWork.clients.length === 0 ? <Empty>אין כרגע כסף פתוח בעבודה</Empty> : (
+            <>
+              <p data-money-in-work className="text-3xl font-bold text-slate-900 tracking-tight">{ils(d.moneyInWork.total)}</p>
+              <div className="mt-2">
+                <StackedHBar max={d.moneyInWork.total} parts={[{ value: d.moneyInWork.paid, color: C_COLLECTED }, { value: d.moneyInWork.owed, color: C_EXPECTED }, { value: d.moneyInWork.notCharged, color: C_NOT_CHARGED }]} />
+              </div>
+              <div className="mt-2">
+                <Legend items={[{ color: C_COLLECTED, label: `שולם ${ils(d.moneyInWork.paid)}` }, { color: C_EXPECTED, label: `לגבייה ${ils(d.moneyInWork.owed)}` }, { color: C_NOT_CHARGED, label: `עוד לא חויב ${ils(d.moneyInWork.notCharged)}` }]} />
+              </div>
+              <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-1 gap-x-6 gap-y-1 -mx-1">
+                {d.moneyInWork.clients.slice(0, IN_WORK_SHOWN).map((c) => (
+                  <button key={c.id} type="button" data-in-work-client onClick={() => navigate(`/clients/${c.id}?tab=payments`)} className="w-full flex items-baseline justify-between gap-3 p-1.5 rounded-lg hover:bg-slate-50 text-right">
+                    <span className="min-w-0 text-sm text-slate-800 truncate">{c.name}</span>
+                    <span className="text-xs text-slate-500 flex-shrink-0 tabular-nums">נשאר <strong className="text-sm text-slate-900">{ils(c.owed + c.notCharged)}</strong> מתוך {ils(c.total)}</span>
+                  </button>
+                ))}
+              </div>
+              {d.moneyInWork.clients.length > IN_WORK_SHOWN && <p className="text-xs text-slate-400 mt-2">ועוד {count(d.moneyInWork.clients.length - IN_WORK_SHOWN, 'לקוח אחד', 'לקוחות')}</p>}
+            </>
+          )}
+        </Panel>
+
+        <Tile className="xl:col-span-2 2xl:col-[span_3] order-4 xl:order-2" icon={AlertTriangle} label="לגבייה" value={ils(d.receivables.outstanding)} tone="bg-red-50 text-red-600"
           onClick={() => navigate('/payments')}
           sub={d.receivables.overdueAmount > 0
             ? <span className="text-red-600 font-medium">{ils(d.receivables.overdueAmount)} באיחור</span>
             : d.receivables.clientsOwing ? count(d.receivables.clientsOwing, 'לקוח אחד', 'לקוחות') : 'אין חובות פתוחים'} />
-        <Tile className="xl:col-span-2 order-3 xl:order-2" icon={CalendarClock} label="צפוי ב-30 יום" value={ils(d.forecast.next30)} tone="bg-primary-50 text-primary-700"
+        <Tile className="xl:col-span-2 2xl:col-[span_3] order-4 xl:order-2" icon={CalendarClock} label="צפוי ב-30 יום" value={ils(d.forecast.next30)} tone="bg-primary-50 text-primary-700"
           onClick={() => navigate('/payments')} sub={d.forecast.items.length ? count(d.forecast.items.length, 'תשלום אחד מתוכנן', 'תשלומים מתוכננים') : 'אין תשלומים מתוכננים'} />
-        <Tile className="xl:col-span-2 order-3 xl:order-2" icon={Repeat} label="הכנסה חודשית קבועה" value={ils(d.mrr.amount)} tone="bg-navy-50 text-navy-700"
+        <Tile className="xl:col-span-2 2xl:col-[span_3] order-4 xl:order-2" icon={Repeat} label="הכנסה חודשית קבועה" value={ils(d.mrr.amount)} tone="bg-navy-50 text-navy-700"
           onClick={() => navigate('/clients')} sub={d.mrr.clients ? count(d.mrr.clients, 'לקוח ריטיינר אחד', 'לקוחות ריטיינר') : 'עדיין אין לקוחות ריטיינר'} />
-        <Tile className="xl:col-span-2 order-3 xl:order-2" icon={Target} label="פוטנציאל מכירות" value={ils(d.pipeline.openLeadsValue + d.pipeline.openQuotesValue)} tone="bg-blue-50 text-blue-700"
+        <Tile className="xl:col-span-2 2xl:col-[span_3] order-4 xl:order-2" icon={Target} label="פוטנציאל מכירות" value={ils(d.pipeline.openLeadsValue + d.pipeline.openQuotesValue)} tone="bg-blue-50 text-blue-700"
           onClick={() => navigate('/leads')} sub={`${count(d.pipeline.openLeadsCount, 'ליד אחד', 'לידים')} · ${count(d.pipeline.openQuotesCount, 'הצעה פתוחה אחת', 'הצעות פתוחות')}`} />
       </div>
 

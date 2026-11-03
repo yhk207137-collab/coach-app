@@ -95,7 +95,6 @@ export default function MeetingBilling({ client, onChanged }: { client: BillingC
                 : 'בלי מחיר, פגישות לא מתווספות ליתרה.'}
               {charged.length > 0 && ` נוספו עד היום: ${charged.length === 1 ? 'פגישה אחת' : `${charged.length} פגישות`}, ${money(chargedSum)}.`}
             </p>
-            {payment && <p className="text-sm font-semibold text-slate-800 mt-1">יתרה לתשלום כרגע: {money(balance)}</p>}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">

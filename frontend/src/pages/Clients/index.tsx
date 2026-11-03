@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Building2, Phone, Mail, ChevronLeft, Trash2 } from 'lucide-react';
+import { Plus, Search, Building2, Phone, Mail, ChevronLeft, Trash2, HandCoins } from 'lucide-react';
 import api from '../../services/api';
 import { Client, ClientStatus } from '../../types';
 import toast from 'react-hot-toast';
 import ClientModal from './ClientModal';
 import clsx from 'clsx';
+import { RecordReceivedModal, balanceOf, ils, useMoneyRefresh } from '../Payments/received';
 
 const statusLabel: Record<ClientStatus, string> = { ACTIVE: 'פעיל', FROZEN: 'מוקפא', ENDED: 'הסתיים' };
 const statusClass: Record<ClientStatus, string> = {
@@ -21,6 +22,8 @@ export default function ClientsPage() {
   const [showModal, setShowModal] = useState(false);
 
   const [confirmDelete, setConfirmDelete] = useState<Client | null>(null);
+  const [receiving, setReceiving] = useState<Client | null>(null);
+  const refreshMoney = useMoneyRefresh();
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ['clients', statusFilter],
@@ -84,6 +87,7 @@ export default function ClientsPage() {
                 <th className="table-header hidden md:table-cell">עסק</th>
                 <th className="table-header hidden lg:table-cell">טלפון</th>
                 <th className="table-header hidden lg:table-cell">פגישות</th>
+                <th className="table-header hidden sm:table-cell">יתרה</th>
                 <th className="table-header">סטטוס</th>
                 <th className="table-header w-8" />
               </tr>
@@ -96,11 +100,16 @@ export default function ClientsPage() {
                       <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center text-xs font-bold text-primary-700 flex-shrink-0">
                         {client.fullName[0]}
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="font-medium text-slate-900">{client.fullName}</p>
-                        <p className="text-xs text-slate-500 flex items-center gap-1">
+                        <p className="text-xs text-slate-500 hidden sm:flex items-center gap-1">
                           <Mail className="w-3 h-3" />{client.email}
                         </p>
+                        {balanceOf(client) !== 0 && (
+                          <p className={clsx('text-xs font-medium sm:hidden', balanceOf(client) > 0 ? 'text-red-600' : 'text-emerald-700')}>
+                            {balanceOf(client) > 0 ? `יתרה ${ils(balanceOf(client))}` : `${ils(-balanceOf(client))} זכות`}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -121,13 +130,25 @@ export default function ClientsPage() {
                   <td className="table-cell hidden lg:table-cell text-slate-600">
                     {client._count?.meetings ?? 0}
                   </td>
+                  <td className="table-cell hidden sm:table-cell whitespace-nowrap">
+                    {balanceOf(client) > 0
+                      ? <span className="font-medium text-red-600">{ils(balanceOf(client))}</span>
+                      : balanceOf(client) < 0
+                        ? <span className="font-medium text-emerald-700">{ils(-balanceOf(client))} זכות</span>
+                        : <span className="text-slate-400">—</span>}
+                  </td>
                   <td className="table-cell">
                     <span className={statusClass[client.status]}>{statusLabel[client.status]}</span>
                   </td>
                   <td className="table-cell" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => setConfirmDelete(client)} className="text-slate-300 hover:text-red-400 transition-colors p-1">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setReceiving(client)} aria-label="כסף שהתקבל" title="כסף שהתקבל" className="text-primary-600 hover:text-primary-800 transition-colors p-1">
+                        <HandCoins className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => setConfirmDelete(client)} aria-label="מחיקה" className="text-slate-300 hover:text-red-400 transition-colors p-1">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -138,6 +159,13 @@ export default function ClientsPage() {
 
       {showModal && <ClientModal onClose={() => setShowModal(false)} onSaved={() => { qc.invalidateQueries({ queryKey: ['clients'] }); setShowModal(false); }} />}
 
+      {receiving && (
+        <RecordReceivedModal
+          client={{ id: receiving.id, fullName: receiving.fullName, balance: balanceOf(receiving) }}
+          onClose={() => setReceiving(null)}
+          onSaved={(clientId) => { setReceiving(null); refreshMoney(clientId); }}
+        />
+      )}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full">

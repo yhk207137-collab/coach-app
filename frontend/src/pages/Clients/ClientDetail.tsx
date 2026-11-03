@@ -17,6 +17,7 @@ import MeetingModal from '../Meetings/MeetingModal';
 import SummaryModal from '../Meetings/SummaryModal';
 import TaskModal from '../Tasks/TaskModal';
 import PaymentPanel from '../Payments/PaymentPanel';
+import ClientMoney from '../Payments/ClientMoney';
 import MeetingBilling, { ChargeBadge } from './MeetingBilling';
 import { useMutation } from '@tanstack/react-query';
 
@@ -84,7 +85,7 @@ export default function ClientDetail() {
     { key: 'timeline', label: 'ציר זמן', icon: Clock },
     { key: 'tasks', label: `משימות (${client.tasks?.length ?? 0})`, icon: CheckSquare },
     { key: 'projects', label: `פרויקטים (${projects.length})`, icon: FolderKanban },
-    { key: 'payments', label: 'תשלומים', icon: CreditCard },
+    { key: 'payments', label: 'כספים', icon: CreditCard },
     { key: 'documents', label: `מסמכים (${client.documents?.length ?? 0})`, icon: FolderOpen },
   ];
 
@@ -147,13 +148,15 @@ export default function ClientDetail() {
         )}
       </div>
 
+      <ClientMoney client={client} onUpdated={invalidate} onShowAll={tab === 'payments' ? undefined : () => setTab('payments')} />
+
       {client.clientType === 'SESSION' && <MeetingBilling client={client} onChanged={invalidate} />}
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit max-w-full overflow-x-auto">
         {tabs.map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setTab(key)}
-            className={clsx('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+            className={clsx('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-150',
               tab === key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
             <Icon className="w-4 h-4" />{label}
           </button>
@@ -358,7 +361,7 @@ export default function ClientDetail() {
       )}
 
       {/* Payments */}
-      {tab === 'payments' && <PaymentPanel clientId={id!} onUpdated={invalidate} />}
+      {tab === 'payments' && <PaymentPanel clientId={id!} clientName={client.fullName} onUpdated={invalidate} />}
 
       {/* Documents */}
       {tab === 'documents' && (

@@ -1,368 +1,153 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
-import { Plus, Loader2, CheckCircle, Clock, CreditCard, Banknote, FileText, Pencil, Trash2 } from 'lucide-react';
-import api from '../../services/api';
-import { Payment } from '../../types';
 import { format } from 'date-fns';
+import { Pencil, Trash2, Wallet } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { EditRecordModal, MarkPaidModal, ReceiptStatus, ReceivedFields, todayInput } from './received';
+import api from '../../services/api';
+import { PaymentCharge, PaymentRecord } from '../../types';
+import { ChargeModal, EditRecordModal, MarkPaidModal, ReceiptStatus, TotalModal, balanceChangeText, ils, todayInput, useMoneyRefresh, usePayment } from './received';
 
-interface Props { clientId: string; onUpdated?: () => void; }
+const day = (date: string) => format(new Date(date), 'd/M/yyyy');
 
-const methodIcon = (m?: string) => {
-  if (!m) return null;
-  if (m === 'אשראי' || m === 'ישראכרט') return <CreditCard className="w-3.5 h-3.5 inline ml-1" />;
-  if (m === 'מזומן') return <Banknote className="w-3.5 h-3.5 inline ml-1" />;
-  return <FileText className="w-3.5 h-3.5 inline ml-1" />;
-};
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="card p-0 overflow-hidden min-w-0">
+      <h3 className="px-4 sm:px-5 py-3 font-semibold text-slate-900 border-b border-slate-100">{title}</h3>
+      <div className="divide-y divide-slate-100">{children}</div>
+    </section>
+  );
+}
 
-export default function PaymentPanel({ clientId, onUpdated }: Props) {
-  const qc = useQueryClient();
-  const [addRecord, setAddRecord] = useState(false);
-  const [setupPlan, setSetupPlan] = useState(false);
-  const [recordType, setRecordType] = useState<'paid' | 'scheduled'>('paid');
-  const [editRecord, setEditRecord] = useState<any | null>(null);
-  const [markingPaid, setMarkingPaid] = useState<any | null>(null);
+function Row({ amount, tone, title, sub, children }: { amount: number; tone: string; title?: string; sub: string; children?: React.ReactNode }) {
+  return (
+    <div data-money-row className="px-4 sm:px-5 py-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+      <div className="flex-1 min-w-[9rem]">
+        <p className={`font-semibold ${tone}`}>{ils(amount)}{title && <span className="text-sm font-medium text-slate-800 mr-2">{title}</span>}</p>
+        <p className="text-xs text-slate-500 mt-0.5 break-words">{sub}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
 
-  const { data: payment, isLoading } = useQuery<Payment | null>({
-    queryKey: ['payment', clientId],
-    queryFn: () => api.get(`/payments/${clientId}`).then(r => r.data).catch(() => null),
-  });
+const IconButtons = ({ onEdit, onDelete }: { onEdit: () => void; onDelete?: () => void }) => (
+  <div className="flex items-center gap-1 flex-shrink-0">
+    <button type="button" onClick={onEdit} aria-label="עריכה" className="p-1.5 text-slate-400 hover:text-primary-600 rounded transition-colors"><Pencil className="w-4 h-4" /></button>
+    {onDelete && <button type="button" onClick={onDelete} aria-label="מחיקה" className="p-1.5 text-slate-400 hover:text-red-500 rounded transition-colors"><Trash2 className="w-4 h-4" /></button>}
+  </div>
+);
 
-  const [addCharge, setAddCharge] = useState(false);
-  const [chargeAmount, setChargeAmount] = useState('');
-  const [chargeSaving, setChargeSaving] = useState(false);
-
-  const { register: regPlan, handleSubmit: submitPlan, reset: resetPlan, formState: { isSubmitting: planSub } } = useForm({
-    defaultValues: { totalAmount: 0 as number | string, nextPaymentDate: '' },
-  });
-
-  const openPlanEditor = () => {
-    resetPlan({
-      totalAmount: payment?.totalAmount ?? 0,
-      nextPaymentDate: payment?.nextPaymentDate ? payment.nextPaymentDate.slice(0, 10) : '',
-    });
-    setSetupPlan(true);
-  };
-
-  const saveCharge = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const amount = parseFloat(chargeAmount);
-    if (!(amount > 0)) return toast.error('הכנס סכום חיובי');
-    setChargeSaving(true);
-    try {
-      await api.post(`/payments/${clientId}/charge`, { amount });
-      qc.invalidateQueries({ queryKey: ['payment', clientId] });
-      setAddCharge(false);
-      setChargeAmount('');
-      toast.success(`נוספו ₪${amount.toLocaleString()} לסכום העסקה`);
-      onUpdated?.();
-    } catch {
-      toast.error('שגיאה בהוספת הסכום');
-    } finally {
-      setChargeSaving(false);
-    }
-  };
-
-  const { register: regRecord, handleSubmit: submitRecord, reset, watch: watchRecord, formState: { errors: recErrors, isSubmitting: recSub } } = useForm({
-    defaultValues: { amount: '', note: '', date: todayInput(), scheduledDate: '', paymentMethod: '', receipt: '' },
-  });
-
-  const moneyChanged = () => {
-    for (const queryKey of [['payment', clientId], ['received-payments'], ['clients-with-payments'], ['alerts'], ['accounting']]) qc.invalidateQueries({ queryKey });
-    onUpdated?.();
-  };
-
-  const savePlan = async (data: any) => {
-    try {
-      await api.post(`/payments/${clientId}`, { ...data, totalAmount: parseFloat(data.totalAmount) });
-      qc.invalidateQueries({ queryKey: ['payment', clientId] });
-      setSetupPlan(false);
-      toast.success('תכנית תשלום עודכנה');
-      onUpdated?.();
-    } catch { toast.error('שגיאה בשמירת תכנית'); }
-  };
-
-  const saveRecord = async (data: any) => {
-    try {
-      const isPaid = recordType === 'paid';
-      await api.post(`/payments/${clientId}/record`, {
-        amount: parseFloat(data.amount),
-        note: data.note || undefined,
-        date: isPaid ? data.date : undefined,
-        isPaid,
-        scheduledDate: !isPaid ? data.scheduledDate : undefined,
-        paymentMethod: isPaid ? data.paymentMethod : undefined,
-        receiptIssued: isPaid ? data.receipt === 'yes' : undefined,
-      });
-      setAddRecord(false);
-      reset();
-      toast.success(isPaid ? 'תשלום נרשם בהצלחה' : 'תשלום מתוזמן נוסף');
-      moneyChanged();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'שגיאה ברישום תשלום');
-    }
-  };
-
-  const deleteRecord = useMutation({
-    mutationFn: (recordId: string) => api.delete(`/payments/record/${recordId}`),
-    onSuccess: () => { toast.success('רשומה נמחקה'); moneyChanged(); },
-    onError: () => toast.error('שגיאה במחיקה'),
-  });
-
-  const handleDeleteRecord = (r: any) => {
-    if (confirm('למחוק רשומה זו?')) deleteRecord.mutate(r.id);
-  };
+// Everything recorded for a client: what is expected, what came in, and what makes up the total.
+export default function PaymentPanel({ clientId, clientName, onUpdated }: { clientId: string; clientName: string; onUpdated?: () => void }) {
+  const [editRecord, setEditRecord] = useState<PaymentRecord | null>(null);
+  const [markingPaid, setMarkingPaid] = useState<PaymentRecord | null>(null);
+  const [editCharge, setEditCharge] = useState<PaymentCharge | null>(null);
+  const [editTotal, setEditTotal] = useState(false);
+  const refresh = useMoneyRefresh(onUpdated);
+  const moneyChanged = () => refresh(clientId);
+  const { data: payment, isLoading, isError } = usePayment(clientId);
 
   if (isLoading) return <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (isError) return <p className="text-sm text-red-600 text-center py-8">לא הצלחנו לטעון את הנתונים. נסו לרענן את הדף.</p>;
 
-  const paidAmount = payment?.paidAmount ?? 0;
-  const totalAmount = payment?.totalAmount ?? 0;
-  const balance = totalAmount - paidAmount;
-  const pct = totalAmount > 0 ? Math.min((paidAmount / totalAmount) * 100, 100) : 0;
+  const total = payment?.totalAmount ?? 0;
+  const paid = payment?.paidAmount ?? 0;
+  const balance = total - paid;
+  const history = payment?.history ?? [];
+  const scheduled = history.filter((r) => !r.isPaid).sort((a, b) => (a.scheduledDate ?? '').localeCompare(b.scheduledDate ?? ''));
+  const received = history.filter((r) => r.isPaid).sort((a, b) => b.date.localeCompare(a.date));
+  const charges = payment?.charges ?? [];
+  const meetingCharges = payment?.meetingCharges ?? [];
+  // Whatever part of the total no line explains was typed by hand as the total itself.
+  const typedByHand = Math.round((total - charges.reduce((s, c) => s + c.amount, 0) - meetingCharges.reduce((s, m) => s + (m.chargedAmount || 0), 0)) * 100) / 100;
+
+  const run = async (question: string, action: () => Promise<unknown>, done: string) => {
+    if (!confirm(question)) return;
+    try {
+      await action();
+      toast.success(done);
+      moneyChanged();
+    } catch {
+      toast.error('הפעולה נכשלה');
+    }
+  };
+  const deleteRecord = (r: PaymentRecord) => run(
+    r.isPaid ? `למחוק את התשלום של ${ils(r.amount)}?\n${balanceChangeText(balance, balance + r.amount)}.` : `למחוק את התשלום העתידי של ${ils(r.amount)}? היתרה לא תשתנה.`,
+    () => api.delete(`/payments/record/${r.id}`), 'הרשומה נמחקה',
+  );
+  const deleteCharge = (c: PaymentCharge) => run(
+    `למחוק את החיוב של ${ils(c.amount)}?\n${balanceChangeText(balance, balance - c.amount)}.`,
+    () => api.delete(`/payments/charge/${c.id}`), 'החיוב נמחק',
+  );
+  const undoMeeting = (id: string, amount: number) => run(
+    `לבטל את החיוב על הפגישה?\n${balanceChangeText(balance, balance - amount)}.`,
+    () => api.post(`/meetings/${id}/reset-charge`), 'החיוב בוטל',
+  );
+
+  const lines = [
+    ...charges.map((c) => ({ key: c.id, date: c.date, charge: c, meeting: null })),
+    ...meetingCharges.map((m) => ({ key: m.id, date: m.date, charge: null, meeting: m })),
+  ].sort((a, b) => b.date.localeCompare(a.date));
+
+  if (!history.length && !lines.length && !typedByHand) {
+    return (
+      <div className="card text-center py-10 text-slate-500">
+        <Wallet className="w-9 h-9 mx-auto mb-2 opacity-30" />
+        <p className="font-medium">עוד לא נרשם כסף ללקוח הזה</p>
+        <p className="text-sm mt-1">מתחילים מהכפתורים למעלה: כסף שהתקבל, חיוב חדש או תשלום עתידי.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      {!payment || setupPlan ? (
-        <div className="card">
-          <h3 className="font-semibold text-slate-900 mb-4">{payment ? 'עדכון תכנית' : 'הגדרת תכנית תשלום'}</h3>
-          <form onSubmit={submitPlan(savePlan)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">סכום עסקה כולל (₪)</label>
-                <input {...regPlan('totalAmount', { required: true, min: 0 })} type="number" min="0" step="0.01" className="input" />
-              </div>
-              <div>
-                <label className="label">תאריך תשלום הבא</label>
-                <input {...regPlan('nextPaymentDate')} type="date" className="input" />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button type="submit" disabled={planSub} className="btn-primary">
-                {planSub ? <Loader2 className="w-4 h-4 animate-spin" /> : 'שמור'}
-              </button>
-              {payment && <button type="button" onClick={() => setSetupPlan(false)} className="btn-secondary">ביטול</button>}
-            </div>
-          </form>
-        </div>
-      ) : (
-        <>
-          {/* Summary cards */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="card text-center py-4">
-              <p className="text-2xl font-bold text-slate-900">₪{totalAmount.toLocaleString()}</p>
-              <p className="text-xs text-slate-500 mt-1">סכום עסקה</p>
-            </div>
-            <div className="card text-center py-4">
-              <p className="text-2xl font-bold text-emerald-600">₪{paidAmount.toLocaleString()}</p>
-              <p className="text-xs text-slate-500 mt-1">שולם</p>
-            </div>
-            <div className="card text-center py-4">
-              <p className={`text-2xl font-bold ${balance > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                ₪{Math.abs(balance).toLocaleString()}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">{balance > 0 ? 'יתרה לתשלום' : balance < 0 ? 'יתרת זכות' : 'שולם במלואו'}</p>
-            </div>
-          </div>
-
-          {/* Progress */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-2 text-sm">
-              <span className="text-slate-600">התקדמות גבייה</span>
-              <span className="font-medium">{Math.round(pct)}%</span>
-            </div>
-            <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
-            </div>
-            {payment.nextPaymentDate && (
-              <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
-                תאריך תשלום הבא: {format(new Date(payment.nextPaymentDate), 'd/M/yyyy')}
-              </p>
-            )}
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 flex-wrap">
-            <button onClick={() => { setAddCharge(true); setAddRecord(false); }} className="btn-primary text-sm">
-              <Plus className="w-4 h-4" /> הוספת סכום לעסקה
-            </button>
-            <button onClick={() => { setAddRecord(true); setAddCharge(false); setRecordType('paid'); }} className="btn-secondary text-sm">
-              <Plus className="w-4 h-4" /> רישום תשלום שהתקבל
-            </button>
-            <button onClick={openPlanEditor} className="btn-secondary text-sm">עריכת תכנית</button>
-          </div>
-
-          {addCharge && (
-            <div className="card border border-primary-100">
-              <h3 className="font-semibold text-slate-900 mb-1">הוספת סכום לעסקה</h3>
-              <p className="text-sm text-slate-500 mb-3">לתוספת שאינה פגישה. פגישות מתווספות לבד לפי המחיר בראש דף הלקוח.</p>
-              <form onSubmit={saveCharge} className="space-y-3">
-                <div>
-                  <label className="label">סכום להוספה (₪)</label>
-                  <input
-                    type="number" min="1" step="0.01" className="input" placeholder="320" autoFocus
-                    value={chargeAmount} onChange={e => setChargeAmount(e.target.value)}
-                  />
-                </div>
-                {parseFloat(chargeAmount) > 0 && (
-                  <p className="text-sm text-slate-600">
-                    סכום העסקה יעלה מ-₪{totalAmount.toLocaleString()} ל-<b>₪{(totalAmount + parseFloat(chargeAmount)).toLocaleString()}</b>
-                  </p>
-                )}
-                <div className="flex gap-2">
-                  <button type="submit" disabled={chargeSaving} className="btn-primary">
-                    {chargeSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'הוסף לעסקה'}
-                  </button>
-                  <button type="button" onClick={() => { setAddCharge(false); setChargeAmount(''); }} className="btn-secondary">ביטול</button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* Add record form */}
-          {addRecord && (
-            <div className="card border border-primary-100">
-              <h3 className="font-semibold text-slate-900 mb-3">הוספת תשלום</h3>
-
-              <div className="flex gap-2 mb-4">
-                <button type="button" onClick={() => setRecordType('paid')}
-                  className={`flex-1 py-2 text-sm rounded-xl font-medium transition-colors ${recordType === 'paid' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                  שולם
-                </button>
-                <button type="button" onClick={() => setRecordType('scheduled')}
-                  className={`flex-1 py-2 text-sm rounded-xl font-medium transition-colors ${recordType === 'scheduled' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                  מתוזמן לעתיד
-                </button>
-              </div>
-
-              <form onSubmit={submitRecord(saveRecord)} noValidate className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="label">סכום (₪) *</label>
-                    <input
-                      {...regRecord('amount', { required: 'חובה', min: { value: 1, message: 'סכום חייב להיות חיובי' } })}
-                      type="number" min="1" step="0.01" className="input"
-                      placeholder="0"
-                    />
-                    {recErrors.amount && <p className="text-xs text-red-500 mt-1">{recErrors.amount.message as string}</p>}
-                  </div>
-                  <div>
-                    <label className="label">{recordType === 'paid' ? 'תאריך תשלום' : 'תאריך מתוכנן'}</label>
-                    <input
-                      {...regRecord(recordType === 'paid' ? 'date' : 'scheduledDate')}
-                      type="date" className="input"
-                    />
-                  </div>
-                </div>
-
-                {recordType === 'paid' && <ReceivedFields register={regRecord} errors={recErrors} receipt={watchRecord('receipt')} />}
-
-                <div>
-                  <label className="label">הערה / פרטים נוספים</label>
-                  <input {...regRecord('note')} className="input" placeholder="לדוגמה: תשלום ראשון, חשבונית 123..." />
-                </div>
-
-                <div className="flex gap-2">
-                  <button type="submit" disabled={recSub} className="btn-primary">
-                    {recSub ? <Loader2 className="w-4 h-4 animate-spin" /> : recordType === 'paid' ? 'רשום תשלום' : 'הוסף תזכורת'}
-                  </button>
-                  <button type="button" onClick={() => { setAddRecord(false); reset(); }} className="btn-secondary">ביטול</button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* History */}
-          {payment.history?.length > 0 && (
-            <div className="card p-0 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100">
-                <h3 className="font-semibold text-slate-900">היסטוריית תשלומים</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="table-header">תאריך</th>
-                      <th className="table-header">סכום</th>
-                      <th className="table-header">אמצעי תשלום</th>
-                      <th className="table-header">קבלה</th>
-                      <th className="table-header">הערה</th>
-                      <th className="table-header">סטטוס</th>
-                      <th className="table-header w-16" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payment.history.map(r => (
-                      <tr key={r.id} className="table-row">
-                        <td className="table-cell text-sm">
-                          {r.isPaid
-                            ? format(new Date(r.date), 'd/M/yyyy')
-                            : r.scheduledDate
-                              ? format(new Date(r.scheduledDate), 'd/M/yyyy')
-                              : '—'}
-                        </td>
-                        <td className={`table-cell font-semibold ${r.isPaid ? 'text-emerald-700' : 'text-blue-600'}`}>
-                          ₪{r.amount.toLocaleString()}
-                        </td>
-                        <td className="table-cell text-sm text-slate-600">
-                          {r.paymentMethod ? (
-                            <span>{methodIcon(r.paymentMethod)}{r.paymentMethod}</span>
-                          ) : '—'}
-                        </td>
-                        <td className="table-cell">
-                          {r.isPaid ? <ReceiptStatus record={r} onChanged={moneyChanged} /> : <span className="text-slate-400">—</span>}
-                        </td>
-                        <td className="table-cell text-slate-500 text-sm">{r.note || '—'}</td>
-                        <td className="table-cell">
-                          {r.isPaid ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                              <CheckCircle className="w-3.5 h-3.5" /> שולם
-                            </span>
-                          ) : (
-                            <button onClick={() => setMarkingPaid(r)}
-                              className="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full hover:bg-blue-100 transition-colors">
-                              <Clock className="w-3.5 h-3.5" /> מתוזמן — סמן כשולם
-                            </button>
-                          )}
-                        </td>
-                        <td className="table-cell">
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => setEditRecord(r)}
-                              className="p-1 text-slate-400 hover:text-primary-600 rounded transition-colors">
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => handleDeleteRecord(r)}
-                              className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </>
+      {scheduled.length > 0 && (
+        <Section title="תשלומים עתידיים">
+          {scheduled.map((r) => {
+            const when = r.scheduledDate ?? '';
+            return (
+              <Row key={r.id} amount={r.amount} tone="text-blue-600" sub={[when ? day(when) : 'בלי תאריך', when && when.slice(0, 10) < todayInput() ? 'המועד עבר' : '', r.note].filter(Boolean).join(' · ')}>
+                <button type="button" onClick={() => setMarkingPaid(r)} className="btn-primary text-xs py-1.5 flex-shrink-0">התקבל</button>
+                <IconButtons onEdit={() => setEditRecord(r)} onDelete={() => deleteRecord(r)} />
+              </Row>
+            );
+          })}
+        </Section>
       )}
-      {editRecord && (
-        <EditRecordModal
-          record={editRecord}
-          onClose={() => setEditRecord(null)}
-          onSaved={() => { setEditRecord(null); moneyChanged(); }}
-        />
-      )}
-      {markingPaid && (
-        <MarkPaidModal
-          recordId={markingPaid.id}
-          amount={markingPaid.amount}
-          onClose={() => setMarkingPaid(null)}
-          onSaved={() => { setMarkingPaid(null); moneyChanged(); }}
-        />
-      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <Section title="כסף שהתקבל">
+          {received.length === 0 && <p className="px-5 py-6 text-sm text-slate-400 text-center">עוד לא נרשם כסף שהתקבל</p>}
+          {received.map((r) => (
+            <Row key={r.id} amount={r.amount} tone="text-emerald-700" sub={[day(r.date), r.paymentMethod || 'דרך לא צוינה', r.note].filter(Boolean).join(' · ')}>
+              <ReceiptStatus record={r} onChanged={moneyChanged} />
+              <IconButtons onEdit={() => setEditRecord(r)} onDelete={() => deleteRecord(r)} />
+            </Row>
+          ))}
+        </Section>
+
+        <Section title="ממה מורכב הסכום">
+          {lines.map(({ key, charge, meeting }) => (charge ? (
+            <Row key={key} amount={charge.amount} tone="text-slate-900" sub={`${day(charge.date)} · ${charge.note || 'חיוב'}`}>
+              <IconButtons onEdit={() => setEditCharge(charge)} onDelete={() => deleteCharge(charge)} />
+            </Row>
+          ) : meeting && (
+            <Row key={key} amount={meeting.chargedAmount || 0} tone="text-slate-900" sub={`${day(meeting.date)} · פגישה · ${meeting.type}`}>
+              <button type="button" onClick={() => undoMeeting(meeting.id, meeting.chargedAmount || 0)} className="text-xs text-slate-500 hover:text-slate-800 hover:underline flex-shrink-0">ביטול חיוב</button>
+            </Row>
+          )))}
+          {typedByHand !== 0 && (
+            <Row amount={typedByHand} tone="text-slate-900" sub={typedByHand > 0 ? 'סכום עסקה שהוכנס ידנית' : 'תיקון ידני של הסכום'}>
+              <IconButtons onEdit={() => setEditTotal(true)} />
+            </Row>
+          )}
+          <p className="px-4 sm:px-5 py-3 bg-slate-50 text-sm font-semibold text-slate-900 flex justify-between gap-3"><span>סך הכול חויב</span><span>{ils(total)}</span></p>
+        </Section>
+      </div>
+
+      {editRecord && <EditRecordModal record={editRecord} balance={balance} onClose={() => setEditRecord(null)} onSaved={() => { setEditRecord(null); moneyChanged(); }} />}
+      {markingPaid && <MarkPaidModal recordId={markingPaid.id} amount={markingPaid.amount} onClose={() => setMarkingPaid(null)} onSaved={() => { setMarkingPaid(null); moneyChanged(); }} />}
+      {editCharge && <ChargeModal clientId={clientId} clientName={clientName} balance={balance} charge={editCharge} onClose={() => setEditCharge(null)} onSaved={() => { setEditCharge(null); moneyChanged(); }} />}
+      {editTotal && <TotalModal clientId={clientId} clientName={clientName} total={total} paid={paid} nextPaymentDate={payment?.nextPaymentDate} onClose={() => setEditTotal(false)} onSaved={() => { setEditTotal(false); moneyChanged(); }} />}
     </div>
   );
 }

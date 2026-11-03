@@ -86,7 +86,16 @@ export interface Payment {
   paidAmount: number;
   nextPaymentDate?: string;
   history: PaymentRecord[];
+  charges?: PaymentCharge[];
+  meetingCharges?: { id: string; date: string; type: string; chargedAmount?: number | null }[];
   createdAt: string;
+}
+
+export interface PaymentCharge {
+  id: string;
+  amount: number;
+  date: string;
+  note?: string | null;
 }
 
 export interface PaymentRecord {

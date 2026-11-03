@@ -7,7 +7,7 @@ const SECRET_SETTING_KEYS = ['google_calendar_tokens'];
 // Every table except credentials (password hashes, login codes, Google tokens).
 export async function buildFullBackup() {
   const [
-    users, clients, meetings, meetingSummaries, tags, tasks, payments, paymentRecords, documents,
+    users, clients, meetings, meetingSummaries, tags, tasks, payments, paymentRecords, paymentCharges, documents,
     quotes, quoteItems, projects, subProjects, contracts, leads, leadActivities, invoices, invoiceItems,
     services, settings, contacts, campaigns, campaignSends, emailTemplates, media, pageVisits,
   ] = await Promise.all([
@@ -19,6 +19,7 @@ export async function buildFullBackup() {
     prisma.task.findMany(),
     prisma.payment.findMany(),
     prisma.paymentRecord.findMany(),
+    prisma.paymentCharge.findMany(),
     prisma.document.findMany(),
     prisma.quote.findMany(),
     prisma.quoteItem.findMany(),
@@ -40,7 +41,7 @@ export async function buildFullBackup() {
   ]);
 
   const data = {
-    users, clients, meetings, meetingSummaries, tags, tasks, payments, paymentRecords, documents,
+    users, clients, meetings, meetingSummaries, tags, tasks, payments, paymentRecords, paymentCharges, documents,
     quotes, quoteItems, projects, subProjects, contracts, leads, leadActivities, invoices, invoiceItems,
     services, settings, contacts, campaigns, campaignSends, emailTemplates, media, pageVisits,
   };
