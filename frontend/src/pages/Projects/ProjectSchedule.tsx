@@ -6,7 +6,7 @@ import type { Project } from './index';
 export const calendarDaysLeft = (date: string) => differenceInCalendarDays(new Date(date), new Date());
 
 const inDays = (n: number) => (n === 0 ? 'מסתיים היום' : n === 1 ? 'מסתיים מחר' : n === 2 ? 'נשארו יומיים' : `נשארו ${n} ימים`);
-const lateBy = (n: number) => (n === 1 ? 'איחור של יום' : n === 2 ? 'איחור של יומיים' : `איחור של ${n} ימים`);
+export const lateBy = (n: number) => (n === 1 ? 'איחור של יום' : n === 2 ? 'איחור של יומיים' : `איחור של ${n} ימים`);
 
 // Start and end dates, how much of the time has gone, and whether the work is keeping up.
 export default function ProjectSchedule({ project: p, compact }: { project: Project; compact?: boolean }) {

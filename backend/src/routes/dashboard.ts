@@ -37,10 +37,12 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   const thisYear = today.slice(0, 4);
   const in30 = new Date(now.getTime() + 30 * DAY);
   const in7 = new Date(now.getTime() + 7 * DAY);
+  // Whole calendar days from today, by the Israeli date.
+  const daysFromToday = (d: Date) => Math.round((Date.parse(dayKey(d)) - Date.parse(today)) / DAY);
 
   const [
     user, mkt, paidRecords, unpaidRecords, payments, clients, leads, quotes,
-    meetings, projects, openTasks, subscribers, newSubscribers, lastCampaign,
+    meetings, projects, openTasks, subscribers, newSubscribers, lastCampaign, endingContracts,
   ] = await Promise.all([
     prisma.user.findUnique({ where: { id: req.user!.id }, select: { name: true } }),
     getMarketingSettings(),
@@ -59,7 +61,7 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
     prisma.client.findMany({ select: { id: true, fullName: true, status: true, clientType: true, monthlyFee: true, createdAt: true } }),
     prisma.lead.findMany({ select: { id: true, fullName: true, stage: true, estimatedValue: true, updatedAt: true } }),
     prisma.quote.findMany({
-      select: { id: true, title: true, status: true, updatedAt: true, client: { select: { id: true, fullName: true } }, items: { select: { price: true, quantity: true } } },
+      select: { id: true, title: true, status: true, updatedAt: true, validUntil: true, client: { select: { id: true, fullName: true } }, items: { select: { price: true, quantity: true } } },
     }),
     prisma.meeting.findMany({
       where: { date: { gte: new Date(now.getTime() - 62 * DAY), lt: in7 } },
@@ -67,18 +69,19 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
       orderBy: { date: 'asc' },
     }),
     prisma.project.findMany({
-      where: { status: 'ACTIVE' },
-      select: { id: true, name: true, budget: true, endDate: true, client: { select: { id: true, fullName: true } }, tasks: { select: { status: true } } },
+      where: { status: { in: ['ACTIVE', 'PLANNING'] } },
+      select: { id: true, name: true, status: true, budget: true, startDate: true, endDate: true, client: { select: { id: true, fullName: true } }, tasks: { select: { status: true } } },
       orderBy: { updatedAt: 'desc' },
     }),
     prisma.task.findMany({
       where: { status: { not: 'COMPLETED' } },
-      select: { id: true, title: true, dueDate: true, clientId: true, client: { select: { fullName: true } } },
+      select: { id: true, title: true, dueDate: true, clientId: true, projectId: true, client: { select: { fullName: true } }, project: { select: { name: true } } },
       orderBy: { dueDate: { sort: 'asc', nulls: 'last' } },
     }),
     prisma.contact.count({ where: { status: 'SUBSCRIBED' } }),
     prisma.contact.count({ where: { status: 'SUBSCRIBED', createdAt: { gte: new Date(now.getTime() - 30 * DAY) } } }),
     prisma.campaign.findFirst({ where: { kind: 'BROADCAST', status: 'SENT' }, orderBy: { sentAt: 'desc' }, select: { id: true, name: true, sentAt: true } }),
+    prisma.contract.findMany({ where: { status: 'SIGNED', validUntil: { not: null } }, select: { id: true, title: true, validUntil: true, client: { select: { fullName: true } } } }),
   ]);
 
   // ── Revenue ───────────────────────────────────────────────────────────────
@@ -193,11 +196,41 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   const weekTasks = openTasks.filter((t) => t.dueDate && dayKey(t.dueDate) >= today && t.dueDate < in7);
 
   // ── Projects ──────────────────────────────────────────────────────────────
-  const activeProjects = projects.map((p) => {
+  // Late first, then the nearest end date; a project with no end date comes last.
+  const openProjects = projects.map((p) => {
     const total = p.tasks.length;
     const done = p.tasks.filter((t) => t.status === 'COMPLETED').length;
-    return { id: p.id, name: p.name, client: p.client, budget: p.budget, endDate: p.endDate, tasksTotal: total, tasksDone: done };
-  });
+    const daysLeft = p.endDate ? daysFromToday(p.endDate) : null;
+    // Same rule as the project page: more of the time has gone than of the work.
+    const span = p.startDate && p.endDate ? daysFromToday(p.endDate) - daysFromToday(p.startDate) : 0;
+    const timePct = span > 0 ? Math.min(100, Math.max(0, Math.round((-daysFromToday(p.startDate!) / span) * 100))) : null;
+    const workPct = total ? Math.round((done / total) * 100) : null;
+    const behind = daysLeft !== null && daysLeft >= 0 && timePct !== null && workPct !== null && timePct >= 25 && timePct - workPct >= 25;
+    return { id: p.id, name: p.name.trim(), status: p.status, client: p.client, budget: p.budget, endDate: p.endDate, daysLeft, behind, tasksTotal: total, tasksDone: done };
+  }).sort((a, b) => (a.daysLeft ?? 1e9) - (b.daysLeft ?? 1e9));
+
+  // ── Deadlines ─────────────────────────────────────────────────────────────
+  // Anything late, and whatever falls due in the next 30 days. Scheduled payments stay with the money panels.
+  const dated = <T,>(list: T[], date: (x: T) => Date | null | undefined) =>
+    list.flatMap((x) => { const d = date(x); return d ? [{ x, date: d, daysLeft: daysFromToday(d) }] : []; });
+  const deadlines = [
+    ...dated(projects, (p) => p.endDate).filter((e) => e.daysLeft <= 30).map(({ x: p, date, daysLeft }) => ({
+      key: `project-end:${p.id}`, kind: 'project-end', title: p.name.trim(), who: p.client.fullName, date, daysLeft, href: `/projects?open=${p.id}`,
+    })),
+    ...dated(projects.filter((p) => p.status === 'PLANNING'), (p) => p.startDate).filter((e) => e.daysLeft <= 30).map(({ x: p, date, daysLeft }) => ({
+      key: `project-start:${p.id}`, kind: 'project-start', title: p.name.trim(), who: p.client.fullName, date, daysLeft, href: `/projects?open=${p.id}`,
+    })),
+    ...dated(openTasks, (t) => t.dueDate).filter((e) => e.daysLeft <= 30).map(({ x: t, date, daysLeft }) => ({
+      key: `task:${t.id}`, kind: 'task', title: t.title.trim(), who: t.project ? `${t.client.fullName} · ${t.project.name.trim()}` : t.client.fullName, date, daysLeft, href: t.projectId ? `/projects?open=${t.projectId}` : '/tasks',
+    })),
+    // An offer or a contract already past its date has nothing left to catch, so these start from today.
+    ...dated(quotes.filter((q) => q.status === 'SENT'), (q) => q.validUntil).filter((e) => e.daysLeft >= 0 && e.daysLeft <= 30).map(({ x: q, date, daysLeft }) => ({
+      key: `quote:${q.id}`, kind: 'quote', title: q.title.trim(), who: q.client.fullName, date, daysLeft, href: '/quotes',
+    })),
+    ...dated(endingContracts, (c) => c.validUntil).filter((e) => e.daysLeft >= 0 && e.daysLeft <= 30).map(({ x: c, date, daysLeft }) => ({
+      key: `contract:${c.id}`, kind: 'contract', title: c.title.trim(), who: c.client.fullName, date, daysLeft, href: '/contracts',
+    })),
+  ].sort((a, b) => a.daysLeft - b.daysLeft);
 
   // ── Needs attention ───────────────────────────────────────────────────────
   // Same engine as the bell and the morning email. Coming-up items stay out of this panel, and late tasks show as one line.
@@ -241,7 +274,20 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
     clients: clientStats,
     meetings: { today: todayMeetings, week: weekMeetings.slice(0, 8), ...meetingStats },
     tasks: { open: openTasks.length, overdue: overdueTasks.length, week: weekTasks.slice(0, 6).map((t) => ({ id: t.id, title: t.title, dueDate: t.dueDate, clientId: t.clientId, name: t.client.fullName })) },
-    projects: { active: activeProjects.slice(0, 5), count: activeProjects.length, budget: Math.round(activeProjects.reduce((s, p) => s + (p.budget || 0), 0)) },
+    projects: {
+      active: openProjects.slice(0, 5),
+      count: openProjects.length,
+      planning: openProjects.filter((p) => p.status === 'PLANNING').length,
+      budget: Math.round(openProjects.reduce((s, p) => s + (p.budget || 0), 0)),
+    },
+    deadlines: {
+      items: deadlines,
+      late: deadlines.filter((x) => x.daysLeft < 0).length,
+      week: deadlines.filter((x) => x.daysLeft >= 0 && x.daysLeft <= 7).length,
+      month: deadlines.filter((x) => x.daysLeft > 7).length,
+      undatedProjects: openProjects.filter((p) => !p.endDate).length,
+      undatedTasks: openTasks.filter((t) => !t.dueDate).length,
+    },
     attention: attention.slice(0, 8),
     attentionTotal: attention.length,
     marketing: { subscribers, newSubscribers, lastCampaign: lastCampaignStats },
