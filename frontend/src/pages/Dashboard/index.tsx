@@ -151,9 +151,9 @@ export default function Dashboard() {
           <p className="page-subtitle">{format(new Date(), 'EEEE, d בMMMM yyyy', { locale: he })}{d.attentionTotal > 0 ? ` · ${count(d.attentionTotal, 'דבר אחד מחכה לטיפול', 'דברים מחכים לטיפול')}` : ' · הכל מטופל'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => navigate('/clients')} className="btn-secondary text-sm"><Plus className="w-4 h-4" /> לקוח</button>
-          <button onClick={() => navigate('/meetings')} className="btn-secondary text-sm"><Plus className="w-4 h-4" /> פגישה</button>
-          <button onClick={() => navigate('/quotes')} className="btn-secondary text-sm"><Plus className="w-4 h-4" /> הצעת מחיר</button>
+          <button onClick={() => navigate('/clients')} className="btn-primary text-sm"><Plus className="w-4 h-4" /> לקוח</button>
+          <button onClick={() => navigate('/meetings')} className="btn-primary text-sm"><Plus className="w-4 h-4" /> פגישה</button>
+          <button onClick={() => navigate('/quotes')} className="btn-primary text-sm"><Plus className="w-4 h-4" /> הצעת מחיר</button>
           <button onClick={() => navigate('/marketing/campaigns')} className="btn-primary text-sm"><Mail className="w-4 h-4" /> דיוור</button>
         </div>
       </div>
