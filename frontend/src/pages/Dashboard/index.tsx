@@ -189,12 +189,12 @@ export default function Dashboard() {
                 {d.projects.active.map((p) => {
                   const pctDone = p.tasksTotal ? Math.round((p.tasksDone / p.tasksTotal) * 100) : 0;
                   return (
-                    <button key={p.id} type="button" data-dashboard-project onClick={() => navigate(`/projects?open=${p.id}`)} className="w-full text-right group">
+                    <button key={p.id} type="button" data-dashboard-project onClick={() => navigate(p.daysLeft === null ? `/clients/${p.client.id}?tab=projects&edit=${p.id}` : `/projects?open=${p.id}`)} className="w-full text-right group">
                       <div className="flex items-start justify-between gap-2">
                         <span className="min-w-0 text-sm font-medium text-slate-800 group-hover:text-slate-900 truncate">{p.name}</span>
                         {p.daysLeft !== null
                           ? <DueBadge days={p.daysLeft} />
-                          : <span className="badge bg-slate-100 text-slate-500 whitespace-nowrap flex-shrink-0">בלי תאריך סיום</span>}
+                          : <span className="badge bg-amber-100 text-amber-800 whitespace-nowrap flex-shrink-0">בלי תאריך סיום</span>}
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5 break-words">
                         {p.client.fullName}

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Copy, Download, ExternalLink, MoreVertical, PlusSquare, Share, Smartphone } from 'lucide-react';
+import { Check, Copy, Download, ExternalLink, LayoutGrid, MoreVertical, PlusSquare, Settings, Share, Smartphone } from 'lucide-react';
 import toast from 'react-hot-toast';
+import api from '../services/api';
 
 type InstallOffer = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> };
 
@@ -27,6 +28,24 @@ function detectDevice() {
     otherIphoneBrowser: iphone && /CriOS|FxiOS|EdgiOS|OPiOS/.test(ua),
   };
 }
+
+// No test here can stand in for the real phone, so each attempt reports what happened on it, with no personal details.
+const visit = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
+const phoneModel: Promise<string | undefined> = (async () => {
+  try {
+    const details = await (navigator as any).userAgentData?.getHighEntropyValues?.(['model', 'platformVersion']);
+    return details ? `${details.model || ''} ${details.platform || ''} ${details.platformVersion || ''}`.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+})();
+const report = async (step: string, detail?: string) => {
+  try {
+    await api.post('/public/install-report', { visit, step, detail, model: await phoneModel });
+  } catch {
+    // A report that doesn't arrive never gets in the way of the page.
+  }
+};
 
 function Steps({ items }: { items: { icon: any; text: React.ReactNode }[] }) {
   return (
@@ -59,22 +78,71 @@ function CopyLink({ address, label }: { address: string; label: string }) {
   );
 }
 
+// The phone's menu can say "installed" while the icon went only to the list of apps, or nowhere, so only a person looking at the screen can tell.
+function DidItAppear({ onAnswer }: { onAnswer: (appeared: boolean) => void }) {
+  return (
+    <div data-icon-question className="border-t border-slate-100 pt-4">
+      <p className="text-sm font-semibold text-slate-800 text-center">הסמל "יהושע כהן" הופיע בטלפון?</p>
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        <button type="button" onClick={() => onAnswer(true)} className="btn-primary justify-center">כן</button>
+        <button type="button" onClick={() => onAnswer(false)} className="btn-secondary justify-center">לא</button>
+      </div>
+    </div>
+  );
+}
+
+const LookInAppList = { icon: LayoutGrid, text: <>מחפשים <strong>"יהושע כהן"</strong> ברשימת כל האפליקציות של הטלפון. אם הוא שם, לוחצים עליו לחיצה ארוכה וגוררים למסך הבית.</> };
+
+function AnotherWay({ iphone, onAppeared }: { iphone: boolean; onAppeared: () => void }) {
+  return (
+    <div data-another-way className="space-y-4">
+      <p className="font-semibold text-slate-800">יש עוד דרך. מנסים לפי הסדר:</p>
+      {iphone ? (
+        <Steps items={[
+          { icon: Share, text: <>בודקים שהדף הזה פתוח ב־<strong>Safari</strong>. בדפדפן אחר האפשרות לפעמים חסרה.</> },
+          { icon: PlusSquare, text: <>בתפריט השיתוף גוללים עד הסוף. אם אין שם <strong>"הוספה למסך הבית"</strong>, לוחצים <strong>"עריכת פעולות"</strong> ומוסיפים אותה.</> },
+        ]} />
+      ) : (
+        <Steps items={[
+          LookInAppList,
+          { icon: MoreVertical, text: <>אם הוא לא שם: ב־Chrome לוחצים על שלוש הנקודות, <strong>"הוספה למסך הבית"</strong>, ובחלון בוחרים <strong>קיצור דרך</strong> ולא התקנה. קיצור דרך לא מתקין כלום, ולכן הוא יכול לעבוד גם כשהטלפון חוסם התקנות.</> },
+          { icon: Settings, text: <>אם עדיין אין סמל: בהגדרות הטלפון נכנסים לאפליקציות, ל־Chrome, ומאשרים לו <strong>קיצורי דרך במסך הבית</strong>. בשיאומי זה נמצא תחת "הרשאות נוספות". אחר כך מנסים שוב.</> },
+        ]} />
+      )}
+      <button type="button" onClick={onAppeared} className="btn-primary w-full justify-center">עכשיו הסמל הופיע</button>
+      <p data-report-sent className="text-xs text-slate-500">סוג הטלפון ומה שקרה בו נשלחו אוטומטית, כדי שאפשר יהיה לבדוק מה חוסם. אין צורך לתאר שום דבר.</p>
+    </div>
+  );
+}
+
+type Stage = 'ready' | 'adding' | 'appeared' | 'did-not-appear';
+
 // The link for putting the software on the phone's home screen. It needs no login and suits itself to the phone.
 export default function Install() {
   const [device] = useState(detectDevice);
   const [fromHomeScreen, setFromHomeScreen] = useState(runsFromHomeScreen);
   const [canOffer, setCanOffer] = useState(!!offer);
-  const [added, setAdded] = useState(false);
+  const [alreadyInstalled, setAlreadyInstalled] = useState(false);
+  const [stage, setStage] = useState<Stage>('ready');
   const address = `${location.origin}/install`;
+  const onPhone = device.android || device.iphone;
 
   useEffect(() => {
-    const onOffer = () => setCanOffer(!!offer);
-    const onInstalled = () => { offer = null; setCanOffer(false); setAdded(true); };
+    const onOffer = () => { setCanOffer(!!offer); report('offer'); };
+    // Chrome says this when the install starts, not when the icon lands, so it proves nothing yet.
+    const onInstalled = () => { offer = null; setCanOffer(false); setStage((s) => (s === 'ready' ? 'adding' : s)); report('installed'); };
     const display = window.matchMedia('(display-mode: standalone)');
     const onDisplay = () => setFromHomeScreen(runsFromHomeScreen());
     window.addEventListener('install-offer', onOffer);
     window.addEventListener('appinstalled', onInstalled);
     display.addEventListener('change', onDisplay);
+    report('opened', runsFromHomeScreen() ? 'from the home screen' : offer ? 'offer waiting' : undefined);
+    // An earlier try may have worked, with the icon only in the list of apps. Then Chrome stops offering, and only this can tell.
+    (navigator as any).getInstalledRelatedApps?.().then((apps: unknown[]) => {
+      if (!apps?.length) return;
+      setAlreadyInstalled(true);
+      report('already-installed');
+    }).catch(() => {});
     return () => {
       window.removeEventListener('install-offer', onOffer);
       window.removeEventListener('appinstalled', onInstalled);
@@ -85,12 +153,24 @@ export default function Install() {
   const addNow = async () => {
     if (!offer) return;
     const current = offer;
-    await current.prompt();
-    const { outcome } = await current.userChoice;
+    report('tapped');
+    try {
+      await current.prompt();
+      const { outcome } = await current.userChoice;
+      report(outcome);
+      if (outcome === 'accepted') setStage('adding');
+    } catch (e: any) {
+      report('prompt-failed', String(e?.message ?? e));
+      setStage('did-not-appear');
+    }
     // Chrome gives each offer one use.
     offer = null;
     setCanOffer(false);
-    if (outcome === 'accepted') setAdded(true);
+  };
+
+  const answer = (appeared: boolean) => {
+    report(appeared ? 'icon-yes' : 'icon-no');
+    setStage(appeared ? 'appeared' : 'did-not-appear');
   };
 
   const browser = device.iphone ? 'Safari' : 'Chrome';
@@ -101,13 +181,24 @@ export default function Install() {
   );
 
   let body: React.ReactNode;
-  if (fromHomeScreen || added) {
+  if (fromHomeScreen || stage === 'appeared') {
     body = (
       <div className="text-center space-y-3">
         <span className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto"><Check className="w-6 h-6" /></span>
-        <p className="font-semibold text-slate-800">{fromHomeScreen ? 'התוכנה כבר פתוחה מהסמל במסך הבית' : 'התוכנה נוספה'}</p>
-        {!fromHomeScreen && <p className="text-sm text-slate-600">הסמל "יהושע כהן" יופיע במסך הבית בתוך רגע. אם הוא לא שם אחרי דקה, הוא נמצא ברשימת האפליקציות של הטלפון.</p>}
+        <p className="font-semibold text-slate-800">{fromHomeScreen ? 'התוכנה כבר פתוחה מהסמל במסך הבית' : 'מעולה, התוכנה בטלפון'}</p>
       </div>
+    );
+  } else if (stage === 'did-not-appear') {
+    body = <AnotherWay iphone={device.iphone} onAppeared={() => answer(true)} />;
+  } else if (stage === 'adding') {
+    body = onPhone ? (
+      <div className="space-y-4">
+        <p className="font-semibold text-slate-800">הטלפון מוסיף עכשיו את הסמל</p>
+        <p className="text-sm text-slate-600">זה יכול לקחת עד דקה. מחפשים את "יהושע כהן" במסך הבית, וגם ברשימת כל האפליקציות של הטלפון.</p>
+        <DidItAppear onAnswer={answer} />
+      </div>
+    ) : (
+      <p className="font-semibold text-slate-800 text-center">התוכנה הותקנה במחשב</p>
     );
   } else if (device.insideApp) {
     body = (
@@ -125,6 +216,14 @@ export default function Install() {
         <p className="text-xs text-slate-500">אחרי ההעתקה פותחים את {browser} ומדביקים בשורת הכתובת.</p>
       </div>
     );
+  } else if (alreadyInstalled) {
+    body = (
+      <div data-already-installed className="space-y-4">
+        <p className="font-semibold text-slate-800">התוכנה כבר מותקנת בטלפון הזה</p>
+        <Steps items={[LookInAppList]} />
+        <DidItAppear onAnswer={answer} />
+      </div>
+    );
   } else if (device.iphone) {
     body = (
       <div className="space-y-4">
@@ -134,12 +233,14 @@ export default function Install() {
             <CopyLink address={address} label="העתקת הקישור" />
           </div>
         )}
+        <p className="text-sm text-slate-600">באייפון אין כפתור שמוריד. מוסיפים את הסמל בשלושה צעדים:</p>
         <Steps items={[
           { icon: Share, text: <>לוחצים על <strong>כפתור השיתוף</strong> של Safari, הריבוע עם החץ למעלה.</> },
           { icon: PlusSquare, text: <>גוללים למטה ובוחרים <strong>"הוספה למסך הבית"</strong>.</> },
           { icon: Check, text: <>לוחצים <strong>"הוספה"</strong> בפינה העליונה.</> },
         ]} />
         <p className="text-xs text-slate-500">בפעם הראשונה שנכנסים מהסמל צריך להתחבר, כי באייפון הסמל נפרד מ־Safari.</p>
+        <DidItAppear onAnswer={answer} />
       </div>
     );
   } else if (device.android) {
@@ -152,7 +253,7 @@ export default function Install() {
           { icon: PlusSquare, text: <>בוחרים <strong>"הוספה למסך הבית"</strong> או <strong>"התקנת האפליקציה"</strong>.</> },
           { icon: Check, text: <>לוחצים <strong>"התקנה"</strong> או <strong>"הוספה"</strong>.</> },
         ]} />
-        <p className="text-xs text-slate-500">אם ההתקנה נכשלת, בוחרים בחלון הזה <strong>קיצור דרך</strong>. גם כך מתקבל סמל במסך הבית.</p>
+        <DidItAppear onAnswer={answer} />
       </div>
     );
   } else {

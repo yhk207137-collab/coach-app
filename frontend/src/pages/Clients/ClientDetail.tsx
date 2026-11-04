@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight, Phone, Mail, Building2, Calendar, CheckSquare,
-  CreditCard, FolderOpen, Edit, Plus, FileText, Clock, Trash2, Pencil, FolderKanban,
+  CreditCard, FolderOpen, Edit, Plus, FileText, Trash2, Pencil, FolderKanban,
 } from 'lucide-react';
 import api from '../../services/api';
 import { Client, ClientStatus, Meeting, Task, TaskStatus } from '../../types';
@@ -16,6 +16,7 @@ import ProjectModal from '../Projects/ProjectModal';
 import MeetingModal from '../Meetings/MeetingModal';
 import SummaryModal from '../Meetings/SummaryModal';
 import TaskModal from '../Tasks/TaskModal';
+import ClientProjects, { isRunning } from './ClientProjects';
 import PaymentPanel from '../Payments/PaymentPanel';
 import ClientMoney from '../Payments/ClientMoney';
 import MeetingBilling, { ChargeBadge } from './MeetingBilling';
@@ -26,14 +27,19 @@ const statusClass: Record<ClientStatus, string> = { ACTIVE: 'status-active', FRO
 const taskLabel: Record<TaskStatus, string> = { PENDING: 'ממתין', IN_PROGRESS: 'בתהליך', COMPLETED: 'הושלם' };
 const taskClass: Record<TaskStatus, string> = { PENDING: 'task-pending', IN_PROGRESS: 'task-progress', COMPLETED: 'task-completed' };
 
+const typeLabel: Record<string, string> = { SESSION: 'לפי פגישות', RETAINER: 'ריטיינר חודשי', PROJECT: 'פרויקט' };
+
 type Tab = 'timeline' | 'tasks' | 'payments' | 'documents' | 'projects';
+const TABS: Tab[] = ['timeline', 'tasks', 'payments', 'documents', 'projects'];
+const tabFromLink = (value: string | null) => (TABS.includes(value as Tab) ? (value as Tab) : null);
 
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [params] = useSearchParams();
-  const [tab, setTab] = useState<Tab>(params.get('tab') === 'payments' ? 'payments' : 'timeline');
+  const [params, setParams] = useSearchParams();
+  // Until a tab is chosen, the page opens on what this client is about.
+  const [chosenTab, setTab] = useState<Tab | null>(tabFromLink(params.get('tab')));
   const [editClient, setEditClient] = useState(false);
   const [newProject, setNewProject] = useState(false);
   const [newMeeting, setNewMeeting] = useState(false);
@@ -70,8 +76,11 @@ export default function ClientDetail() {
     queryFn: () => api.get(`/clients/${id}`).then(r => r.data),
   });
 
+  useEffect(() => { setTab(tabFromLink(params.get('tab'))); }, [id]);
+
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['client', id] });
+    qc.invalidateQueries({ queryKey: ['client-projects', id] });
     qc.invalidateQueries({ queryKey: ['payment', id] });
     qc.invalidateQueries({ queryKey: ['alerts'] });
     qc.invalidateQueries({ queryKey: ['dashboard'] });
@@ -81,10 +90,24 @@ export default function ClientDetail() {
   if (!client) return <div className="text-center py-16 text-slate-400">לקוח לא נמצא</div>;
 
   const projects: any[] = (client as any).projects ?? [];
+  // A client works by projects or by meetings. A project in progress counts too, whatever the client is marked as.
+  const projectsFirst = client.clientType === 'PROJECT' || projects.some((p: any) => isRunning(p.status));
+  const tab: Tab = chosenTab ?? (projectsFirst ? 'projects' : 'timeline');
+  const meetingsTab = { key: 'timeline' as Tab, label: `פגישות (${client.meetings?.length ?? 0})`, icon: Calendar };
+  const projectsTab = { key: 'projects' as Tab, label: `פרויקטים (${projects.length})`, icon: FolderKanban };
+  const newProjectButton = (
+    <button onClick={() => setNewProject(true)} className={clsx('text-xs', projectsFirst ? 'btn-primary' : 'btn-secondary')}>
+      <FolderKanban className="w-3.5 h-3.5" /> פרויקט חדש
+    </button>
+  );
+  const newMeetingButton = (
+    <button onClick={() => setNewMeeting(true)} className={clsx('text-xs', projectsFirst ? 'btn-secondary' : 'btn-primary')}>
+      <Plus className="w-3.5 h-3.5" /> פגישה חדשה
+    </button>
+  );
   const tabs: { key: Tab; label: string; icon: any }[] = [
-    { key: 'timeline', label: 'ציר זמן', icon: Clock },
+    ...(projectsFirst ? [projectsTab, meetingsTab] : [meetingsTab, projectsTab]),
     { key: 'tasks', label: `משימות (${client.tasks?.length ?? 0})`, icon: CheckSquare },
-    { key: 'projects', label: `פרויקטים (${projects.length})`, icon: FolderKanban },
     { key: 'payments', label: 'כספים', icon: CreditCard },
     { key: 'documents', label: `מסמכים (${client.documents?.length ?? 0})`, icon: FolderOpen },
   ];
@@ -107,6 +130,7 @@ export default function ClientDetail() {
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl font-bold text-slate-900">{client.fullName}</h1>
                 <span className={statusClass[client.status]}>{statusLabel[client.status]}</span>
+                {client.clientType && <span data-client-type className="badge bg-slate-100 text-slate-600">{typeLabel[client.clientType]}</span>}
               </div>
               <div className="flex flex-wrap items-center gap-3 mt-1.5 text-sm text-slate-500">
                 {client.email && <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" />{client.email}</span>}
@@ -126,14 +150,9 @@ export default function ClientDetail() {
             <button onClick={() => setEditClient(true)} className="btn-secondary text-xs">
               <Edit className="w-3.5 h-3.5" /> עריכה
             </button>
-            <button onClick={() => setNewMeeting(true)} className="btn-primary text-xs">
-              <Plus className="w-3.5 h-3.5" /> פגישה חדשה
-            </button>
+            {projectsFirst ? <>{newProjectButton}{newMeetingButton}</> : <>{newMeetingButton}{newProjectButton}</>}
             <button onClick={() => setNewTask(true)} className="btn-secondary text-xs">
               <CheckSquare className="w-3.5 h-3.5" /> משימה חדשה
-            </button>
-            <button onClick={() => setNewProject(true)} className="btn-secondary text-xs">
-              <FolderKanban className="w-3.5 h-3.5" /> פרויקט חדש
             </button>
             <button onClick={() => setConfirmDeleteClient(true)} className="text-xs px-3 py-1.5 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition-colors flex items-center gap-1">
               <Trash2 className="w-3.5 h-3.5" /> מחק לקוח
@@ -150,7 +169,7 @@ export default function ClientDetail() {
 
       <ClientMoney client={client} onUpdated={invalidate} onShowAll={tab === 'payments' ? undefined : () => setTab('payments')} />
 
-      {client.clientType === 'SESSION' && <MeetingBilling client={client} onChanged={invalidate} />}
+      {client.clientType === 'SESSION' && (!projectsFirst || tab === 'timeline') && <MeetingBilling client={client} onChanged={invalidate} />}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit max-w-full overflow-x-auto">
@@ -169,7 +188,8 @@ export default function ClientDetail() {
           {!client.meetings?.length && (
             <div className="card text-center py-12 text-slate-400">
               <Calendar className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p>אין פגישות עדיין</p>
+              <p className="font-medium mb-1">אין פגישות עדיין</p>
+              <button onClick={() => setNewMeeting(true)} className="btn-primary mt-3 text-sm"><Plus className="w-4 h-4" /> פגישה חדשה</button>
             </div>
           )}
           {client.meetings?.map(m => (
@@ -291,73 +311,14 @@ export default function ClientDetail() {
 
       {/* Projects */}
       {tab === 'projects' && (
-        <div className="space-y-4">
-          {projects.length === 0 ? (
-            <div className="card text-center py-12 text-slate-400">
-              <FolderKanban className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="font-medium mb-1">אין פרויקטים עדיין</p>
-              <button onClick={() => setNewProject(true)} className="btn-primary mt-3 text-sm">הוסף פרויקט ראשון</button>
-            </div>
-          ) : (
-            <>
-              {/* Total budget summary */}
-              {projects.some((p: any) => p.budget) && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div className="card border-l-4 border-l-primary-400">
-                    <p className="text-xs text-slate-500">סה"כ תקציב פרויקטים</p>
-                    <p className="text-xl font-bold text-primary-700">
-                      ₪{projects.reduce((s: number, p: any) => s + (p.budget || 0), 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="card">
-                    <p className="text-xs text-slate-500">פרויקטים פעילים</p>
-                    <p className="text-xl font-bold text-slate-800">{projects.filter((p: any) => p.status === 'ACTIVE').length}</p>
-                  </div>
-                  <div className="card">
-                    <p className="text-xs text-slate-500">הושלמו</p>
-                    <p className="text-xl font-bold text-slate-800">{projects.filter((p: any) => p.status === 'COMPLETED').length}</p>
-                  </div>
-                </div>
-              )}
-              <div className="space-y-3">
-                {projects.map((p: any) => (
-                  <div key={p.id} className="card">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <FolderKanban className="w-5 h-5 text-primary-600" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-slate-800">{p.name}</p>
-                          {p.description && <p className="text-sm text-slate-500 mt-0.5">{p.description}</p>}
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                              p.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
-                              p.status === 'COMPLETED' ? 'bg-gray-100 text-gray-600' :
-                              p.status === 'PLANNING' ? 'bg-blue-100 text-blue-700' :
-                              p.status === 'ON_HOLD' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
-                              {p.status === 'PLANNING' ? 'תכנון' : p.status === 'ACTIVE' ? 'פעיל' : p.status === 'ON_HOLD' ? 'מושהה' : p.status === 'COMPLETED' ? 'הושלם' : 'בוטל'}
-                            </span>
-                            {p.startDate && <span className="text-xs text-slate-400">{format(new Date(p.startDate), 'dd/MM/yyyy')}</span>}
-                            {p.endDate && <span className="text-xs text-slate-400">→ {format(new Date(p.endDate), 'dd/MM/yyyy')}</span>}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        {p.budget && (
-                          <p className="text-lg font-bold text-emerald-700">₪{p.budget.toLocaleString()}</p>
-                        )}
-                        <p className="text-xs text-slate-400">{p.tasks?.length ?? 0} משימות</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+        <ClientProjects
+          clientId={id!}
+          onChanged={invalidate}
+          onNew={() => setNewProject(true)}
+          openId={params.get('project')}
+          editId={params.get('edit')}
+          onLinkUsed={() => setParams({}, { replace: true })}
+        />
       )}
 
       {/* Payments */}
@@ -391,7 +352,7 @@ export default function ClientDetail() {
           project={null}
           preselectedClientId={id}
           onClose={() => setNewProject(false)}
-          onSave={() => { invalidate(); setNewProject(false); }}
+          onSave={() => { invalidate(); setNewProject(false); setTab('projects'); }}
         />
       )}
       {newMeeting && <MeetingModal clientId={id!} onClose={() => setNewMeeting(false)} onSaved={() => { invalidate(); setNewMeeting(false); }} />}

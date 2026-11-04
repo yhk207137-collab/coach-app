@@ -22,6 +22,20 @@ const maskEmail = (e: string) => {
 
 export const publicRouter = asyncRouter();
 
+const INSTALL_STEPS = new Set(['opened', 'offer', 'tapped', 'accepted', 'dismissed', 'prompt-failed', 'installed', 'already-installed', 'icon-yes', 'icon-no']);
+const INSTALL_REPORTS_KEPT = 300;
+
+publicRouter.post('/install-report', async (req, res) => {
+  const b = req.body || {};
+  const step = String(b.step ?? '');
+  const visit = visitorId(b.visit);
+  if (!INSTALL_STEPS.has(step) || !visit) return res.status(400).json({ ok: false });
+  await prisma.installReport.create({ data: { visit, step, model: str(b.model, 80), detail: str(b.detail, 200), userAgent: str(req.get('user-agent'), 300) } });
+  const older = await prisma.installReport.findMany({ orderBy: { createdAt: 'desc' }, skip: INSTALL_REPORTS_KEPT, select: { id: true } });
+  if (older.length) await prisma.installReport.deleteMany({ where: { id: { in: older.map((r) => r.id) } } });
+  res.json({ ok: true });
+});
+
 publicRouter.post('/subscribe', async (req, res) => {
   const b = req.body || {};
   if (b.website) return res.json({ ok: true }); // honeypot

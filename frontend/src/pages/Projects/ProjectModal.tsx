@@ -24,7 +24,8 @@ export default function ProjectModal({ project, onClose, onSave, preselectedClie
   const [strategy, setStrategy] = useState(project?.strategy ?? '');
   const [goals, setGoals] = useState(project?.goals ?? '');
   const [saving, setSaving] = useState(false);
-  const [dateError, setDateError] = useState('');
+  const [error, setError] = useState('');
+  const [tried, setTried] = useState(false);
 
   useEffect(() => {
     api.get('/clients').then((r: { data: Client[] }) => setClients(r.data));
@@ -32,19 +33,24 @@ export default function ProjectModal({ project, onClose, onSave, preselectedClie
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientId || !name) return;
-    if (startDate && endDate && endDate < startDate) {
-      setDateError('תאריך הסיום לא יכול להיות לפני תאריך ההתחלה');
-      return;
-    }
-    setDateError('');
+    setTried(true);
+    const problem = !clientId ? 'חובה לבחור לקוח'
+      : !name.trim() ? 'חובה לתת לפרויקט שם'
+      : !startDate ? 'חובה לקבוע תאריך התחלה'
+      : !endDate ? 'חובה לקבוע תאריך סיום'
+      : endDate < startDate ? 'תאריך הסיום לא יכול להיות לפני תאריך ההתחלה'
+      : '';
+    setError(problem);
+    if (problem) return;
     setSaving(true);
     try {
-      const payload = { clientId, name, description, status, startDate: startDate || null, endDate: endDate || null, budget: budget || null, strategy, goals };
+      const payload = { clientId, name, description, status, startDate, endDate, budget: budget || null, strategy, goals };
       const res = project
         ? await api.put(`/projects/${project.id}`, payload)
         : await api.post('/projects', payload);
       onSave(res.data);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'השמירה לא הצליחה. נסו שוב.');
     } finally {
       setSaving(false);
     }
@@ -58,11 +64,11 @@ export default function ProjectModal({ project, onClose, onSave, preselectedClie
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X className="w-5 h-5" /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <form id="project-form" noValidate onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">לקוח *</label>
-              <select value={clientId} onChange={e => setClientId(e.target.value)} required className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400">
+              <select value={clientId} onChange={e => setClientId(e.target.value)} required disabled={!!project || !!preselectedClientId} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 disabled:bg-gray-50 disabled:text-gray-600">
                 <option value="">בחר לקוח</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.fullName}{c.businessName ? ` — ${c.businessName}` : ''}</option>)}
               </select>
@@ -86,16 +92,14 @@ export default function ProjectModal({ project, onClose, onSave, preselectedClie
               <input type="number" value={budget} onChange={e => setBudget(e.target.value)} placeholder="0" min={0} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">תאריך התחלה</label>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400" />
+              <label htmlFor="project-start" className="block text-sm font-medium text-gray-700 mb-1">תאריך התחלה *</label>
+              <input id="project-start" type="date" required value={startDate} onChange={e => setStartDate(e.target.value)} className={`w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 ${tried && !startDate ? 'border-red-400 bg-red-50' : ''}`} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">תאריך סיום</label>
-              <input type="date" value={endDate} min={startDate || undefined} onChange={e => setEndDate(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400" />
+              <label htmlFor="project-end" className="block text-sm font-medium text-gray-700 mb-1">תאריך סיום *</label>
+              <input id="project-end" type="date" required value={endDate} min={startDate || undefined} onChange={e => setEndDate(e.target.value)} className={`w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 ${tried && (!endDate || endDate < startDate) ? 'border-red-400 bg-red-50' : ''}`} />
             </div>
-            <p className={`sm:col-span-2 text-xs -mt-2 ${dateError ? 'text-red-600' : 'text-gray-500'}`}>
-              {dateError || 'ככל שתאריך הסיום מתקרב תקבל תזכורות: שבועיים לפני, שבוע לפני ויומיים לפני.'}
-            </p>
+            <p className="sm:col-span-2 text-xs -mt-2 text-gray-500">ככל שתאריך הסיום מתקרב תקבל תזכורות: שבועיים לפני, שבוע לפני, יומיים לפני וביום עצמו.</p>
           </div>
 
           <div>
@@ -114,9 +118,10 @@ export default function ProjectModal({ project, onClose, onSave, preselectedClie
           </div>
         </form>
 
+        {error && <p role="alert" data-project-error className="px-6 pt-3 text-sm font-medium text-red-600">{error}</p>}
         <div className="flex gap-3 px-6 py-4 border-t justify-end">
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">ביטול</button>
-          <button onClick={handleSubmit as unknown as React.MouseEventHandler} disabled={saving} className="px-5 py-2 rounded-xl bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50">
+          <button type="submit" form="project-form" disabled={saving} className="px-5 py-2 rounded-xl bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50">
             {saving ? 'שומר...' : 'שמור'}
           </button>
         </div>

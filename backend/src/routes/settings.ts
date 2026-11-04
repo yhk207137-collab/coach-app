@@ -14,6 +14,15 @@ router.get('/public/:key', async (req, res) => {
   }
 });
 
+// What happened on phones that tried to add the software to the home screen.
+router.get('/install-reports', requireAuth, requireCoach, async (_req, res) => {
+  try {
+    res.json(await prisma.installReport.findMany({ orderBy: { createdAt: 'desc' }, take: 100 }));
+  } catch {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.get('/:key', requireAuth, requireCoach, async (req, res) => {
   try {
     const setting = await prisma.setting.findUnique({ where: { key: req.params.key } });

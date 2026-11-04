@@ -8,6 +8,10 @@
   "display": "standalone",
   "background_color": "#0a1e3c",
   "theme_color": "#0a1e3c",
+  "related_applications": [
+    { "platform": "webapp", "url": "https://coach-app-production-908f.up.railway.app/manifest.json" },
+    { "platform": "webapp", "url": "https://app.yehoshua.co.il/manifest.json" }
+  ],
   "lang": "he",
   "dir": "rtl",
   "icons": [

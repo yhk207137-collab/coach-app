@@ -11,7 +11,7 @@ export const lateBy = (n: number) => (n === 1 ? 'איחור של יום' : n ===
 // Start and end dates, how much of the time has gone, and whether the work is keeping up.
 export default function ProjectSchedule({ project: p, compact }: { project: Project; compact?: boolean }) {
   if (!p.startDate && !p.endDate) {
-    return <p className={clsx('text-xs text-gray-400', compact ? 'mt-1.5' : 'mt-3')}>עוד לא נקבעו תאריכי התחלה וסיום. בעריכת הפרויקט קובעים אותם, ואז מגיעות תזכורות.</p>;
+    return <p className={clsx('text-xs font-medium text-amber-700', compact ? 'mt-1.5' : 'mt-3')}>חסרים תאריכי התחלה וסיום. בלי תאריך סיום לא תגיע תזכורת לפני ההגשה.</p>;
   }
 
   const running = p.status === 'PLANNING' || p.status === 'ACTIVE';

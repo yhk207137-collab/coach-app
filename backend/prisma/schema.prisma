@@ -538,3 +538,17 @@ model Media {
   height    Int?
   createdAt DateTime @default(now())
 }
+
+// The steps of an attempt to add the software to a phone's home screen, so a failure can be understood
+// without asking the user to describe it. Holds the phone's model and browser only, and only the latest attempts.
+model InstallReport {
+  id        String   @id @default(cuid())
+  visit     String
+  step      String
+  model     String?
+  detail    String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}

@@ -4,9 +4,21 @@ import { requireAuth, requireCoach } from '../middleware/auth';
 
 const router = Router();
 
-router.get('/', requireAuth, requireCoach, async (_req, res) => {
+// Every project has a start and an end: the reminders count down to the end.
+const projectDates = (body: any): { error: string } | { start: Date; end: Date } => {
+  const start = body.startDate ? new Date(body.startDate) : null;
+  const end = body.endDate ? new Date(body.endDate) : null;
+  if (!start || isNaN(start.getTime())) return { error: 'חובה לקבוע תאריך התחלה' };
+  if (!end || isNaN(end.getTime())) return { error: 'חובה לקבוע תאריך סיום' };
+  if (end < start) return { error: 'תאריך הסיום לא יכול להיות לפני תאריך ההתחלה' };
+  return { start, end };
+};
+
+router.get('/', requireAuth, requireCoach, async (req, res) => {
   try {
+    const clientId = typeof req.query.clientId === 'string' ? req.query.clientId : undefined;
     const projects = await prisma.project.findMany({
+      where: clientId ? { clientId } : undefined,
       include: {
         client: true,
         subProjects: { include: { tasks: { orderBy: { createdAt: 'asc' } } } },
@@ -39,15 +51,19 @@ router.get('/:id', requireAuth, requireCoach, async (req, res) => {
 
 router.post('/', requireAuth, requireCoach, async (req, res) => {
   try {
-    const { clientId, name, description, status, startDate, endDate, budget, strategy, goals } = req.body;
+    const { clientId, name, description, status, budget, strategy, goals } = req.body;
+    if (!clientId) return res.status(400).json({ error: 'חובה לבחור לקוח' });
+    if (!String(name ?? '').trim()) return res.status(400).json({ error: 'חובה לתת לפרויקט שם' });
+    const dates = projectDates(req.body);
+    if ('error' in dates) return res.status(400).json({ error: dates.error });
     const project = await prisma.project.create({
       data: {
         clientId,
         name,
         description,
         status,
-        startDate: startDate ? new Date(startDate) : null,
-        endDate: endDate ? new Date(endDate) : null,
+        startDate: dates.start,
+        endDate: dates.end,
         budget: budget ? Number(budget) : null,
         strategy,
         goals,
@@ -62,15 +78,18 @@ router.post('/', requireAuth, requireCoach, async (req, res) => {
 
 router.put('/:id', requireAuth, requireCoach, async (req, res) => {
   try {
-    const { name, description, status, startDate, endDate, budget, strategy, goals } = req.body;
+    const { name, description, status, budget, strategy, goals } = req.body;
+    if (!String(name ?? '').trim()) return res.status(400).json({ error: 'חובה לתת לפרויקט שם' });
+    const dates = projectDates(req.body);
+    if ('error' in dates) return res.status(400).json({ error: dates.error });
     const project = await prisma.project.update({
       where: { id: req.params.id },
       data: {
         name,
         description,
         status,
-        startDate: startDate ? new Date(startDate) : null,
-        endDate: endDate ? new Date(endDate) : null,
+        startDate: dates.start,
+        endDate: dates.end,
         budget: budget ? Number(budget) : null,
         strategy,
         goals,

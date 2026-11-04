@@ -184,3 +184,6 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 }
+
+/* A full-screen window is never pushed down by the spacing of the page around it. */
+.modal-overlay, .fixed.inset-0 { margin: 0 !important; }

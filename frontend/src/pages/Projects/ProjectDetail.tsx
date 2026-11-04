@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowRight, Plus, Trash2, Edit2, CheckSquare, Square, FolderOpen } from 'lucide-react';
 import api from '../../services/api';
 import type { Project, SubProject, ProjectStatusType } from './index';
+import ProjectModal from './ProjectModal';
 import ProjectSchedule from './ProjectSchedule';
 import { calendarDaysLeft } from './ProjectSchedule';
 
@@ -12,10 +13,12 @@ const statusLabel: Record<ProjectStatusType, string> = {
 interface Props {
   project: Project;
   onBack: () => void;
+  onChanged?: () => void;
 }
 
-export default function ProjectDetail({ project: initial, onBack }: Props) {
+export default function ProjectDetail({ project: initial, onBack, onChanged }: Props) {
   const [project, setProject] = useState(initial);
+  const [editing, setEditing] = useState(false);
   const [newSubName, setNewSubName] = useState('');
   const [addingTask, setAddingTask] = useState<string | null>(null); // subId or 'root'
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -26,6 +29,7 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
   const reload = async () => {
     const res = await api.get(`/projects/${project.id}`);
     setProject(res.data);
+    onChanged?.();
   };
 
   const addSubProject = async () => {
@@ -131,7 +135,10 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
             <p className="text-sm text-gray-500 mt-0.5">{project.client.fullName}{project.client.businessName ? ` — ${project.client.businessName}` : ''}</p>
             {project.description && <p className="text-sm text-gray-600 mt-2">{project.description}</p>}
           </div>
-          <span className="text-sm px-3 py-1 bg-primary-100 text-primary-700 rounded-full font-medium">{statusLabel[project.status]}</span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-sm px-3 py-1 bg-primary-100 text-primary-700 rounded-full font-medium">{statusLabel[project.status]}</span>
+            <button type="button" onClick={() => setEditing(true)} className="btn-secondary text-xs"><Edit2 className="w-3.5 h-3.5" /> עריכה</button>
+          </div>
         </div>
         <ProjectSchedule project={project} />
         {(project.goals || project.strategy || project.budget) && (
@@ -218,6 +225,8 @@ export default function ProjectDetail({ project: initial, onBack }: Props) {
           </button>
         </div>
       </div>
+
+      {editing && <ProjectModal project={project} onClose={() => setEditing(false)} onSave={(saved) => { setProject(saved); setEditing(false); onChanged?.(); }} />}
     </div>
   );
 }
