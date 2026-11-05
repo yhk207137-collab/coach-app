@@ -318,8 +318,8 @@ export async function getWelcomeCampaign() {
     data: {
       kind: 'WELCOME',
       name: 'מייל ברוכים הבאים',
-      subject: 'ברוכים הבאים למדריך לעמותה מנצחת',
-      preheader: 'מה יקרה מעכשיו, ועוד טיפ קטן אחד',
+      subject: 'המדריך לעמותה מנצחת מחכה לך',
+      preheader: 'הנה המדריך שביקשת',
       markAsAd: false,
       status: 'PAUSED',
       design: welcomeDesign({ brand: s.brand, logoUrl: s.logoUrl, senderName: s.senderName, businessName: s.businessName }),

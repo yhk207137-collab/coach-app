@@ -77,9 +77,9 @@ export const welcomeDesign = (o: StarterOptions) => ({
   settings: settings(o),
   blocks: [
     ...logo(o),
-    { id: id(), type: 'heading', size: 'xl', align: 'center', color: o.brand, html: 'ברוכים הבאים למדריך לעמותה מנצחת!' },
-    { id: id(), type: 'text', align: 'right', html: 'שלום {{שם}},<br><br>תודה שהצטרפת. מעכשיו, פעם בשבוע, יגיע אליך מייל קצר עם תוכן וכלים אמיתיים לשיווק, פרסום וגיוס כספים לעמותה.' },
-    { id: id(), type: 'quote', html: '<strong>טיפ קטן:</strong> כדי שהמיילים לא ייפלו לספאם, כדאי להשיב למייל הזה במילה אחת או להוסיף אותי לאנשי הקשר.' },
+    { id: id(), type: 'heading', size: 'xl', align: 'center', color: o.brand, html: 'המדריך לעמותה מנצחת מחכה לך' },
+    { id: id(), type: 'text', align: 'right', html: 'שלום {{שם}},<br><br>הנה המדריך שביקשת.' },
+    { id: id(), type: 'button', text: 'להורדת המדריך', url: '', align: 'center', radius: 12, fullWidth: false },
     { id: id(), type: 'text', align: 'right', html: 'יש נושא שהכי בוער לך עכשיו בעמותה? אפשר פשוט להשיב למייל הזה. אני קורא כל תשובה.' },
     signature(o),
   ],
