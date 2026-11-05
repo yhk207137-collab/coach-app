@@ -1,7 +1,10 @@
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
-import { sendEmail, sendingDomainStatus, getResendDeliveryStatus, EmailError } from '../lib/email';
+import { UPLOAD_DIR } from '../lib/uploads';
+import { sendEmail, sendingDomainStatus, getResendDeliveryStatus, EmailError, EmailAttachment } from '../lib/email';
 import { renderEmail, renderSubject, FooterInfo, BRAND_COLOR } from './emailRender';
 import { welcomeDesign } from './emailStarters';
 
@@ -108,6 +111,39 @@ const linkKey = (u: string) => {
 };
 export const isGuideUrl = (url: string, guideUrl: string) => !!guideUrl && !!linkKey(url) && linkKey(url) === linkKey(guideUrl);
 
+// ── The guide in the welcome email ──────────────────────────────────────────
+
+export const GUIDE_BUTTON_ID = 'guide-download-button';
+
+// The guide button always points at the uploaded guide: uploading (or replacing) the file is
+// enough. An empty link, or one to an older uploaded guide, would otherwise hide the button.
+function withGuideLink<T>(design: T, guideUrl: string): T {
+  if (!guideUrl) return design;
+  const walk = (o: any): any => {
+    if (Array.isArray(o)) return o.map(walk);
+    if (!o || typeof o !== 'object') return o;
+    if (o.id === GUIDE_BUTTON_ID && (!String(o.url || '').trim() || linkKey(String(o.url)).startsWith('/uploads/guide/'))) {
+      return { ...o, url: guideUrl };
+    }
+    return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, walk(v)]));
+  };
+  return walk(design);
+}
+
+// The uploaded guide as a real PDF attachment of the welcome email.
+const GUIDE_FILENAME = 'המדריך לעמותה מנצחת.pdf';
+export async function guideAttachment(settings: MarketingSettings): Promise<EmailAttachment[]> {
+  const key = linkKey(settings.guideUrl);
+  if (!key.startsWith('/uploads/guide/')) return [];
+  try {
+    const content = await fs.promises.readFile(path.join(UPLOAD_DIR, 'guide', path.basename(key)));
+    return [{ filename: GUIDE_FILENAME, content }];
+  } catch (e: any) {
+    console.error('[MARKETING] guide file missing, sending without the attachment:', e?.message || e);
+    return [];
+  }
+}
+
 export function buildForSend(
   campaign: { design: Prisma.JsonValue; subject: string; preheader: string | null; markAsAd: boolean },
   contact: { name: string | null; firstName?: string | null; email: string; unsubToken: string },
@@ -119,7 +155,7 @@ export function buildForSend(
   const unsubscribeUrl = sendId
     ? `${base}/unsubscribe/${contact.unsubToken}?s=${sendId}`
     : `${base}/unsubscribe/preview`;
-  const { html, text } = renderEmail(onEmailAddress(campaign.design, base), {
+  const { html, text } = renderEmail(onEmailAddress(withGuideLink(campaign.design, settings.guideUrl), base), {
     merge,
     footer: footerFrom(settings),
     unsubscribeUrl,
@@ -205,6 +241,7 @@ export async function processQueue() {
       take: Math.min(remaining, 40),
     });
 
+    let guideFiles: EmailAttachment[] | null = null;
     for (const send of sends) {
       if (send.contact.status !== 'SUBSCRIBED') {
         await prisma.campaignSend.update({ where: { id: send.id }, data: { status: 'SKIPPED', error: 'הנמען אינו רשום' } });
@@ -213,7 +250,9 @@ export async function processQueue() {
       await prisma.campaignSend.update({ where: { id: send.id }, data: { status: 'SENDING' } });
       const built = buildForSend(send.campaign, send.contact, send.id, send.campaign.baseUrl || base, settings);
       try {
-        const resendId = await sendEmail(send.email, built.subject, built.html, [], {
+        // The welcome email carries the guide itself, besides the download button.
+        const attachments = send.campaign.kind === 'WELCOME' ? (guideFiles ??= await guideAttachment(settings)) : [];
+        const resendId = await sendEmail(send.email, built.subject, built.html, attachments, {
           fromName: send.campaign.fromName || settings.senderName,
           replyTo: settings.replyTo || undefined,
           text: built.text,

@@ -13,6 +13,7 @@ import { STARTERS, StarterKey } from '../services/emailStarters';
 import {
   getMarketingSettings, saveMarketingSettings, getBaseUrl, buildForSend, audienceWhere,
   startCampaign, statsByCampaign, emptyStats, getWelcomeCampaign, DAILY_LIMIT, sentInLast24h, processQueue,
+  guideAttachment,
 } from '../services/marketing';
 
 const router = asyncRouter();
@@ -457,11 +458,12 @@ router.post('/campaigns/:id/test', async (req: AuthRequest, res) => {
   const settings = await getMarketingSettings();
   const coach = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { name: true } });
   const base = await getBaseUrl();
+  const attachments = campaign.kind === 'WELCOME' ? await guideAttachment(settings) : [];
   const results: { email: string; ok: boolean; error?: string }[] = [];
   for (const email of emails) {
     const built = buildForSend(campaign, { name: ownerName(coach?.name, settings), email, unsubToken: 'preview' }, null, base, settings);
     try {
-      await sendEmail(email, `[בדיקה] ${built.subject}`, built.html, [], {
+      await sendEmail(email, `[בדיקה] ${built.subject}`, built.html, attachments, {
         fromName: campaign.fromName || settings.senderName,
         replyTo: settings.replyTo || undefined,
         text: built.text,
