@@ -494,6 +494,7 @@ export default function ContactsPage() {
                     <td className="table-cell">
                       <p className="font-medium text-slate-800">{c.name || '—'}</p>
                       <p className="text-xs text-slate-400" dir="ltr">{c.email}</p>
+                      {c.phone && <p className="text-xs text-slate-400" dir="ltr">{c.phone}</p>}
                     </td>
                     <td className="table-cell" onClick={(e) => e.stopPropagation()}><FirstNameCell contact={c} onSaved={refresh} /></td>
                     <td className="table-cell"><span className={clsx('badge', CONTACT_STATUS[c.status].cls)}>{CONTACT_STATUS[c.status].label}</span></td>

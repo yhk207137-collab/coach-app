@@ -68,6 +68,8 @@ publicRouter.post('/subscribe', async (req, res) => {
       where: { id: existing.id },
       data: {
         name: existing.name || name,
+        // Optional on the form; a number they give now fills an empty one, never overwrites.
+        phone: existing.phone || str(b.phone, 30),
         tags: list && !existing.tags.includes(list) ? [...existing.tags, list] : existing.tags,
         ...(resubscribed ? { status: 'SUBSCRIBED', unsubscribedAt: null, ...consent } : {}),
       },
