@@ -201,7 +201,8 @@ export async function startCampaign(campaignId: string, scheduledAt: Date | null
 
 // ── Sending queue ───────────────────────────────────────────────────────────
 
-export const DAILY_LIMIT = parseInt(process.env.EMAIL_DAILY_LIMIT || '90');
+// Resend's own plan limit is the real cap: past it Resend answers 429 and the send waits in the queue.
+export const DAILY_LIMIT = parseInt(process.env.EMAIL_DAILY_LIMIT || '2000');
 
 export async function sentInLast24h() {
   return prisma.campaignSend.count({ where: { sentAt: { gte: new Date(Date.now() - 24 * 3600_000) } } });

@@ -47,7 +47,8 @@ app.use(express.urlencoded({ extended: true }));
 // Called from landing pages on other domains and from inside emails, so these get their own open CORS.
 const publicLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  // Generous: people behind a kosher filter (NetFree and the like) reach us from a few shared addresses.
+  max: 300,
   message: { ok: false, error: 'rate-limited' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -56,7 +57,7 @@ const publicLimiter = rateLimit({
 });
 app.use('/api/public', cors({ origin: true }), publicLimiter, publicRouter);
 // Landing-page views; generous, since one person browsing loads it once per page.
-app.use('/api/t/v.gif', rateLimit({ windowMs: 15 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false }));
+app.use('/api/t/v.gif', rateLimit({ windowMs: 15 * 60 * 1000, max: 1500, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/t', trackingRouter);
 
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true }));
