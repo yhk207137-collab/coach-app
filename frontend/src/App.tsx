@@ -24,6 +24,7 @@ import ContractsPage from './pages/Contracts';
 import SignContract from './pages/Contracts/SignContract';
 import ReviewQuote from './pages/Quotes/ReviewQuote';
 import LeadsPage from './pages/Leads';
+import ConsultsPage from './pages/Consults';
 import ServicesPage from './pages/Services';
 import ContactsPage from './pages/Marketing/Contacts';
 import CampaignsPage from './pages/Marketing/Campaigns';
@@ -98,6 +99,7 @@ export default function App() {
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/contracts" element={<ContractsPage />} />
           <Route path="/leads" element={<LeadsPage />} />
+          <Route path="/consults" element={<ConsultsPage />} />
           <Route path="/services" element={<ServicesPage />} />
           <Route path="/marketing/contacts" element={<ContactsPage />} />
           <Route path="/marketing/campaigns" element={<CampaignsPage />} />

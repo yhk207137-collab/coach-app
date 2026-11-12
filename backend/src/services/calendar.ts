@@ -39,7 +39,7 @@ export async function saveTokens(tokens: any) {
   });
 }
 
-async function getAuthorizedClient() {
+export async function getAuthorizedClient() {
   const row = await prisma.setting.findUnique({ where: { key: TOKENS_KEY } });
   if (!row) return null;
 

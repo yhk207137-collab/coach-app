@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Phone, Mail, Building2, Flame, ChevronDown, X, ArrowRight, Trash2 } from 'lucide-react';
 import api from '../../services/api';
@@ -51,6 +52,14 @@ export default function LeadsPage() {
       api.put(`/leads/${id}`, { stage }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['leads'] }),
   });
+
+  // /leads?open=<id> opens that lead card (links from the consult meetings page)
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const id = params.get("open");
+    const lead = id && leads.find((l) => l.id === id);
+    if (lead) { setSelectedLead(lead); setParams({}, { replace: true }); }
+  }, [params, leads]);
 
   const byStage = (stage: LeadStage) => leads.filter(l => l.stage === stage);
   const totalValue = leads.filter(l => l.stage !== 'LOST').reduce((s, l) => s + (l.estimatedValue ?? 0), 0);

@@ -316,18 +316,19 @@ model QuoteItem {
 }
 
 model Lead {
-  id             String         @id @default(cuid())
+  id             String           @id @default(cuid())
   fullName       String
   email          String?
   phone          String?
   company        String?
   source         String?
-  stage          LeadStage      @default(COLD)
+  stage          LeadStage        @default(COLD)
   notes          String?
   estimatedValue Float?
   activities     LeadActivity[]
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  consults       ConsultBooking[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 }
 
 model LeadActivity {
@@ -551,4 +552,43 @@ model InstallReport {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// ── Free consult meetings booked from the landing page ("פגישת הקפצה") ──────
+enum ConsultStatus {
+  BOOKED // נקבעה
+  CONFIRMED // אישר הגעה
+  NOT_CONFIRMED // לא אישר: no reply 4 hours before
+  CANCELED // בוטלה
+  DONE // התקיימה
+}
+
+model ConsultBooking {
+  id            String        @id @default(cuid())
+  leadId        String
+  lead          Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  name          String
+  phone         String
+  email         String
+  org           String
+  start         DateTime
+  duration      Int           @default(40)
+  status        ConsultStatus @default(BOOKED)
+  token         String        @unique @default(cuid())
+  googleEventId String?
+  meetLink      String?
+  source        String?
+  // When each step of the reminder sequence went out (null = not yet)
+  warmSentAt    DateTime?
+  confirmSentAt DateTime?
+  finalSentAt   DateTime?
+  noReplyAt     DateTime?
+  confirmedAt   DateTime?
+  canceledAt    DateTime?
+  rescheduledAt DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([start])
+  @@index([phone])
 }

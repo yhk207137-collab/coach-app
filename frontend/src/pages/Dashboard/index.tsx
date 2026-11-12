@@ -1,18 +1,19 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import clsx from 'clsx';
 import {
   TrendingUp, TrendingDown, Wallet, CalendarClock, Repeat, Target, AlertTriangle, Clock, Info, ArrowLeft,
-  Calendar, FolderKanban, Users, Mail, CheckCircle2, Plus, Table2, BarChart3, ChevronLeft, MailOpen, Briefcase,
+  Calendar, FolderKanban, Users, Mail, CheckCircle2, Plus, Table2, BarChart3, ChevronLeft, MailOpen, Briefcase, Eye, EyeOff,
 } from 'lucide-react';
 import api from '../../services/api';
 import { C_COLLECTED, C_EXPECTED, HBar, Legend, MonthPoint, RevenueChart, RevenueTable, Sparkline, StackedHBar, ils } from './charts';
 import { lateBy } from '../Projects/ProjectSchedule';
 
 interface Attention { kind: string; severity: 'critical' | 'warning' | 'info'; title: string; detail: string; amount?: number; href: string }
+interface UpcomingItem { key: string; kind: 'meeting' | 'consult'; date: string; duration: number; title: string; detail: string; status: string | null; href: string }
 interface MeetingItem { id: string; date: string; duration: number; type: string; clientId: string; name: string }
 interface ProjectItem { id: string; name: string; status: string; client: { id: string; fullName: string }; budget: number | null; endDate: string | null; daysLeft: number | null; behind: boolean; tasksTotal: number; tasksDone: number }
 interface DeadlineItem { key: string; kind: keyof typeof DEADLINE_KIND; title: string; who: string; date: string; daysLeft: number; href: string }
@@ -30,7 +31,7 @@ interface DashboardData {
   };
   topClients: { id: string; name: string; paid: number; outstanding: number }[];
   clients: { active: number; newThisMonth: number; byType: { SESSION: number; RETAINER: number; PROJECT: number } };
-  meetings: { today: MeetingItem[]; week: MeetingItem[]; thisMonth: number; lastMonth: number };
+  meetings: { today: MeetingItem[]; week: MeetingItem[]; upcoming: UpcomingItem[]; upcomingTotal: number; thisMonth: number; lastMonth: number };
   tasks: { open: number; overdue: number; week: { id: string; title: string; dueDate: string; clientId: string; name: string }[] };
   projects: { active: ProjectItem[]; count: number; planning: number; budget: number };
   moneyInWork: { total: number; paid: number; owed: number; notCharged: number; clients: { id: string; name: string; total: number; paid: number; owed: number; notCharged: number }[] };
@@ -54,6 +55,27 @@ const DEADLINE_KIND = {
   contract: 'סיום חוזה',
 };
 const DEADLINES_SHOWN = 6;
+const HIDDEN = "₪ ••••";
+const MONEY_KEY = "dashboard_show_money";
+
+const CONSULT_STATUS: Record<string, { label: string; cls: string }> = {
+  BOOKED: { label: "נקבעה", cls: "bg-slate-100 text-slate-600" },
+  CONFIRMED: { label: "אישר הגעה", cls: "bg-emerald-50 text-emerald-700" },
+  NOT_CONFIRMED: { label: "לא אישר", cls: "bg-red-50 text-red-600" },
+};
+
+const israelDay = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date(iso));
+function groupByDay(items: UpcomingItem[]) {
+  const map = new Map<string, UpcomingItem[]>();
+  for (const it of items) { const k = israelDay(it.date); map.set(k, [...(map.get(k) || []), it]); }
+  return [...map.entries()];
+}
+function relativeDayLabel(iso: string) {
+  const diff = Math.round((Date.parse(israelDay(iso)) - Date.parse(israelDay(new Date().toISOString()))) / 86_400_000);
+  if (diff === 0) return "היום";
+  if (diff === 1) return "מחר";
+  return format(new Date(iso), "EEEE d/M", { locale: he });
+}
 const IN_WORK_SHOWN = 5;
 const C_NOT_CHARGED = '#cbd5e1';
 
@@ -123,6 +145,15 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [tableView, setTableView] = useState(false);
   const [allDeadlines, setAllDeadlines] = useState(false);
+  const qc = useQueryClient();
+  // Hidden unless the owner chose to show it; the choice is saved on the server, so phone and computer agree.
+  const { data: moneyPref } = useQuery<{ value: string | null }>({ queryKey: ["setting", MONEY_KEY], queryFn: () => api.get(`/settings/${MONEY_KEY}`).then((r) => r.data) });
+  const showMoney = moneyPref?.value === "1";
+  const toggleMoney = () => {
+    const value = showMoney ? "0" : "1";
+    qc.setQueryData(["setting", MONEY_KEY], { value });
+    api.put(`/settings/${MONEY_KEY}`, { value }).catch(() => qc.invalidateQueries({ queryKey: ["setting", MONEY_KEY] }));
+  };
   const { data: d, isLoading, isError } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: () => api.get('/dashboard').then((r) => r.data),
@@ -145,6 +176,9 @@ export default function Dashboard() {
     d.deadlines.undatedTasks ? count(d.deadlines.undatedTasks, 'משימה אחת', 'משימות') : '',
   ].filter(Boolean).join(', ');
 
+  const money = (n: number) => (showMoney ? ils(n) : HIDDEN);
+  const upcomingDays = groupByDay(d.meetings.upcoming || []);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -161,28 +195,38 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* The top shows what is going on and not only the money. Phone: income, projects, deadlines, money in work, other money.
-          Computer: all the money figures in one row, the work panels right under it. */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-10 2xl:grid-cols-[repeat(15,minmax(0,1fr))] gap-4">
-        <button type="button" onClick={() => navigate('/accounting')} className="card col-span-2 lg:col-span-4 xl:col-span-2 2xl:col-[span_3] order-1 p-5 text-right hover:shadow-card-hover transition-all flex flex-col">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-50 text-emerald-700"><Wallet className="w-4 h-4" /></span>
-            <span className="text-sm text-slate-600">הכנסות החודש</span>
+      {/* The top shows only the coming meetings: the screen may be open in front of other people, so no money here. */}
+      <Panel title="פגישות קרובות" icon={Calendar} action={<MoreLink to="/calendar" label="ליומן" />}>
+        {upcomingDays.length === 0 ? <Empty>אין פגישות בשבוע הקרוב</Empty> : (
+          <div data-dashboard-upcoming className="grid gap-x-8 gap-y-4 md:grid-cols-2 xl:grid-cols-3">
+            {upcomingDays.map(([day, items]) => (
+              <div key={day}>
+                <p className="text-xs font-semibold text-slate-500 mb-1.5">{relativeDayLabel(items[0].date)}</p>
+                <div className="space-y-1 -mx-1">
+                  {items.map((m) => (
+                    <button key={m.key} type="button" data-upcoming-item onClick={() => navigate(m.href)} className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 text-right">
+                      <span className="text-sm font-bold text-primary-700 tabular-nums w-12 flex-shrink-0">{format(new Date(m.date), 'HH:mm')}</span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm font-medium text-slate-800 truncate">{m.title}</span>
+                        <span className="block text-xs text-slate-500 truncate">{m.detail} · {m.duration} דק׳</span>
+                      </span>
+                      {m.status && CONSULT_STATUS[m.status] && <span className={clsx('badge whitespace-nowrap flex-shrink-0', CONSULT_STATUS[m.status].cls)}>{CONSULT_STATUS[m.status].label}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
-          <p data-dashboard-income className="text-4xl xl:text-2xl 2xl:text-3xl font-bold text-slate-900 tracking-tight leading-tight">{ils(d.revenue.thisMonth)}</p>
-          <div className="mt-1.5 space-y-1">
-            <Delta now={d.revenue.thisMonth} before={d.revenue.lastMonthToDate} suffix="מול התקופה המקבילה בחודש שעבר" />
-            <p className="text-xs text-slate-500">מתחילת השנה <strong className="text-slate-800">{ils(d.revenue.ytd)}</strong>
-              {d.revenue.lastYtd > 0 && <span className="text-slate-400"> · אשתקד {ils(d.revenue.lastYtd)}</span>}
-            </p>
-          </div>
-          <div className="mt-auto pt-3 hidden xl:block">
-            <Sparkline values={past12} currentIndex={currentIdx} w={300} h={56} className="w-full h-auto" />
-            <p className="text-[11px] text-slate-400 mt-1">12 החודשים האחרונים</p>
-          </div>
-        </button>
+        )}
+        <p className="text-xs text-slate-400 mt-4 pt-3 border-t border-slate-100">
+          {count(d.meetings.thisMonth, 'פגישה אחת', 'פגישות')} החודש · {d.meetings.lastMonth} בחודש שעבר
+          {d.meetings.upcomingTotal > (d.meetings.upcoming || []).length ? ` · ועוד ${d.meetings.upcomingTotal - d.meetings.upcoming.length} השבוע` : ''}
+        </p>
+      </Panel>
 
-        <Panel title="פרויקטים פעילים" icon={FolderKanban} className="col-span-2 xl:col-span-5 order-2 xl:order-3 2xl:col-[span_5]" action={<MoreLink to="/projects" label={d.projects.count > d.projects.active.length ? `עוד ${d.projects.count - d.projects.active.length}` : 'הכל'} />}>
+      {/* The work: projects, deadlines, what needs attention */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Panel title="פרויקטים פעילים" icon={FolderKanban} action={<MoreLink to="/projects" label={d.projects.count > d.projects.active.length ? `עוד ${d.projects.count - d.projects.active.length}` : 'הכל'} />}>
           {d.projects.active.length === 0 ? <Empty>אין פרויקטים פעילים</Empty> : (
             <>
               <div className="space-y-4">
@@ -201,7 +245,7 @@ export default function Dashboard() {
                         {p.status === 'PLANNING' ? ' · בתכנון' : ''}
                         {p.tasksTotal ? ` · ${p.tasksDone}/${p.tasksTotal} משימות` : ' · אין משימות'}
                         {p.endDate ? ` · יעד ${format(new Date(p.endDate), 'd/M/yy')}` : ''}
-                        {p.budget ? ` · ${ils(p.budget)}` : ''}
+                        {showMoney && p.budget ? ` · ${ils(p.budget)}` : ''}
                         {p.behind && <span className="font-medium text-amber-700"> · מאחור בלוח הזמנים</span>}
                       </p>
                       {p.tasksTotal > 0 && <div className="h-2 mt-1.5 rounded-full bg-primary-100 overflow-hidden"><div className="h-full rounded-full" style={{ width: `${pctDone}%`, background: C_COLLECTED }} /></div>}
@@ -210,13 +254,13 @@ export default function Dashboard() {
                 })}
               </div>
               <p className="text-xs text-slate-400 mt-4 pt-3 border-t border-slate-100">
-                {count(d.projects.count, 'פרויקט אחד', 'פרויקטים')}{d.projects.planning ? ` · ${d.projects.planning} בתכנון` : ''}{d.projects.budget ? ` · תקציב כולל ${ils(d.projects.budget)}` : ''}
+                {count(d.projects.count, 'פרויקט אחד', 'פרויקטים')}{d.projects.planning ? ` · ${d.projects.planning} בתכנון` : ''}{showMoney && d.projects.budget ? ` · תקציב כולל ${ils(d.projects.budget)}` : ''}
               </p>
             </>
           )}
         </Panel>
 
-        <Panel title="דדליינים" icon={CalendarClock} className="col-span-2 xl:col-span-5 order-2 xl:order-3 2xl:col-[span_5]" action={<MoreLink to="/tasks" label="למשימות" />}>
+        <Panel title="דדליינים" icon={CalendarClock} action={<MoreLink to="/tasks" label="למשימות" />}>
           {d.deadlines.items.length === 0 ? <Empty>אין דדליינים ב-30 הימים הקרובים</Empty> : (
             <>
               <div className="space-y-1 -mx-1">
@@ -244,58 +288,9 @@ export default function Dashboard() {
           )}
           {undated && <p className="text-xs text-slate-500 mt-2">לא מופיעים כאן כי אין להם תאריך: {undated}</p>}
         </Panel>
-
-        <Panel title="כסף בעבודה" icon={Briefcase} className="col-span-2 lg:col-span-4 xl:col-span-10 2xl:col-[span_5] order-3 xl:order-4 2xl:order-3" action={<MoreLink to="/payments" label="לתשלומים" />}>
-          {d.moneyInWork.clients.length === 0 ? <Empty>אין כרגע כסף פתוח בעבודה</Empty> : (
-            <>
-              <p data-money-in-work className="text-3xl font-bold text-slate-900 tracking-tight">{ils(d.moneyInWork.total)}</p>
-              <div className="mt-2">
-                <StackedHBar max={d.moneyInWork.total} parts={[{ value: d.moneyInWork.paid, color: C_COLLECTED }, { value: d.moneyInWork.owed, color: C_EXPECTED }, { value: d.moneyInWork.notCharged, color: C_NOT_CHARGED }]} />
-              </div>
-              <div className="mt-2">
-                <Legend items={[{ color: C_COLLECTED, label: `שולם ${ils(d.moneyInWork.paid)}` }, { color: C_EXPECTED, label: `לגבייה ${ils(d.moneyInWork.owed)}` }, { color: C_NOT_CHARGED, label: `עוד לא חויב ${ils(d.moneyInWork.notCharged)}` }]} />
-              </div>
-              <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-1 gap-x-6 gap-y-1 -mx-1">
-                {d.moneyInWork.clients.slice(0, IN_WORK_SHOWN).map((c) => (
-                  <button key={c.id} type="button" data-in-work-client onClick={() => navigate(`/clients/${c.id}?tab=payments`)} className="w-full flex items-baseline justify-between gap-3 p-1.5 rounded-lg hover:bg-slate-50 text-right">
-                    <span className="min-w-0 text-sm text-slate-800 truncate">{c.name}</span>
-                    <span className="text-xs text-slate-500 flex-shrink-0 tabular-nums">נשאר <strong className="text-sm text-slate-900">{ils(c.owed + c.notCharged)}</strong> מתוך {ils(c.total)}</span>
-                  </button>
-                ))}
-              </div>
-              {d.moneyInWork.clients.length > IN_WORK_SHOWN && <p className="text-xs text-slate-400 mt-2">ועוד {count(d.moneyInWork.clients.length - IN_WORK_SHOWN, 'לקוח אחד', 'לקוחות')}</p>}
-            </>
-          )}
-        </Panel>
-
-        <Tile className="xl:col-span-2 2xl:col-[span_3] order-4 xl:order-2" icon={AlertTriangle} label="לגבייה" value={ils(d.receivables.outstanding)} tone="bg-red-50 text-red-600"
-          onClick={() => navigate('/payments')}
-          sub={d.receivables.overdueAmount > 0
-            ? <span className="text-red-600 font-medium">{ils(d.receivables.overdueAmount)} באיחור</span>
-            : d.receivables.clientsOwing ? count(d.receivables.clientsOwing, 'לקוח אחד', 'לקוחות') : 'אין חובות פתוחים'} />
-        <Tile className="xl:col-span-2 2xl:col-[span_3] order-4 xl:order-2" icon={CalendarClock} label="צפוי ב-30 יום" value={ils(d.forecast.next30)} tone="bg-primary-50 text-primary-700"
-          onClick={() => navigate('/payments')} sub={d.forecast.items.length ? count(d.forecast.items.length, 'תשלום אחד מתוכנן', 'תשלומים מתוכננים') : 'אין תשלומים מתוכננים'} />
-        <Tile className="xl:col-span-2 2xl:col-[span_3] order-4 xl:order-2" icon={Repeat} label="הכנסה חודשית קבועה" value={ils(d.mrr.amount)} tone="bg-navy-50 text-navy-700"
-          onClick={() => navigate('/clients')} sub={d.mrr.clients ? count(d.mrr.clients, 'לקוח ריטיינר אחד', 'לקוחות ריטיינר') : 'עדיין אין לקוחות ריטיינר'} />
-        <Tile className="xl:col-span-2 2xl:col-[span_3] order-4 xl:order-2" icon={Target} label="פוטנציאל מכירות" value={ils(d.pipeline.openLeadsValue + d.pipeline.openQuotesValue)} tone="bg-blue-50 text-blue-700"
-          onClick={() => navigate('/leads')} sub={`${count(d.pipeline.openLeadsCount, 'ליד אחד', 'לידים')} · ${count(d.pipeline.openQuotesCount, 'הצעה פתוחה אחת', 'הצעות פתוחות')}`} />
       </div>
 
-      {/* Revenue + attention */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Panel title="הכנסות לפי חודש" icon={BarChart3} className="lg:col-span-2"
-          action={
-            <div className="flex items-center gap-4">
-              <Legend items={[{ color: C_COLLECTED, label: 'נגבה' }, { color: C_EXPECTED, label: 'צפוי (תשלומים מתוכננים)' }]} />
-              <button onClick={() => setTableView((v) => !v)} className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1" title={tableView ? 'הצגה כגרף' : 'הצגה כטבלה'}>
-                {tableView ? <BarChart3 className="w-4 h-4" /> : <Table2 className="w-4 h-4" />}
-              </button>
-            </div>
-          }>
-          {tableView ? <div className="max-h-64 overflow-y-auto"><RevenueTable data={d.revenue.monthly} /></div> : <RevenueChart data={d.revenue.monthly} />}
-          {nothingThisMonth && d.revenue.ytd > 0 && <p className="text-xs text-slate-400 mt-2">החודש עוד לא נכנסו תשלומים ואין תשלומים מתוכננים. כדאי לתזמן גבייה בכרטיסי הלקוחות.</p>}
-        </Panel>
-
         <Panel title="דורש טיפול" icon={AlertTriangle} action={<MoreLink to="/alerts" label={d.attentionTotal > d.attention.length ? `עוד ${d.attentionTotal - d.attention.length}` : 'להתראות'} />}>
           {d.attention.length === 0 ? (
             <div className="text-center py-8">
@@ -314,113 +309,32 @@ export default function Dashboard() {
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-medium text-slate-800 truncate">{a.title}</span>
-                      <span className="block text-xs text-slate-500 truncate">{a.detail}</span>
+                      <span className="block text-xs text-slate-500 truncate">{showMoney ? a.detail : a.detail.replace(/₪\s?[\d,.]+|[\d,.]+\s?₪/g, HIDDEN)}</span>
                     </span>
-                    {a.amount ? <span className="text-sm font-semibold text-slate-900 tabular-nums flex-shrink-0">{ils(a.amount)}</span> : null}
+                    {showMoney && a.amount ? <span className="text-sm font-semibold text-slate-900 tabular-nums flex-shrink-0">{ils(a.amount)}</span> : null}
                   </button>
                 );
               })}
             </div>
           )}
         </Panel>
-      </div>
 
-      {/* Pipeline / top clients / upcoming collections */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Panel title="משפך מכירות" icon={Target} action={<MoreLink to="/leads" label="ללידים" />}>
-          {d.pipeline.stages.every((s) => s.count === 0) ? (
-            <Empty>עדיין אין לידים. הוסיפו לידים כדי לראות את המשפך.</Empty>
-          ) : (
-            <>
-              <div className="space-y-3">
-                {d.pipeline.stages.filter((s) => s.key !== 'LOST').map((s) => (
-                  <HBar key={s.key} label={s.label} value={s.count} max={stageMax} right={`${s.count}`} sub={s.value ? ils(s.value) : undefined} onClick={() => navigate('/leads')} />
-                ))}
-              </div>
-              <div className="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-slate-100">
-                <div><p className="text-xs text-slate-500">אחוז סגירה</p><p className="text-lg font-bold text-slate-900">{d.pipeline.winRate !== null ? `${d.pipeline.winRate}%` : '—'}</p></div>
-                <div><p className="text-xs text-slate-500">הצעות שאושרו</p><p className="text-lg font-bold text-slate-900">{d.pipeline.quoteAcceptance !== null ? `${d.pipeline.quoteAcceptance}%` : '—'}</p></div>
-              </div>
-            </>
-          )}
-        </Panel>
-
-        <Panel title="לקוחות מובילים" icon={Users} action={<Legend items={[{ color: C_COLLECTED, label: 'שולם' }, { color: C_EXPECTED, label: 'יתרה' }]} />}>
-          {d.topClients.length === 0 ? <Empty>עדיין אין תשלומים מלקוחות</Empty> : (
-            <div className="space-y-4">
-              {d.topClients.map((c) => (
-                <button key={c.id} type="button" onClick={() => navigate(`/clients/${c.id}`)} className="w-full text-right group">
-                  <div className="flex items-baseline justify-between gap-3 mb-1">
-                    <span className="text-sm text-slate-700 group-hover:text-slate-900 truncate">{c.name}</span>
-                    <span className="text-sm font-semibold text-slate-900 tabular-nums">{ils(c.paid)}{c.outstanding > 0 && <span className="text-xs font-normal text-slate-500"> + {ils(c.outstanding)} פתוח</span>}</span>
-                  </div>
-                  <StackedHBar max={clientMax} parts={[{ value: c.paid, color: C_COLLECTED }, { value: c.outstanding, color: C_EXPECTED }]} />
-                </button>
-              ))}
-            </div>
-          )}
-        </Panel>
-
-        <Panel title="גבייה צפויה" icon={CalendarClock} action={<MoreLink to="/payments" label="לתשלומים" />}>
-          {d.forecast.items.length === 0 ? (
-            <Empty>אין תשלומים מתוכננים ל-30 הימים הקרובים. אפשר לתזמן תשלום עתידי בכרטיס הלקוח ← תשלומים.</Empty>
-          ) : (
+        <Panel title="משימות השבוע" icon={CheckCircle2} action={<MoreLink to="/tasks" label="למשימות" />}>
+          {d.tasks.week.length === 0 ? <Empty>אין משימות לשבוע הקרוב</Empty> : (
             <div className="space-y-1 -mx-1">
-              {d.forecast.items.map((f) => (
-                <button key={f.id} type="button" onClick={() => navigate(`/clients/${f.clientId}`)} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 text-right">
-                  <span className="w-10 text-center flex-shrink-0">
-                    <span className="block text-lg font-bold text-slate-900 leading-none">{format(new Date(f.date), 'd')}</span>
-                    <span className="block text-[11px] text-slate-400">{format(new Date(f.date), 'MMM', { locale: he })}</span>
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-sm font-medium text-slate-800 truncate">{f.name}</span>
-                    {f.note && <span className="block text-xs text-slate-400 truncate">{f.note}</span>}
-                  </span>
-                  <span className="text-sm font-semibold text-slate-900 tabular-nums">{ils(f.amount)}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </Panel>
-      </div>
-
-      {/* Agenda / clients & marketing */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Panel title="השבוע שלי" icon={Calendar} action={<MoreLink to="/calendar" label="ליומן" />}>
-          <p className="text-xs font-semibold text-slate-500 mb-2">היום</p>
-          {d.meetings.today.length === 0 ? <p className="text-sm text-slate-400 mb-4">אין פגישות היום</p> : (
-            <div className="space-y-1 mb-4 -mx-1">
-              {d.meetings.today.map((m) => (
-                <button key={m.id} type="button" onClick={() => navigate(`/clients/${m.clientId}`)} className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 text-right">
-                  <span className="text-sm font-bold text-primary-700 tabular-nums w-12">{format(new Date(m.date), 'HH:mm')}</span>
-                  <span className="flex-1 min-w-0 text-sm text-slate-800 truncate">{m.name}</span>
-                  <span className="text-xs text-slate-400">{m.duration} דק׳</span>
-                </button>
-              ))}
-            </div>
-          )}
-          <p className="text-xs font-semibold text-slate-500 mb-2">בהמשך השבוע</p>
-          {d.meetings.week.length === 0 && d.tasks.week.length === 0 ? <p className="text-sm text-slate-400">השבוע פנוי</p> : (
-            <div className="space-y-1 -mx-1">
-              {d.meetings.week.map((m) => (
-                <button key={m.id} type="button" onClick={() => navigate(`/clients/${m.clientId}`)} className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 text-right">
-                  <Calendar className="w-4 h-4 text-slate-300 flex-shrink-0" />
-                  <span className="flex-1 min-w-0 text-sm text-slate-800 truncate">{m.name}</span>
-                  <span className="text-xs text-slate-500">{dayLabel(m.date)} {format(new Date(m.date), 'HH:mm')}</span>
-                </button>
-              ))}
               {d.tasks.week.map((t) => (
                 <button key={t.id} type="button" onClick={() => navigate('/tasks')} className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 text-right">
                   <CheckCircle2 className="w-4 h-4 text-slate-300 flex-shrink-0" />
-                  <span className="flex-1 min-w-0 text-sm text-slate-800 truncate">{t.title}</span>
-                  <span className="text-xs text-slate-500">{dayLabel(t.dueDate)}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm text-slate-800 truncate">{t.title}</span>
+                    <span className="block text-xs text-slate-500 truncate">{t.name}</span>
+                  </span>
+                  <span className="text-xs text-slate-500 flex-shrink-0">{dayLabel(t.dueDate)}</span>
                 </button>
               ))}
             </div>
           )}
-          <p className="text-xs text-slate-400 mt-4 pt-3 border-t border-slate-100">
-            {count(d.meetings.thisMonth, 'פגישה אחת', 'פגישות')} החודש · {d.meetings.lastMonth} בחודש שעבר · {count(d.tasks.open, 'משימה פתוחה אחת', 'משימות פתוחות')}{d.tasks.overdue ? ` (${d.tasks.overdue} באיחור)` : ''}
-          </p>
+          <p className="text-xs text-slate-400 mt-4 pt-3 border-t border-slate-100">{count(d.tasks.open, 'משימה פתוחה אחת', 'משימות פתוחות')}{d.tasks.overdue ? ` (${d.tasks.overdue} באיחור)` : ''}</p>
         </Panel>
 
         <Panel title="לקוחות ודיוור" icon={Users}>
@@ -457,6 +371,153 @@ export default function Dashboard() {
           </div>
         </Panel>
       </div>
+
+      {/* Money: at the bottom, hidden until the owner asks to see it. The choice is saved in the system. */}
+      <section data-money-section className="space-y-4 pt-2">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Wallet className="w-5 h-5 text-slate-400" />נתונים כספיים</h2>
+          <button type="button" data-toggle-money onClick={() => toggleMoney()} aria-pressed={showMoney}
+            className={clsx('text-sm flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors', showMoney ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100')}>
+            {showMoney ? <><EyeOff className="w-4 h-4" /> הסתר נתונים כספיים</> : <><Eye className="w-4 h-4" /> הצג נתונים כספיים</>}
+          </button>
+        </div>
+
+        {!showMoney ? (
+          <button type="button" onClick={() => toggleMoney()} className="card w-full p-6 text-center hover:shadow-card-hover transition-all">
+            <EyeOff className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-medium text-slate-700">הנתונים הכספיים מוסתרים</p>
+            <p className="text-xs text-slate-400 mt-1">הכנסות, גבייה, כסף בעבודה וגבייה צפויה. לחיצה כאן או על העין מציגה אותם.</p>
+          </button>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              <button type="button" onClick={() => navigate('/accounting')} className="card col-span-2 lg:col-span-1 p-5 text-right hover:shadow-card-hover transition-all flex flex-col">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-50 text-emerald-700"><Wallet className="w-4 h-4" /></span>
+                  <span className="text-sm text-slate-600">הכנסות החודש</span>
+                </div>
+                <p data-dashboard-income className="text-2xl font-bold text-slate-900 tracking-tight leading-tight">{money(d.revenue.thisMonth)}</p>
+                <div className="mt-1.5 space-y-1">
+                  <Delta now={d.revenue.thisMonth} before={d.revenue.lastMonthToDate} suffix="מול התקופה המקבילה בחודש שעבר" />
+                  <p className="text-xs text-slate-500">מתחילת השנה <strong className="text-slate-800">{money(d.revenue.ytd)}</strong>
+                    {d.revenue.lastYtd > 0 && <span className="text-slate-400"> · אשתקד {money(d.revenue.lastYtd)}</span>}
+                  </p>
+                </div>
+                <div className="mt-auto pt-3">
+                  <Sparkline values={past12} currentIndex={currentIdx} w={300} h={56} className="w-full h-auto" />
+                </div>
+              </button>
+              <Tile icon={AlertTriangle} label="לגבייה" value={money(d.receivables.outstanding)} tone="bg-red-50 text-red-600"
+                onClick={() => navigate('/payments')}
+                sub={d.receivables.overdueAmount > 0
+                  ? <span className="text-red-600 font-medium">{money(d.receivables.overdueAmount)} באיחור</span>
+                  : d.receivables.clientsOwing ? count(d.receivables.clientsOwing, 'לקוח אחד', 'לקוחות') : 'אין חובות פתוחים'} />
+              <Tile icon={CalendarClock} label="צפוי ב-30 יום" value={money(d.forecast.next30)} tone="bg-primary-50 text-primary-700"
+                onClick={() => navigate('/payments')} sub={d.forecast.items.length ? count(d.forecast.items.length, 'תשלום אחד מתוכנן', 'תשלומים מתוכננים') : 'אין תשלומים מתוכננים'} />
+              <Tile icon={Repeat} label="הכנסה חודשית קבועה" value={money(d.mrr.amount)} tone="bg-navy-50 text-navy-700"
+                onClick={() => navigate('/clients')} sub={d.mrr.clients ? count(d.mrr.clients, 'לקוח ריטיינר אחד', 'לקוחות ריטיינר') : 'עדיין אין לקוחות ריטיינר'} />
+              <Tile icon={Target} label="פוטנציאל מכירות" value={money(d.pipeline.openLeadsValue + d.pipeline.openQuotesValue)} tone="bg-blue-50 text-blue-700"
+                onClick={() => navigate('/leads')} sub={`${count(d.pipeline.openLeadsCount, 'ליד אחד', 'לידים')} · ${count(d.pipeline.openQuotesCount, 'הצעה פתוחה אחת', 'הצעות פתוחות')}`} />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Panel title="הכנסות לפי חודש" icon={BarChart3} className="lg:col-span-2"
+                action={
+                  <div className="flex items-center gap-4">
+                    <Legend items={[{ color: C_COLLECTED, label: 'נגבה' }, { color: C_EXPECTED, label: 'צפוי (תשלומים מתוכננים)' }]} />
+                    <button onClick={() => setTableView((v) => !v)} className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1" title={tableView ? 'הצגה כגרף' : 'הצגה כטבלה'}>
+                      {tableView ? <BarChart3 className="w-4 h-4" /> : <Table2 className="w-4 h-4" />}
+                    </button>
+                  </div>
+                }>
+                {tableView ? <div className="max-h-64 overflow-y-auto"><RevenueTable data={d.revenue.monthly} /></div> : <RevenueChart data={d.revenue.monthly} />}
+                {nothingThisMonth && d.revenue.ytd > 0 && <p className="text-xs text-slate-400 mt-2">החודש עוד לא נכנסו תשלומים ואין תשלומים מתוכננים. כדאי לתזמן גבייה בכרטיסי הלקוחות.</p>}
+              </Panel>
+
+              <Panel title="כסף בעבודה" icon={Briefcase} action={<MoreLink to="/payments" label="לתשלומים" />}>
+                {d.moneyInWork.clients.length === 0 ? <Empty>אין כרגע כסף פתוח בעבודה</Empty> : (
+                  <>
+                    <p data-money-in-work className="text-3xl font-bold text-slate-900 tracking-tight">{money(d.moneyInWork.total)}</p>
+                    <div className="mt-2">
+                      <StackedHBar max={d.moneyInWork.total} parts={[{ value: d.moneyInWork.paid, color: C_COLLECTED }, { value: d.moneyInWork.owed, color: C_EXPECTED }, { value: d.moneyInWork.notCharged, color: C_NOT_CHARGED }]} />
+                    </div>
+                    <div className="mt-2">
+                      <Legend items={[{ color: C_COLLECTED, label: `שולם ${money(d.moneyInWork.paid)}` }, { color: C_EXPECTED, label: `לגבייה ${money(d.moneyInWork.owed)}` }, { color: C_NOT_CHARGED, label: `עוד לא חויב ${money(d.moneyInWork.notCharged)}` }]} />
+                    </div>
+                    <div className="mt-3 space-y-1 -mx-1">
+                      {d.moneyInWork.clients.slice(0, IN_WORK_SHOWN).map((c) => (
+                        <button key={c.id} type="button" data-in-work-client onClick={() => navigate(`/clients/${c.id}?tab=payments`)} className="w-full flex items-baseline justify-between gap-3 p-1.5 rounded-lg hover:bg-slate-50 text-right">
+                          <span className="min-w-0 text-sm text-slate-800 truncate">{c.name}</span>
+                          <span className="text-xs text-slate-500 flex-shrink-0 tabular-nums">נשאר <strong className="text-sm text-slate-900">{money(c.owed + c.notCharged)}</strong> מתוך {money(c.total)}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {d.moneyInWork.clients.length > IN_WORK_SHOWN && <p className="text-xs text-slate-400 mt-2">ועוד {count(d.moneyInWork.clients.length - IN_WORK_SHOWN, 'לקוח אחד', 'לקוחות')}</p>}
+                  </>
+                )}
+              </Panel>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Panel title="משפך מכירות" icon={Target} action={<MoreLink to="/leads" label="ללידים" />}>
+                {d.pipeline.stages.every((s) => s.count === 0) ? (
+                  <Empty>עדיין אין לידים. הוסיפו לידים כדי לראות את המשפך.</Empty>
+                ) : (
+                  <>
+                    <div className="space-y-3">
+                      {d.pipeline.stages.filter((s) => s.key !== 'LOST').map((s) => (
+                        <HBar key={s.key} label={s.label} value={s.count} max={stageMax} right={`${s.count}`} sub={s.value ? ils(s.value) : undefined} onClick={() => navigate('/leads')} />
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-slate-100">
+                      <div><p className="text-xs text-slate-500">אחוז סגירה</p><p className="text-lg font-bold text-slate-900">{d.pipeline.winRate !== null ? `${d.pipeline.winRate}%` : '—'}</p></div>
+                      <div><p className="text-xs text-slate-500">הצעות שאושרו</p><p className="text-lg font-bold text-slate-900">{d.pipeline.quoteAcceptance !== null ? `${d.pipeline.quoteAcceptance}%` : '—'}</p></div>
+                    </div>
+                  </>
+                )}
+              </Panel>
+
+              <Panel title="לקוחות מובילים" icon={Users} action={<Legend items={[{ color: C_COLLECTED, label: 'שולם' }, { color: C_EXPECTED, label: 'יתרה' }]} />}>
+                {d.topClients.length === 0 ? <Empty>עדיין אין תשלומים מלקוחות</Empty> : (
+                  <div className="space-y-4">
+                    {d.topClients.map((c) => (
+                      <button key={c.id} type="button" onClick={() => navigate(`/clients/${c.id}`)} className="w-full text-right group">
+                        <div className="flex items-baseline justify-between gap-3 mb-1">
+                          <span className="text-sm text-slate-700 group-hover:text-slate-900 truncate">{c.name}</span>
+                          <span className="text-sm font-semibold text-slate-900 tabular-nums">{ils(c.paid)}{c.outstanding > 0 && <span className="text-xs font-normal text-slate-500"> + {ils(c.outstanding)} פתוח</span>}</span>
+                        </div>
+                        <StackedHBar max={clientMax} parts={[{ value: c.paid, color: C_COLLECTED }, { value: c.outstanding, color: C_EXPECTED }]} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </Panel>
+
+              <Panel title="גבייה צפויה" icon={CalendarClock} action={<MoreLink to="/payments" label="לתשלומים" />}>
+                {d.forecast.items.length === 0 ? (
+                  <Empty>אין תשלומים מתוכננים ל-30 הימים הקרובים. אפשר לתזמן תשלום עתידי בכרטיס הלקוח ← תשלומים.</Empty>
+                ) : (
+                  <div className="space-y-1 -mx-1">
+                    {d.forecast.items.map((f) => (
+                      <button key={f.id} type="button" onClick={() => navigate(`/clients/${f.clientId}`)} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 text-right">
+                        <span className="w-10 text-center flex-shrink-0">
+                          <span className="block text-lg font-bold text-slate-900 leading-none">{format(new Date(f.date), 'd')}</span>
+                          <span className="block text-[11px] text-slate-400">{format(new Date(f.date), 'MMM', { locale: he })}</span>
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm font-medium text-slate-800 truncate">{f.name}</span>
+                          {f.note && <span className="block text-xs text-slate-400 truncate">{f.note}</span>}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-900 tabular-nums">{ils(f.amount)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </Panel>
+            </div>
+          </>
+        )}
+      </section>
     </div>
   );
 }

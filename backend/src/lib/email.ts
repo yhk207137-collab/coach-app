@@ -19,6 +19,8 @@ export class EmailError extends Error {
   }
 }
 
+export const testEmailOutbox: { to: string; subject: string; html: string; at: Date }[] = [];
+
 export let lastSentEmail: { id?: string; to: string; subject: string; at: string } | null = null;
 
 const resendKey = () => process.env.SMTP_PASS;
@@ -76,6 +78,11 @@ export async function sendEmail(
   attachments: EmailAttachment[] = [],
   options: EmailOptions = {}
 ): Promise<string | undefined> {
+  // Local end-to-end tests only: nothing leaves the machine, the email is kept for the test to read.
+  if (process.env.EMAIL_TEST_OUTBOX === '1' && !process.env.RAILWAY_ENVIRONMENT) {
+    testEmailOutbox.push({ to, subject, html, at: new Date() });
+    return `test-${testEmailOutbox.length}`;
+  }
   if (!resendKey()) throw new EmailError('Email not configured (SMTP_PASS missing)');
   const fromName = options.fromName || process.env.FROM_NAME || 'ליוי שיווק ופרסום';
   const fromEmail = fromEmailAddress();

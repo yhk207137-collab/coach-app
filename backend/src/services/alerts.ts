@@ -401,6 +401,10 @@ export async function collectAlerts(now = new Date()): Promise<Alert[]> {
     alerts.push({ kind: 'client', key: `client:${c.id}`, severity: 'info', href: `/clients/${c.id}`, title: `אין פגישה מתוכננת · ${c.fullName}`, detail: days === null ? 'עוד לא נקבעה פגישה ראשונה' : `הפגישה האחרונה הייתה ${ago(days)}` });
   }
 
+  // Free consult meetings: no reply to the confirmation, and messages waiting to be sent by hand
+  const { consultAlerts } = await import("./consult");
+  for (const c of await consultAlerts(now)) alerts.push({ kind: "lead", href: "/consults", ...c });
+
   const hidden = new Set(snoozed.map((s) => s.key));
   return alerts
     .filter((a) => !hidden.has(a.key))
@@ -584,3 +588,6 @@ export async function alertsTick(now = new Date()) {
     ticking = false;
   }
 }
+
+// Shared with the consult reminders, so the owner's emails look the same everywhere.
+export { frame as ownerEmailFrame, section as ownerEmailSection, appUrl as ownerAppUrl, SENDER_NAME as OWNER_SENDER_NAME, whatsappLink };

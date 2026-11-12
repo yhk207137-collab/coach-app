@@ -165,7 +165,7 @@ export default function LeadDetail({ lead, onBack, stages }: Props) {
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-slate-600 mt-0.5">{act.notes}</p>
+                      <p className="text-sm text-slate-600 mt-0.5 whitespace-pre-line">{act.notes}</p>
                     </div>
                     {!act.done && (
                       <button onClick={() => doneMut.mutate(act.id)} className="p-1.5 text-slate-400 hover:text-emerald-600 rounded" title="סמן כבוצע">

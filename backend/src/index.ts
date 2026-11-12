@@ -12,6 +12,9 @@ import { UPLOAD_DIR } from './lib/uploads';
 import { startMarketingWorker } from './services/marketing';
 import { alertsTick } from './services/alerts';
 import { chargeDueMeetings } from './services/meetingBilling';
+import { consultTick } from './services/consult';
+import consultRoutes from './routes/consults';
+import { consultPublicRouter } from './routes/consultPublic';
 import marketingRoutes from './routes/marketing';
 import alertRoutes from './routes/alerts';
 import { publicRouter, trackingRouter } from './routes/public';
@@ -55,6 +58,7 @@ const publicLimiter = rateLimit({
   // Removal is never refused: one-click requests from a mail provider all come from its few addresses.
   skip: (req) => /^\/(un|re)subscribe\//.test(req.path),
 });
+app.use('/api/public/consult', cors({ origin: true }), publicLimiter, consultPublicRouter);
 app.use('/api/public', cors({ origin: true }), publicLimiter, publicRouter);
 // Landing-page views; generous, since one person browsing loads it once per page.
 app.use('/api/t/v.gif', rateLimit({ windowMs: 15 * 60 * 1000, max: 1500, standardHeaders: true, legacyHeaders: false }));
@@ -139,6 +143,7 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/marketing', marketingRoutes);
 app.use('/api/alerts', alertRoutes);
+app.use('/api/consults', consultRoutes);
 
 app.get('/api/health', (_, res) =>
   res.json({ ok: true, version: (process.env.RAILWAY_GIT_COMMIT_SHA || 'dev').slice(0, 7) })
@@ -205,6 +210,7 @@ async function bootstrap() {
   startMarketingWorker();
   cron.schedule('* * * * *', () => {
     void alertsTick();
+    consultTick().catch((e) => console.error('[CONSULT] tick failed:', e?.message || e));
     chargeDueMeetings().catch((e) => console.error('[BILLING] charging due meetings failed:', e?.message || e));
   }, { timezone: 'Asia/Jerusalem' });
   cron.schedule('0 3 * * *', runNightlyBackup, { timezone: 'Asia/Jerusalem' });

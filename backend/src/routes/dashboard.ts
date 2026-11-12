@@ -188,6 +188,15 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
   const meetingView = (m: (typeof meetings)[number]) => ({ id: m.id, date: m.date, duration: m.duration, type: m.type, clientId: m.clientId, name: m.client.fullName });
   const todayMeetings = meetings.filter((m) => dayKey(m.date) === today).map(meetingView);
   const weekMeetings = meetings.filter((m) => dayKey(m.date) > today).map(meetingView);
+  // The top of the dashboard: what is coming up, client meetings and free consult meetings together.
+  const consults = await prisma.consultBooking.findMany({
+    where: { status: { in: ["BOOKED", "CONFIRMED", "NOT_CONFIRMED"] }, start: { gte: new Date(now.getTime() - 60 * 60_000), lt: in7 } },
+    orderBy: { start: "asc" },
+  });
+  const upcomingAgenda = [
+    ...meetings.filter((m) => m.date.getTime() + m.duration * 60_000 > now.getTime()).map((m) => ({ key: `m:${m.id}`, kind: "meeting" as const, date: m.date, duration: m.duration, title: m.client.fullName, detail: m.type, status: null as string | null, href: `/clients/${m.clientId}` })),
+    ...consults.filter((c) => c.start.getTime() + c.duration * 60_000 > now.getTime()).map((c) => ({ key: `c:${c.id}`, kind: "consult" as const, date: c.start, duration: c.duration, title: c.name, detail: `פגישת הקפצה · ${c.org}`, status: c.status as string | null, href: "/consults" })),
+  ].sort((a, b) => a.date.getTime() - b.date.getTime());
   const meetingStats = {
     thisMonth: meetings.filter((m) => monthKey(m.date) === thisMonth && m.date <= now).length,
     lastMonth: meetings.filter((m) => monthKey(m.date) === lastMonth).length,
@@ -290,7 +299,7 @@ router.get('/', requireAuth, requireCoach, async (req: AuthRequest, res) => {
     pipeline,
     topClients,
     clients: clientStats,
-    meetings: { today: todayMeetings, week: weekMeetings.slice(0, 8), ...meetingStats },
+    meetings: { today: todayMeetings, week: weekMeetings.slice(0, 8), upcoming: upcomingAgenda.slice(0, 12), upcomingTotal: upcomingAgenda.length, ...meetingStats },
     tasks: { open: openTasks.length, overdue: overdueTasks.length, week: weekTasks.slice(0, 6).map((t) => ({ id: t.id, title: t.title, dueDate: t.dueDate, clientId: t.clientId, name: t.client.fullName })) },
     projects: {
       active: openProjects.slice(0, 5),
