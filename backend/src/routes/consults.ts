@@ -2,7 +2,6 @@ import { asyncRouter } from '../lib/asyncRouter';
 import { requireAuth, requireCoach } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { cancelConsult, ConsultError, DEFAULT_CONSULT_SETTINGS, getConsultSettings, logToCard, placesLeft, plan, saveConsultSettings } from '../services/consult';
-import { messagingConnected } from '../services/messaging';
 import { isCalendarConnected } from '../services/calendar';
 
 const router = asyncRouter();
@@ -17,7 +16,6 @@ router.get('/', async (_req, res) => {
   res.json({
     places,
     google,
-    messaging: messagingConnected(),
     bookings: bookings.map(({ lead, ...b }) => ({
       ...b,
       plan: plan(b),
@@ -53,12 +51,6 @@ router.post('/:id/status', async (req, res) => {
   const b = await prisma.consultBooking.update({ where: { id: req.params.id }, data: { status: status as any, ...(status === 'CONFIRMED' ? { confirmedAt: new Date() } : {}) } });
   await logToCard(b, 'סטטוס עודכן ידנית', `הסטטוס שונה ל"${STATUS_LABEL[status]}".`);
   res.json(b);
-});
-
-// A message that waited for manual sending was sent by the owner in WhatsApp.
-router.post('/activity/:id/sent', async (req, res) => {
-  const a = await prisma.leadActivity.findUniqueOrThrow({ where: { id: req.params.id } });
-  res.json(await prisma.leadActivity.update({ where: { id: a.id }, data: { done: true, type: a.type.replace('לא נשלחה', 'נשלחה ידנית בוואטסאפ') } }));
 });
 
 export default router;

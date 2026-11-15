@@ -1,10 +1,9 @@
 // Public: the free consult meeting ("פגישת הקפצה") from the landing site. Counter, free times,
-// booking, moving, canceling, waiting list, and replies from the message provider.
+// booking, moving, canceling, confirming (button in the email) and the waiting list.
 import { prisma } from '../lib/prisma';
 import { asyncRouter } from '../lib/asyncRouter';
 import { normalizeEmail } from './marketing';
-import { bookConsult, cancelConsult, ConsultError, dateLabel, dayName, freeSlots, handleReply, hhmm, placesLeft, rescheduleConsult } from '../services/consult';
-import { phoneDigits } from '../services/messaging';
+import { bookConsult, cancelConsult, ConsultError, dateLabel, dayName, freeSlots, confirmByToken, hhmm, phoneDigits, placesLeft, rescheduleConsult } from '../services/consult';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/;
 const str = (v: unknown, max: number) => {
@@ -92,12 +91,9 @@ consultPublicRouter.post('/waitlist', async (req, res) => {
   res.json({ ok: true });
 });
 
-// Replies to the confirmation message, posted by the message provider. Protected by a shared secret.
-consultPublicRouter.all('/reply', async (req, res) => {
-  const secret = process.env.MESSAGE_INBOUND_SECRET;
-  if (!secret || (req.query.key !== secret && req.get('x-inbound-key') !== secret)) return res.status(403).json({ ok: false });
-  const b: any = { ...(req.query || {}), ...(req.body || {}) };
-  const from = String(b.from ?? b.phone ?? b.sender ?? b.Sender ?? b.From ?? '');
-  const text = String(b.text ?? b.message ?? b.body ?? b.Body ?? b.Message ?? '');
-  res.json({ ok: true, ...(await handleReply(from, text)) });
+// The "מגיע/ה" button in the confirmation email.
+consultPublicRouter.post('/confirm', async (req, res) => {
+  try {
+    res.json({ ok: true, booking: view(await confirmByToken(String(req.body?.token || ''))) });
+  } catch (e) { fail(res, e); }
 });

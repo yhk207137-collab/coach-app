@@ -16,11 +16,11 @@ interface Booking {
   plan: { warm: string; confirm: string; noReply: string; final: string };
   log: LogItem[];
 }
-interface Data { places: { max: number; taken: number; left: number; open: boolean }; google: boolean; messaging: boolean; bookings: Booking[] }
+interface Data { places: { max: number; taken: number; left: number; open: boolean }; google: boolean; bookings: Booking[] }
 interface Hours { day: number; on: boolean; from: string; to: string }
 interface Settings {
   open: boolean; maxMeetings: number; duration: number; step: number; minNoticeHours: number; horizonDays: number; hours: Hours[];
-  meetingLink: string; bookingPageUrl: string; warmSubject: string; warmBody: string; confirmText: string; finalText: string;
+  meetingLink: string; bookingPageUrl: string; warmSubject: string; warmBody: string; confirmSubject: string; confirmText: string; finalSubject: string; finalText: string;
 }
 
 const STATUS: Record<Booking['status'], { label: string; cls: string }> = {
@@ -51,7 +51,6 @@ function BookingCard({ b, onChange }: { b: Booking; onChange: () => void }) {
   const act = async (fn: () => Promise<unknown>, ok: string) => {
     try { await fn(); toast.success(ok); onChange(); } catch (e: any) { toast.error(e.response?.data?.error || 'הפעולה נכשלה'); }
   };
-  const pending = b.log.filter((l) => !l.done && l.type.endsWith('לא נשלחה'));
   return (
     <div data-consult={b.id} className="card p-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -63,22 +62,11 @@ function BookingCard({ b, onChange }: { b: Booking; onChange: () => void }) {
         <span className={clsx('badge', STATUS[b.status].cls)}>{STATUS[b.status].label}</span>
       </div>
 
-      {pending.map((p) => (
-        <div key={p.id} className="mt-3 rounded-xl bg-amber-50 p-3 text-sm">
-          <p className="font-medium text-amber-800">{p.type.replace(' לא נשלחה', '')}: לא מחובר ספק הודעות, ההודעה מחכה לך</p>
-          <p className="text-xs text-amber-900 whitespace-pre-line mt-1">{p.notes.split('\n').slice(1).join('\n')}</p>
-          <div className="flex gap-3 mt-2">
-            <a className="text-xs font-semibold text-emerald-700" target="_blank" rel="noreferrer" href={`https://wa.me/${b.phone.replace(/\D/g, '').replace(/^0/, '972')}?text=${encodeURIComponent(p.notes.split('\n').slice(1).join('\n'))}`}>לשליחה בוואטסאפ</a>
-            <button className="text-xs text-slate-600 hover:underline" onClick={() => act(() => api.post(`/consults/activity/${p.id}/sent`), 'סומן כנשלח')}>שלחתי</button>
-          </div>
-        </div>
-      ))}
-
       {active && (
         <ul className="mt-3 space-y-1">
           <Step label="① מייל חימום (50 שעות לפני)" at={b.plan.warm} sent={b.warmSentAt} />
-          <Step label="② בקשת אישור הגעה (24 שעות לפני)" at={b.plan.confirm} sent={b.confirmSentAt} skipped={b.status === 'CONFIRMED' && !b.confirmSentAt} />
-          <Step label="③ תזכורת אחרונה (שעתיים לפני)" at={b.plan.final} sent={b.finalSentAt} />
+          <Step label="② מייל אישור הגעה (24 שעות לפני)" at={b.plan.confirm} sent={b.confirmSentAt} skipped={b.status === 'CONFIRMED' && !b.confirmSentAt} />
+          <Step label="③ מייל תזכורת (שעתיים לפני)" at={b.plan.final} sent={b.finalSentAt} />
         </ul>
       )}
 
@@ -119,7 +107,7 @@ function SettingsPanel() {
   const save = async () => {
     try { await api.put('/consults/settings', s); toast.success('נשמר'); qc.invalidateQueries({ queryKey: ['consult-settings'] }); qc.invalidateQueries({ queryKey: ['consults'] }); } catch { toast.error('השמירה נכשלה'); }
   };
-  const text = (key: 'warmSubject' | 'warmBody' | 'confirmText' | 'finalText', label: string, rows: number) => (
+  const text = (key: 'warmSubject' | 'warmBody' | 'confirmSubject' | 'confirmText' | 'finalSubject' | 'finalText', label: string, rows: number) => (
     <div>
       <div className="flex items-center justify-between">
         <label className="label">{label}</label>
@@ -164,8 +152,10 @@ function SettingsPanel() {
         <p className="text-xs text-slate-500">מילים בסוגריים מסולסלים מתמלאות לבד: <span dir="rtl" className="font-mono">{PLACEHOLDERS}</span>. {'{מתי}'} הופך ל"מחר", "היום" או "ביום ראשון", לפי היום שבו ההודעה יוצאת.</p>
         {text('warmSubject', '① מייל חימום, 50 שעות לפני: נושא', 1)}
         {text('warmBody', '① מייל חימום: גוף המייל (שורה ריקה = פסקה חדשה)', 14)}
-        {text('confirmText', '② הודעה 24 שעות לפני: בקשת אישור הגעה', 4)}
-        {text('finalText', '③ הודעה שעתיים לפני', 3)}
+        {text('confirmSubject', '② מייל 24 שעות לפני, בקשת אישור הגעה: נושא', 1)}
+        {text('confirmText', '② גוף המייל (מתחתיו מופיע כפתור: מגיע/ה, מאשר/ת)', 4)}
+        {text('finalSubject', '③ מייל שעתיים לפני: נושא', 1)}
+        {text('finalText', '③ גוף המייל (מתחתיו כפתור כניסה לפגישה)', 3)}
       </div>
       <button className="btn-primary" onClick={save}><Save className="w-4 h-4" />שמירה</button>
     </div>
@@ -195,11 +185,10 @@ export default function ConsultsPage() {
       </div>
 
       {data && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <div className="card p-4"><p className="text-xs text-slate-500">מקומות שנותרו</p><p data-places-left className="text-2xl font-bold text-slate-900">{data.places.left} <span className="text-sm font-normal text-slate-400">מתוך {data.places.max}</span></p></div>
           <div className="card p-4"><p className="text-xs text-slate-500">נקבעו (בלי ביטולים)</p><p className="text-2xl font-bold text-slate-900">{data.places.taken}</p></div>
           <div className={clsx('card p-4', !data.google && 'ring-1 ring-red-200')}><p className="text-xs text-slate-500">יומן גוגל</p><p className={clsx('text-sm font-semibold mt-1', data.google ? 'text-emerald-700' : 'text-red-600')}>{data.google ? 'מחובר: רואים רק שעות פנויות' : 'לא מחובר: חברו בהגדרות'}</p></div>
-          <div className={clsx('card p-4', !data.messaging && 'ring-1 ring-amber-200')}><p className="text-xs text-slate-500">וואטסאפ / SMS</p><p className={clsx('text-sm font-semibold mt-1', data.messaging ? 'text-emerald-700' : 'text-amber-700')}>{data.messaging ? 'מחובר: ההודעות יוצאות לבד' : 'לא מחובר: ההודעות מחכות לשליחה ידנית'}</p></div>
         </div>
       )}
 

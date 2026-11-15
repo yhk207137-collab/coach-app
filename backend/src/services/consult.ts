@@ -7,7 +7,13 @@ import { prisma } from '../lib/prisma';
 import { sendEmail } from '../lib/email';
 import { getAuthorizedClient } from './calendar';
 import { dayKey, isQuietTime, getAlertSettings, ownerEmailFrame, ownerEmailSection, ownerAppUrl, OWNER_SENDER_NAME, whatsappLink } from './alerts';
-import { sendTextMessage, phoneDigits, messagingConnected } from './messaging';
+// Israeli phone numbers compared by digits only (050-1234567 = +972501234567).
+export function phoneDigits(v: string | null | undefined) {
+  let d = String(v || '').replace(/\D/g, '');
+  if (d.startsWith('00')) d = d.slice(2);
+  if (d.startsWith('0')) d = '972' + d.slice(1);
+  return d;
+}
 
 const TZ = 'Asia/Jerusalem';
 const MIN = 60_000;
@@ -29,7 +35,9 @@ export interface ConsultSettings {
   bookingPageUrl: string;
   warmSubject: string;
   warmBody: string;
+  confirmSubject: string;
   confirmText: string;
+  finalSubject: string;
   finalText: string;
 }
 
@@ -54,7 +62,9 @@ export const DEFAULT_CONSULT_SETTINGS: ConsultSettings = {
     'נתראה ב{יום} ב-{שעה}. 40 דקות שיכולות לשנות את הכיוון של {שם_העמותה}.',
     'יהושע כהן',
   ].join('\n\n'),
-  confirmText: 'שלום {שם}, {מתי} ב-{שעה} אנחנו נפגשים, ואני כבר מחכה! 40 דקות שבהן נבנה יחד את הצעד הבא שיקפיץ את {שם_העמותה} קדימה.\nמגיעים? השיבו 1 לאישור.\nצריך להזיז? לחצו כאן: {קישור_לשינוי}',
+  confirmSubject: '{מתי} ב-{שעה} נפגשים. מאשרים הגעה?',
+  confirmText: 'שלום {שם}, {מתי} ב-{שעה} אנחנו נפגשים, ואני כבר מחכה! 40 דקות שבהן נבנה יחד את הצעד הבא שיקפיץ את {שם_העמותה} קדימה.\nמגיעים? לחצו על הכפתור לאישור.\nצריך להזיז? לחצו כאן: {קישור_לשינוי}',
+  finalSubject: 'עוד שעתיים נפגשים, ב-{שעה}',
   finalText: '{שם}, עוד שעתיים נפגשים! 🙌 {שעה}. הקישור לפגישה: {קישור_לפגישה}. כדאי להגיע עם השאלה שהכי מעסיקה אתכם כרגע בעמותה.',
 };
 
@@ -69,6 +79,8 @@ const int = (v: unknown, min: number, max: number, dflt: number) => {
 export async function getConsultSettings(): Promise<ConsultSettings> {
   const row = await prisma.setting.findUnique({ where: { key: SETTINGS_KEY } });
   const saved = row ? JSON.parse(row.value) : {};
+  // Reminders go by email only: an old saved text that asked to reply "1" gets the button wording.
+  if (typeof saved.confirmText === 'string') saved.confirmText = saved.confirmText.replace('השיבו 1 לאישור.', 'לחצו על הכפתור לאישור.');
   return { ...DEFAULT_CONSULT_SETTINGS, ...saved };
 }
 
@@ -93,7 +105,9 @@ export async function saveConsultSettings(patch: Partial<ConsultSettings>) {
     bookingPageUrl: patch.bookingPageUrl !== undefined ? clean(patch.bookingPageUrl, 300).trim() || DEFAULT_CONSULT_SETTINGS.bookingPageUrl : cur.bookingPageUrl,
     warmSubject: patch.warmSubject !== undefined ? clean(patch.warmSubject, 200) : cur.warmSubject,
     warmBody: patch.warmBody !== undefined ? clean(patch.warmBody, 6000) : cur.warmBody,
+    confirmSubject: patch.confirmSubject !== undefined ? clean(patch.confirmSubject, 200) : cur.confirmSubject,
     confirmText: patch.confirmText !== undefined ? clean(patch.confirmText, 1000) : cur.confirmText,
+    finalSubject: patch.finalSubject !== undefined ? clean(patch.finalSubject, 200) : cur.finalSubject,
     finalText: patch.finalText !== undefined ? clean(patch.finalText, 1000) : cur.finalText,
   };
   await prisma.setting.upsert({ where: { key: SETTINGS_KEY }, create: { key: SETTINGS_KEY, value: JSON.stringify(next) }, update: { value: JSON.stringify(next) } });
@@ -250,7 +264,7 @@ export async function logToCard(booking: Pick<ConsultBooking, 'leadId'>, type: s
 
 // ── Texts ───────────────────────────────────────────────────────────────────
 
-export function fillText(text: string, b: ConsultBooking, s: ConsultSettings, now: Date) {
+export function fillText(text: string, b: ConsultBooking, s: ConsultSettings, now: Date, html = false) {
   const first = b.name.trim().split(/\s+/)[0];
   const values: Record<string, string> = {
     'שם': first,
@@ -264,13 +278,23 @@ export function fillText(text: string, b: ConsultBooking, s: ConsultSettings, no
     'קישור_לפגישה': b.meetLink || 'יישלח אליך בנפרד',
     'משך': String(b.duration),
   };
-  return text.replace(/\{([^{}]+)\}/g, (m, k) => (k in values ? values[k] : m));
+  if (!html) return text.replace(/\{([^{}]+)\}/g, (m, k) => (k in values ? values[k] : m));
+  // Inside the email, links become real links.
+  const link = (href: string, label: string) => `<a href="${esc(href)}" style="color:#007f91;font-weight:bold;">${label}</a>`;
+  const htmlValues: Record<string, string> = {
+    'קישור_לשינוי': link(manageUrl(b, s), 'לבחירת מועד חדש'),
+    'קישור_לפגישה': b.meetLink ? link(b.meetLink, 'לכניסה לפגישה') : 'יישלח אליך בנפרד',
+  };
+  return esc(text).replace(/\{([^{}]+)\}/g, (m, k) => (k in htmlValues ? htmlValues[k] : k in values ? esc(values[k]) : m));
 }
+export const confirmUrl = (b: Pick<ConsultBooking, 'token'>, s: ConsultSettings) => `${s.bookingPageUrl}${s.bookingPageUrl.includes('?') ? '&' : '?'}c=${b.token}`;
 export const manageUrl = (b: Pick<ConsultBooking, 'token'>, s: ConsultSettings) => `${s.bookingPageUrl}${s.bookingPageUrl.includes('?') ? '&' : '?'}r=${b.token}`;
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-function warmEmailHtml(body: string, b: ConsultBooking, s: ConsultSettings) {
-  const paras = body.split(/\n{2,}/).map((p) => `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#1e293b;">${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
+// bodyHtml is already escaped (fillText(..., true)). button: a big call to action under the text.
+function emailHtml(bodyHtml: string, b: ConsultBooking, s: ConsultSettings, button?: { href: string; label: string }) {
+  const paras = bodyHtml.split(/\n{2,}/).map((p) => `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#1e293b;">${p.replace(/\n/g, '<br>')}</p>`).join('')
+    + (button ? `<p style="margin:8px 0 18px;"><a href="${esc(button.href)}" style="display:inline-block;background:#0A1E3C;color:#ffffff;text-decoration:none;font-weight:bold;font-size:17px;padding:14px 30px;border-radius:12px;">${esc(button.label)}</a></p>` : '');
   return `<!doctype html><html lang="he" dir="rtl"><body style="margin:0;padding:0;background:#f4f1ea;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1ea;"><tr><td align="center" style="padding:24px 12px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" dir="rtl" style="max-width:600px;background:#ffffff;border-radius:16px;font-family:Arial,Helvetica,sans-serif;">
@@ -381,16 +405,20 @@ export const plan = (b: Pick<ConsultBooking, 'start'>) => ({
   final: beforeRest(new Date(b.start.getTime() - 2 * HOUR)),
 });
 
-async function sendMessageStep(b: ConsultBooking, field: 'confirmSentAt' | 'finalSentAt', label: string, text: string, now: Date) {
+// Every reminder goes by email (no text messages).
+async function sendEmailStep(b: ConsultBooking, field: 'warmSentAt' | 'confirmSentAt' | 'finalSentAt', label: string, subjectT: string, bodyT: string, s: ConsultSettings, now: Date, button?: { href: string; label: string }) {
   // Claim the step first so two ticks never send it twice.
   const { count } = await prisma.consultBooking.updateMany({ where: { id: b.id, [field]: null }, data: { [field]: now } });
   if (!count) return;
-  const r = await sendTextMessage(b.phone, text, now);
-  if (r.ok) {
-    await logToCard(b, `${label} נשלחה`, `נשלח ל-${b.phone} (${r.provider}):\n${text}`);
-  } else {
-    // No provider yet: the owner gets the message ready to send in WhatsApp (bell + alerts page).
-    await logToCard(b, `${label} לא נשלחה`, `${r.error}. ההודעה מחכה לשליחה ידנית:\n${text}`, false);
+  const subject = fillText(subjectT, b, s, now);
+  const body = fillText(bodyT, b, s, now);
+  try {
+    await sendEmail(b.email, subject, emailHtml(fillText(bodyT, b, s, now, true), b, s, button), [], { fromName: 'יהושע כהן', idempotencyKey: `consult-${field}-${b.id}-${b.start.getTime()}` });
+    await logToCard(b, `${label} נשלח`, `אל ${b.email}\nנושא: ${subject}\n\n${body}`);
+  } catch (e: any) {
+    // Not sent: free the step so the next tick tries again.
+    await prisma.consultBooking.update({ where: { id: b.id }, data: { [field]: null } });
+    console.error(`[CONSULT] ${field} email failed:`, e?.message || e);
   }
 }
 
@@ -403,23 +431,12 @@ export async function runSequence(b: ConsultBooking, now = new Date()) {
 
   // ① 50 hours before: the warm-up email (at once if booked later than that).
   if (!b.warmSentAt && now >= p.warm && !quiet) {
-    const { count } = await prisma.consultBooking.updateMany({ where: { id: b.id, warmSentAt: null }, data: { warmSentAt: now } });
-    if (count) {
-      const subject = fillText(s.warmSubject, b, s, now);
-      const body = fillText(s.warmBody, b, s, now);
-      try {
-        await sendEmail(b.email, subject, warmEmailHtml(body, b, s), [], { fromName: 'יהושע כהן', idempotencyKey: `consult-warm-${b.id}` });
-        await logToCard(b, 'מייל חימום נשלח', `אל ${b.email}\nנושא: ${subject}\n\n${body}`);
-      } catch (e: any) {
-        await prisma.consultBooking.update({ where: { id: b.id }, data: { warmSentAt: null } });
-        console.error('[CONSULT] warm email failed:', e?.message || e);
-      }
-    }
+    await sendEmailStep(b, 'warmSentAt', 'מייל חימום', s.warmSubject, s.warmBody, s, now);
   }
 
-  // ② 24 hours before: a message asking to confirm. Not sent if the meeting is already under 4 hours away.
+  // ② 24 hours before: an email asking to confirm, with a button. Not sent if the meeting is already under 4 hours away.
   if (!b.confirmSentAt && b.status !== 'CONFIRMED' && now >= p.confirm && left > 4 * HOUR && !quiet) {
-    await sendMessageStep(b, 'confirmSentAt', 'בקשת אישור הגעה', fillText(s.confirmText, b, s, now), now);
+    await sendEmailStep(b, 'confirmSentAt', 'מייל בקשת אישור הגעה', s.confirmSubject, s.confirmText, s, now, { href: confirmUrl(b, s), label: 'מגיע/ה, מאשר/ת' });
   }
 
   // No reply by 4 hours before → "לא אישר" and the owner hears about it.
@@ -432,27 +449,20 @@ export async function runSequence(b: ConsultBooking, now = new Date()) {
     }
   }
 
-  // ③ 2 hours before: the last reminder, message only.
+  // ③ 2 hours before: the last reminder email.
   if (!fresh.finalSentAt && now >= p.final && !quiet) {
-    await sendMessageStep(fresh, 'finalSentAt', 'תזכורת שעתיים לפני', fillText(s.finalText, fresh, s, now), now);
+    await sendEmailStep(fresh, 'finalSentAt', 'מייל תזכורת שעתיים לפני', s.finalSubject, s.finalText, s, now, fresh.meetLink ? { href: fresh.meetLink, label: 'לכניסה לפגישה' } : undefined);
   }
 }
 
-// A reply to the confirmation message ("1" = coming).
-export async function handleReply(from: string, text: string, now = new Date()) {
-  const digits = phoneDigits(from);
-  if (!digits) return { matched: false };
-  const candidates = await prisma.consultBooking.findMany({ where: { status: { in: ['BOOKED', 'NOT_CONFIRMED', 'CONFIRMED'] }, start: { gt: now } }, orderBy: { start: 'asc' } });
-  const b = candidates.find((c) => phoneDigits(c.phone) === digits);
-  if (!b) return { matched: false };
-  const answer = text.trim();
-  if (/^1[.!]?$/.test(answer) && b.status !== 'CONFIRMED') {
-    await prisma.consultBooking.update({ where: { id: b.id }, data: { status: 'CONFIRMED', confirmedAt: now } });
-    await logToCard(b, 'אישר הגעה', `השיב/ה "${answer}".`);
-    return { matched: true, confirmed: true };
-  }
-  await logToCard(b, 'תשובה להודעה', answer, false);
-  return { matched: true, confirmed: false };
+// The "מגיע/ה" button in the confirmation email.
+export async function confirmByToken(token: string, now = new Date()) {
+  const b = await prisma.consultBooking.findUnique({ where: { token } });
+  if (!b || !ACTIVE.includes(b.status) || b.start.getTime() <= now.getTime()) throw new ConsultError('not-found');
+  if (b.status === 'CONFIRMED') return b;
+  const confirmed = await prisma.consultBooking.update({ where: { id: b.id }, data: { status: 'CONFIRMED', confirmedAt: now } });
+  await logToCard(confirmed, 'אישר הגעה', 'לחץ/ה על כפתור האישור במייל.');
+  return confirmed;
 }
 
 // Meetings deleted or moved by hand in Google Calendar follow here too.
@@ -493,18 +503,13 @@ export async function consultTick(now = new Date()) {
   }
 }
 
-// For the owner's alerts: messages waiting to be sent by hand, and people who didn't confirm.
+// For the owner's alerts: people who didn't confirm.
 export async function consultAlerts(now = new Date()) {
   const out: { key: string; severity: 'critical' | 'warning'; title: string; detail: string; whatsapp?: string }[] = [];
-  const upcoming = await prisma.consultBooking.findMany({ where: { status: { in: ACTIVE }, start: { gt: now } }, include: { lead: { include: { activities: { where: { done: false, type: { endsWith: 'לא נשלחה' } }, orderBy: { createdAt: 'desc' } } } } } });
+  const upcoming = await prisma.consultBooking.findMany({ where: { status: 'NOT_CONFIRMED', start: { gt: now } } });
   for (const b of upcoming) {
     if (b.status === 'NOT_CONFIRMED') out.push({ key: `consult-noreply:${b.id}:${b.start.getTime()}`, severity: 'critical', title: `לא אישר הגעה · ${b.org}`, detail: `${b.name}, ${dayName(b.start)} ${hhmm(b.start)} · ${b.phone}`, whatsapp: whatsappLink(b.phone, `שלום ${b.name.split(/\s+/)[0]}, רק מוודא שאנחנו נפגשים ${relativeDay(b.start, now)} ב-${hhmm(b.start)}. מגיעים?`) });
-    for (const a of b.lead.activities) {
-      const msg = a.notes.split('\n').slice(1).join('\n');
-      out.push({ key: `consult-manual:${a.id}`, severity: 'warning', title: `${a.type.replace(' לא נשלחה', '')} · ${b.org}`, detail: `אין עדיין ספק הודעות. ההודעה מוכנה לשליחה בוואטסאפ.`, whatsapp: whatsappLink(b.phone, msg) });
-    }
   }
   return out;
 }
 
-export const messagingStatus = () => ({ connected: messagingConnected() });
