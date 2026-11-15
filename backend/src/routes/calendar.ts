@@ -15,14 +15,17 @@ router.get('/status', requireAuth, requireCoach, async (_req, res) => {
   }
 });
 
-router.get('/connect', requireAuth, requireCoach, (_, res) => {
+// The callback on this same server. (GOOGLE_REDIRECT_URI once pointed to an old Railway address that no longer exists.)
+const callbackUrl = (req: any) => `${req.protocol}://${req.get('host')}/api/calendar/callback`;
+
+router.get('/connect', requireAuth, requireCoach, (req, res) => {
   if (!process.env.GOOGLE_CLIENT_ID) {
     return res.status(400).json({ error: 'Google OAuth not configured' });
   }
   const state = crypto.randomBytes(16).toString('hex');
   pendingStates.add(state);
   setTimeout(() => pendingStates.delete(state), 10 * 60 * 1000);
-  const url = getAuthUrl(state);
+  const url = getAuthUrl(state, callbackUrl(req));
   res.json({ url });
 });
 
@@ -34,7 +37,7 @@ router.get('/callback', async (req, res) => {
   }
   pendingStates.delete(state as string);
   try {
-    const tokens = await getTokensFromCode(code as string);
+    const tokens = await getTokensFromCode(code as string, callbackUrl(req));
     await saveTokens(tokens);
     // The app may be open on the custom domain while Google returns to the Railway host.
     const origins = [...new Set([`${req.protocol}://${req.get('host')}`, process.env.PUBLIC_URL?.replace(/\/$/, '')].filter(Boolean))];

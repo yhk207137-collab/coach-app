@@ -3,16 +3,17 @@ import { prisma } from '../lib/prisma';
 
 const TOKENS_KEY = 'google_calendar_tokens';
 
-function createOAuth2Client() {
+function createOAuth2Client(redirectUri?: string) {
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
+    redirectUri || process.env.GOOGLE_REDIRECT_URI
   );
 }
 
-export function getAuthUrl(state?: string) {
-  const client = createOAuth2Client();
+// redirectUri: this server's own callback, so Google returns to the address the app actually runs on.
+export function getAuthUrl(state?: string, redirectUri?: string) {
+  const client = createOAuth2Client(redirectUri);
   return client.generateAuthUrl({
     access_type: 'offline',
     scope: [
@@ -25,8 +26,8 @@ export function getAuthUrl(state?: string) {
   });
 }
 
-export async function getTokensFromCode(code: string) {
-  const client = createOAuth2Client();
+export async function getTokensFromCode(code: string, redirectUri?: string) {
+  const client = createOAuth2Client(redirectUri);
   const { tokens } = await client.getToken(code);
   return tokens;
 }
