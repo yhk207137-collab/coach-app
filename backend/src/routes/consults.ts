@@ -1,7 +1,7 @@
 import { asyncRouter } from '../lib/asyncRouter';
 import { requireAuth, requireCoach } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
-import { cancelConsult, ConsultError, DEFAULT_CONSULT_SETTINGS, getConsultSettings, logToCard, placesLeft, plan, saveConsultSettings } from '../services/consult';
+import { cancelConsult, ConsultError, DEFAULT_CONSULT_SETTINGS, getConsultSettings, logToCard, placesLeft, plan, saveConsultSettings, setClosedDay } from '../services/consult';
 import { isCalendarConnected } from '../services/calendar';
 
 const router = asyncRouter();
@@ -31,6 +31,16 @@ router.get('/settings', async (_req, res) => {
 
 router.put('/settings', async (req, res) => {
   res.json({ settings: await saveConsultSettings(req.body || {}) });
+});
+
+// Close a day (mark it full) or open it again: { day: "2026-11-18", closed: true }
+router.put('/closed-days', async (req, res) => {
+  try {
+    res.json({ closedDays: await setClosedDay(String(req.body?.day || ''), !!req.body?.closed) });
+  } catch (e) {
+    if (e instanceof ConsultError) return res.status(400).json({ error: 'תאריך לא תקין' });
+    throw e;
+  }
 });
 
 router.post('/:id/cancel', async (req, res) => {

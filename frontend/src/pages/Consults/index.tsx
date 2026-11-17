@@ -19,7 +19,7 @@ interface Booking {
 interface Data { places: { max: number; taken: number; left: number; open: boolean }; google: boolean; bookings: Booking[] }
 interface Hours { day: number; on: boolean; from: string; to: string }
 interface Settings {
-  open: boolean; maxMeetings: number; duration: number; step: number; minNoticeHours: number; horizonDays: number; hours: Hours[];
+  open: boolean; maxMeetings: number; duration: number; step: number; minNoticeHours: number; horizonDays: number; hours: Hours[]; closedDays: string[];
   meetingLink: string; bookingPageUrl: string; warmSubject: string; warmBody: string; confirmSubject: string; confirmText: string; finalSubject: string; finalText: string;
 }
 
@@ -94,6 +94,58 @@ function BookingCard({ b, onChange }: { b: Booking; onChange: () => void }) {
         </ol>
       )}
     </div>
+  );
+}
+
+// Israel-time day key, e.g. "2026-11-18"
+const israelDay = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+const addDay = (day: string, n: number) => new Date(Date.parse(`${day}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
+// Days the owner can close (vacation, a full day): one click per day, saved at once.
+function ClosedDays({ bookings }: { bookings: Booking[] }) {
+  const qc = useQueryClient();
+  const { data } = useQuery<{ settings: Settings }>({ queryKey: ['consult-settings'], queryFn: () => api.get('/consults/settings').then((r) => r.data) });
+  const [busy, setBusy] = useState<string | null>(null);
+  if (!data) return null;
+  const s = data.settings;
+  const closed = new Set(s.closedDays || []);
+  const today = israelDay(new Date());
+  const days = Array.from({ length: s.horizonDays + 1 }, (_, i) => addDay(today, i))
+    .filter((d) => s.hours.find((h) => h.day === new Date(`${d}T12:00:00Z`).getUTCDay())?.on);
+  const count = (d: string) => bookings.filter((b) => ['BOOKED', 'CONFIRMED', 'NOT_CONFIRMED'].includes(b.status) && israelDay(new Date(b.start)) === d).length;
+  const toggle = async (d: string) => {
+    const close = !closed.has(d);
+    const n = count(d);
+    if (close && n > 0 && !confirm(`יש ${n === 1 ? 'פגישה אחת' : `${n} פגישות`} ביום הזה. ${n === 1 ? 'היא נשארת' : 'הן נשארות'} במקום, ורק מועדים חדשים לא יוצעו. לסגור את היום?`)) return;
+    setBusy(d);
+    try {
+      await api.put('/consults/closed-days', { day: d, closed: close });
+      await qc.invalidateQueries({ queryKey: ['consult-settings'] });
+      toast.success(close ? 'היום נסגר. אי אפשר לקבוע בו פגישות' : 'היום נפתח שוב לקביעת פגישות');
+    } catch { toast.error('השמירה נכשלה'); } finally { setBusy(null); }
+  };
+  return (
+    <section className="card p-4" data-closed-days>
+      <h2 className="font-semibold text-slate-900">ימים פתוחים לקביעה</h2>
+      <p className="text-xs text-slate-500 mt-0.5 mb-3">לוחצים על יום כדי לסגור אותו (חופש, יום מלא). ביום סגור אף אחד לא יכול לקבוע. לוחצים שוב כדי לפתוח.</p>
+      <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-2">
+        {days.map((d) => {
+          const isClosed = closed.has(d);
+          const n = count(d);
+          const wd = new Date(`${d}T12:00:00Z`).getUTCDay();
+          return (
+            <button key={d} data-day={d} disabled={busy === d} onClick={() => toggle(d)}
+              className={clsx('rounded-xl border p-2 text-center transition-colors disabled:opacity-50',
+                isClosed ? 'border-red-200 bg-red-50 hover:bg-red-100' : 'border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100')}>
+              <p className="text-xs text-slate-500">{d === today ? 'היום' : d === addDay(today, 1) ? 'מחר' : `יום ${DAYS[wd]}`}</p>
+              <p className="font-semibold text-slate-900">{Number(d.slice(8))}/{Number(d.slice(5, 7))}</p>
+              <p className={clsx('text-xs font-semibold', isClosed ? 'text-red-600' : 'text-emerald-700')}>{isClosed ? 'סגור' : 'פתוח'}</p>
+              {n > 0 && <p className="text-[11px] text-slate-500">{n === 1 ? 'פגישה 1' : `${n} פגישות`}</p>}
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -194,6 +246,7 @@ export default function ConsultsPage() {
 
       {tab === 'settings' ? <SettingsPanel /> : isLoading ? null : (
         <>
+          <ClosedDays bookings={data?.bookings || []} />
           {!data?.places.open && <div className="card p-4 flex items-center gap-2 text-sm text-amber-800 bg-amber-50"><AlertTriangle className="w-4 h-4" />ההצעה סגורה בדף התודה. מוצגת הודעת "כל המקומות נתפסו" וטופס רשימת המתנה.</div>}
           <section className="space-y-3">
             <h2 className="font-semibold text-slate-900">קרובות</h2>

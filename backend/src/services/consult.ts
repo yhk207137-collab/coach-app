@@ -31,6 +31,7 @@ export interface ConsultSettings {
   minNoticeHours: number;
   horizonDays: number;
   hours: ConsultHours[];
+  closedDays: string[];  // "2026-11-18": days the owner marked as full (vacation etc.)
   meetingLink: string;   // fixed link (Zoom etc.); empty = a Google Meet link per meeting
   bookingPageUrl: string;
   warmSubject: string;
@@ -49,6 +50,7 @@ export const DEFAULT_CONSULT_SETTINGS: ConsultSettings = {
   minNoticeHours: 3,
   horizonDays: 21,
   hours: [0, 1, 2, 3, 4, 5, 6].map((day) => ({ day, on: day <= 4, from: '09:00', to: '17:00' })),
+  closedDays: [],
   meetingLink: '',
   bookingPageUrl: 'https://yehoshua.co.il/book.html',
   warmSubject: 'לפני שאנחנו נפגשים, הדבר האחד שמשנה כל פגישה עם תורם',
@@ -101,6 +103,8 @@ export async function saveConsultSettings(patch: Partial<ConsultSettings>) {
         return { day: d.day, on: !!h.on, from, to };
       })
       : cur.hours,
+    // Changed only through setClosedDay, so saving the settings form never undoes a day just closed.
+    closedDays: cur.closedDays,
     meetingLink: patch.meetingLink !== undefined ? clean(patch.meetingLink, 300).trim() : cur.meetingLink,
     bookingPageUrl: patch.bookingPageUrl !== undefined ? clean(patch.bookingPageUrl, 300).trim() || DEFAULT_CONSULT_SETTINGS.bookingPageUrl : cur.bookingPageUrl,
     warmSubject: patch.warmSubject !== undefined ? clean(patch.warmSubject, 200) : cur.warmSubject,
@@ -113,6 +117,20 @@ export async function saveConsultSettings(patch: Partial<ConsultSettings>) {
   await prisma.setting.upsert({ where: { key: SETTINGS_KEY }, create: { key: SETTINGS_KEY, value: JSON.stringify(next) }, update: { value: JSON.stringify(next) } });
   slotCache = null;
   return next;
+}
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Mark one day as full (no new bookings) or open it again. Past days drop off the list.
+export async function setClosedDay(day: string, closed: boolean, now = new Date()) {
+  if (!DAY_RE.test(day)) throw new ConsultError('bad-day');
+  const cur = await getConsultSettings();
+  const today = dayKey(now);
+  const set = new Set((cur.closedDays || []).filter((d) => DAY_RE.test(d) && d >= today));
+  if (closed) set.add(day); else set.delete(day);
+  const next = { ...cur, closedDays: [...set].sort() };
+  await prisma.setting.upsert({ where: { key: SETTINGS_KEY }, create: { key: SETTINGS_KEY, value: JSON.stringify(next) }, update: { value: JSON.stringify(next) } });
+  slotCache = null;
+  return next.closedDays;
 }
 
 // ── Israel-time helpers ─────────────────────────────────────────────────────
@@ -195,7 +213,7 @@ export async function freeSlots(now = new Date(), opts: { fresh?: boolean; ignor
   for (let i = 0; i <= s.horizonDays; i++) {
     const day = addDays(today, i);
     const h = s.hours.find((x) => x.day === weekdayOf(day));
-    if (!h?.on) continue;
+    if (!h?.on || (s.closedDays || []).includes(day)) continue;
     const [fh, fm] = h.from.split(':').map(Number);
     const [th, tm] = h.to.split(':').map(Number);
     for (let m = fh * 60 + fm; m + s.duration <= th * 60 + tm; m += s.step) {
