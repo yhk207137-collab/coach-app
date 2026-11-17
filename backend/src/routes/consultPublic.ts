@@ -51,7 +51,7 @@ consultPublicRouter.post('/book', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'invalid', message: 'חסרים פרטים' });
   }
   try {
-    const booking = await bookConsult({ name, phone, email, org, start, source: str(b.source, 60) });
+    const booking = await bookConsult({ name, phone, email, org, start, source: str(b.source, 60), visitorId: /^[A-Za-z0-9_-]{8,40}$/.test(String(b.vid || '')) ? String(b.vid) : null });
     res.json({ ok: true, booking: view(booking) });
   } catch (e) { fail(res, e); }
 });

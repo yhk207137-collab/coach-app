@@ -339,7 +339,7 @@ const ownerRows = (b: ConsultBooking): [string, string][] => [['עמותה', b.o
 
 export class ConsultError extends Error { constructor(public code: string) { super(code); } }
 
-export interface BookingInput { name: string; phone: string; email: string; org: string; start: Date; source?: string | null }
+export interface BookingInput { name: string; phone: string; email: string; org: string; start: Date; source?: string | null; visitorId?: string | null }
 
 export async function bookConsult(input: BookingInput, now = new Date()) {
   const s = await getConsultSettings();
@@ -364,7 +364,7 @@ export async function bookConsult(input: BookingInput, now = new Date()) {
     if (taken >= s.maxMeetings) throw new ConsultError('full');
     const clash = await tx.consultBooking.findFirst({ where: { status: { in: ACTIVE }, start: input.start } });
     if (clash) throw new ConsultError('slot-taken');
-    return tx.consultBooking.create({ data: { leadId: lead!.id, name: input.name, phone: input.phone, email: input.email, org: input.org, start: input.start, duration: s.duration, source: input.source || null } });
+    return tx.consultBooking.create({ data: { leadId: lead!.id, name: input.name, phone: input.phone, email: input.email, org: input.org, start: input.start, duration: s.duration, source: input.source || null, visitorId: input.visitorId || null } });
   });
   slotCache = null;
 
@@ -521,9 +521,11 @@ export async function consultTick(now = new Date()) {
   }
 }
 
-// For the owner's alerts: people who didn't confirm.
+// For the owner's alerts: new bookings (last 2 days) and people who didn't confirm.
 export async function consultAlerts(now = new Date()) {
-  const out: { key: string; severity: 'critical' | 'warning'; title: string; detail: string; whatsapp?: string }[] = [];
+  const out: { key: string; severity: 'critical' | 'warning' | 'info'; title: string; detail: string; whatsapp?: string }[] = [];
+  const fresh = await prisma.consultBooking.findMany({ where: { status: { in: ['BOOKED', 'CONFIRMED'] }, createdAt: { gte: new Date(now.getTime() - 2 * DAY) }, start: { gt: now } }, orderBy: { createdAt: 'desc' } });
+  for (const b of fresh) out.push({ key: `consult-new:${b.id}`, severity: 'info', title: `נקבעה פגישת הקפצה · ${b.org}`, detail: `${b.name}, ${dayName(b.start)} ${dateLabel(b.start)} ב-${hhmm(b.start)} · ${b.phone}` });
   const upcoming = await prisma.consultBooking.findMany({ where: { status: 'NOT_CONFIRMED', start: { gt: now } } });
   for (const b of upcoming) {
     if (b.status === 'NOT_CONFIRMED') out.push({ key: `consult-noreply:${b.id}:${b.start.getTime()}`, severity: 'critical', title: `לא אישר הגעה · ${b.org}`, detail: `${b.name}, ${dayName(b.start)} ${hhmm(b.start)} · ${b.phone}`, whatsapp: whatsappLink(b.phone, `שלום ${b.name.split(/\s+/)[0]}, רק מוודא שאנחנו נפגשים ${relativeDay(b.start, now)} ב-${hhmm(b.start)}. מגיעים?`) });

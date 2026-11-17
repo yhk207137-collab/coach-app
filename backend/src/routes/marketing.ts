@@ -583,7 +583,13 @@ router.get('/tracking', async (req, res) => {
   const from = days ? new Date(Date.now() - days * 24 * 3600_000) : new Date(0);
   const [settings, welcome] = await Promise.all([getMarketingSettings(), getWelcomeCampaign()]);
   // Local copies of the page opened while working on it don't count as visitors.
-  const realPages = process.env.NODE_ENV === 'production' ? { NOT: { page: { startsWith: 'localhost' } } } : {};
+  // The consult pages (thank-you, pgisha, book) have their own list under פגישות הקפצה and stay out of the landing numbers.
+  const realPages = {
+    AND: [
+      ...(process.env.NODE_ENV === 'production' ? [{ NOT: { page: { startsWith: 'localhost' } } }] : []),
+      { NOT: { OR: ['/thank-you', '/pgisha', '/book'].map((p) => ({ page: { contains: p } })) } },
+    ],
+  };
 
   const [visits, signups, welcomeRows, downloadRows, recent, people] = await Promise.all([
     prisma.pageVisit.findMany({ where: { createdAt: { gte: from }, ...realPages }, select: { visitorId: true, contactId: true, source: true, referrer: true, createdAt: true }, take: 50_000 }),

@@ -578,6 +578,7 @@ model ConsultBooking {
   googleEventId String?
   meetLink      String?
   source        String?
+  visitorId     String?       // the browser id of the consult pages, so their visits show who booked
   // When each step of the reminder sequence went out (null = not yet)
   warmSentAt    DateTime?
   confirmSentAt DateTime?

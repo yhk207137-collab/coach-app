@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import { CalendarCheck, Settings2, AlertTriangle, CheckCircle2, Mail, MessageSquare, XCircle, Clock, ChevronDown, Save, RotateCcw } from 'lucide-react';
+import { CalendarCheck, Settings2, AlertTriangle, CheckCircle2, Mail, MessageSquare, XCircle, Clock, ChevronDown, Save, RotateCcw, Eye } from 'lucide-react';
 import api from '../../services/api';
 
 interface LogItem { id: string; type: string; notes: string; done: boolean; createdAt: string }
@@ -149,6 +149,59 @@ function ClosedDays({ bookings }: { bookings: Booking[] }) {
   );
 }
 
+interface VisitRow {
+  visitorId: string; first: string; last: string; views: number; pages: string[]; source: string;
+  contact: { id: string; name: string | null; email: string } | null;
+  booking: { id: string; name: string; org: string; status: Booking['status']; start: string; leadId: string } | null;
+}
+const SOURCE_NAMES: [RegExp, string][] = [[/whatsapp|wa\.me/i, 'וואטסאפ'], [/facebook|fb\./i, 'פייסבוק'], [/instagram/i, 'אינסטגרם'], [/google\./i, 'גוגל'], [/mail|outlook|walla/i, 'מייל']];
+const sourceName = (s: string) => (s ? SOURCE_NAMES.find(([re]) => re.test(s))?.[1] || s.replace(/^www\./, '') : 'ישירות');
+
+// Who opened the consult pages, newest first.
+function VisitsPanel() {
+  const [days, setDays] = useState(30);
+  const { data } = useQuery<{ visitors: number; booked: number; byPage: Record<string, number>; rows: VisitRow[] }>({
+    queryKey: ['consult-visits', days], queryFn: () => api.get(`/consults/visits?days=${days}`).then((r) => r.data), refetchInterval: 60_000,
+  });
+  if (!data) return null;
+  return (
+    <div className="space-y-4" data-consult-visits>
+      <div className="flex items-center gap-2">
+        {[7, 30, 90].map((d) => <button key={d} className={clsx('text-xs px-2.5 py-1 rounded-lg', d === days ? 'btn-primary' : 'btn-secondary')} onClick={() => setDays(d)}>{d} ימים</button>)}
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="card p-3"><p className="text-xs text-slate-500">נכנסו</p><p className="text-xl font-bold">{data.visitors}</p></div>
+        <div className="card p-3"><p className="text-xs text-slate-500">קבעו פגישה</p><p className="text-xl font-bold text-emerald-700">{data.booked}</p></div>
+        {['דף התודה', 'דף הפגישה', 'בחירת מועד'].map((p) => <div key={p} className="card p-3"><p className="text-xs text-slate-500">{p}</p><p className="text-xl font-bold">{data.byPage[p] || 0}</p></div>)}
+      </div>
+      <div className="card divide-y divide-slate-100">
+        {data.rows.length === 0 && <p className="p-4 text-sm text-slate-400">עוד לא נכנס אף אחד בתקופה הזאת</p>}
+        {data.rows.map((r) => {
+          const name = r.booking ? `${r.booking.name} · ${r.booking.org}` : r.contact ? (r.contact.name || r.contact.email) : null;
+          return (
+            <div key={r.visitorId} className="p-3 flex items-start justify-between gap-3 flex-wrap text-sm">
+              <div className="min-w-0">
+                <p className={clsx('font-semibold', name ? 'text-slate-900' : 'text-slate-500')}>
+                  {name || `מבקר/ת לא מזוהה`}
+                  {!r.booking && r.contact && <span className="font-normal text-xs text-slate-400"> · הוריד/ה את המדריך</span>}
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">{r.pages.join(' · ')} · {r.views === 1 ? 'כניסה אחת' : `${r.views} כניסות`} · הגיע/ה מ{sourceName(r.source)}</p>
+              </div>
+              <div className="text-left shrink-0">
+                {r.booking
+                  ? <span className={clsx('badge', STATUS[r.booking.status].cls)}>{r.booking.status === 'CANCELED' ? 'קבע/ה וביטל/ה' : `קבע/ה ל-${short(r.booking.start)}`}</span>
+                  : <span className="badge bg-amber-50 text-amber-700">לא קבע/ה</span>}
+                <p className="text-xs text-slate-400 mt-1">{format(new Date(r.last), 'd/M HH:mm')}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-xs text-slate-400">שם מופיע כשהאדם הוריד את המדריך או קבע פגישה מאותו מכשיר. מי שנכנס בלי להשאיר פרטים מופיע כ"מבקר/ת לא מזוהה".</p>
+    </div>
+  );
+}
+
 function SettingsPanel() {
   const qc = useQueryClient();
   const { data } = useQuery<{ settings: Settings; defaults: Settings }>({ queryKey: ['consult-settings'], queryFn: () => api.get('/consults/settings').then((r) => r.data) });
@@ -216,7 +269,7 @@ function SettingsPanel() {
 
 export default function ConsultsPage() {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<'list' | 'settings'>('list');
+  const [tab, setTab] = useState<'list' | 'visits' | 'settings'>('list');
   const { data, isLoading } = useQuery<Data>({ queryKey: ['consults'], queryFn: () => api.get('/consults').then((r) => r.data), refetchInterval: 60_000 });
   const refresh = () => qc.invalidateQueries({ queryKey: ['consults'] });
   const now = Date.now();
@@ -232,6 +285,7 @@ export default function ConsultsPage() {
         </div>
         <div className="flex gap-2">
           <button className={clsx('text-sm px-3 py-1.5 rounded-lg', tab === 'list' ? 'btn-primary' : 'btn-secondary')} onClick={() => setTab('list')}><CalendarCheck className="w-4 h-4" />פגישות</button>
+          <button className={clsx('text-sm px-3 py-1.5 rounded-lg', tab === 'visits' ? 'btn-primary' : 'btn-secondary')} onClick={() => setTab('visits')}><Eye className="w-4 h-4" />מי נכנס</button>
           <button className={clsx('text-sm px-3 py-1.5 rounded-lg', tab === 'settings' ? 'btn-primary' : 'btn-secondary')} onClick={() => setTab('settings')}><Settings2 className="w-4 h-4" />הגדרות וטקסטים</button>
         </div>
       </div>
@@ -244,7 +298,7 @@ export default function ConsultsPage() {
         </div>
       )}
 
-      {tab === 'settings' ? <SettingsPanel /> : isLoading ? null : (
+      {tab === 'settings' ? <SettingsPanel /> : tab === 'visits' ? <VisitsPanel /> : isLoading ? null : (
         <>
           <ClosedDays bookings={data?.bookings || []} />
           {!data?.places.open && <div className="card p-4 flex items-center gap-2 text-sm text-amber-800 bg-amber-50"><AlertTriangle className="w-4 h-4" />ההצעה סגורה בדף התודה. מוצגת הודעת "כל המקומות נתפסו" וטופס רשימת המתנה.</div>}
