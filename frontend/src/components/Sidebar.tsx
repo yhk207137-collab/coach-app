@@ -3,7 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare, CreditCard, FolderOpen, Sparkles, LogOut, CalendarDays,
   BarChart2, X, Settings, Smartphone, FileText, FolderKanban, FileSignature, Target, Package, Mail, BookUser, ChevronDown,
-  Megaphone, Wallet, CalendarClock, Activity, Bell, CalendarCheck,
+  Megaphone, Wallet, CalendarClock, Activity, Bell, CalendarCheck, Bot,
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import clsx from 'clsx';
@@ -127,6 +127,10 @@ export default function Sidebar({ open, onClose }: Props) {
           <NavLink to="/alerts" onClick={handleNav} className={linkClass}>
             <Bell size={18} className="flex-shrink-0" />
             <span>התראות</span>
+          </NavLink>
+          <NavLink to="/assistant" onClick={handleNav} className={linkClass}>
+            <Bot size={18} className="flex-shrink-0" />
+            <span>העוזר שלי</span>
           </NavLink>
 
           <div className="pt-2 space-y-1">

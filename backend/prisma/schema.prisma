@@ -578,7 +578,7 @@ model ConsultBooking {
   googleEventId String?
   meetLink      String?
   source        String?
-  visitorId     String?       // the browser id of the consult pages, so their visits show who booked
+  visitorId     String? // the browser id of the consult pages, so their visits show who booked
   // When each step of the reminder sequence went out (null = not yet)
   warmSentAt    DateTime?
   confirmSentAt DateTime?
@@ -592,4 +592,45 @@ model ConsultBooking {
 
   @@index([start])
   @@index([phone])
+}
+
+// ── WhatsApp personal assistant ─────────────────────────────────────────────
+// One conversation with the owner. Only the visible text is kept between turns.
+model AssistantMessage {
+  id        String   @id @default(cuid())
+  role      String // user | assistant
+  text      String
+  waId      String?  @unique // WhatsApp message id, so a re-delivered webhook is handled once
+  createdAt DateTime @default(now())
+}
+
+// Facts the assistant learned about the owner ("remember that...").
+model AssistantMemory {
+  id        String   @id @default(cuid())
+  fact      String
+  topic     String   @default("כללי")
+  createdAt DateTime @default(now())
+}
+
+// Something that acts in the owner's name waits here until the owner answers "yes" on WhatsApp.
+model AssistantPending {
+  id         String    @id @default(cuid())
+  kind       String
+  summary    String
+  payload    String
+  status     String    @default("WAITING") // WAITING | DONE | CANCELLED | FAILED
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+}
+
+// Spend per request, so the monthly cost is visible.
+model AssistantUsage {
+  id         String   @id @default(cuid())
+  model      String
+  inputTok   Int
+  outputTok  Int
+  cacheRead  Int      @default(0)
+  cacheWrite Int      @default(0)
+  costUsd    Float
+  createdAt  DateTime @default(now())
 }

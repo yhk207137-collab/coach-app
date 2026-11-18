@@ -31,6 +31,7 @@ import CampaignsPage from './pages/Marketing/Campaigns';
 import CampaignReport from './pages/Marketing/Report';
 import TrackingPage from './pages/Marketing/Tracking';
 import AlertsPage from './pages/Alerts';
+import AssistantPage from './pages/Assistant';
 import CampaignEditor from './pages/Marketing/Editor';
 import Unsubscribe from './pages/Unsubscribe';
 
@@ -85,6 +86,7 @@ export default function App() {
         <Route element={<RequireCoach><Layout /></RequireCoach>}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/alerts" element={<AlertsPage />} />
+          <Route path="/assistant" element={<AssistantPage />} />
           <Route path="/clients" element={<ClientsPage />} />
           <Route path="/clients/:id" element={<ClientDetail />} />
           <Route path="/meetings" element={<MeetingsPage />} />

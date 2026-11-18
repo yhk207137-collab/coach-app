@@ -20,6 +20,8 @@ export function getAuthUrl(state?: string, redirectUri?: string) {
       'https://www.googleapis.com/auth/calendar',
       'https://www.googleapis.com/auth/spreadsheets',
       'https://www.googleapis.com/auth/drive.file',
+      // The WhatsApp assistant reads, drafts and (after the owner says yes) sends email.
+      'https://www.googleapis.com/auth/gmail.modify',
     ],
     prompt: 'consent',
     ...(state ? { state } : {}),
@@ -55,6 +57,17 @@ export async function getAuthorizedClient() {
   });
 
   return client;
+}
+
+// True when the stored grant includes Gmail (older grants were calendar-only and need one reconnect).
+export async function hasGmailAccess(): Promise<boolean> {
+  const row = await prisma.setting.findUnique({ where: { key: TOKENS_KEY } });
+  if (!row) return false;
+  try {
+    return String(JSON.parse(row.value).scope || '').includes('gmail.modify');
+  } catch {
+    return false;
+  }
 }
 
 export function isRevokedGoogleGrant(err: any) {
