@@ -31,4 +31,10 @@ export interface HostOptions {
   hostDescription?: string;
   /** Local trial only: serve a chat window at http://localhost:<port>/ (never through the public tunnel). */
   localChat?: boolean;
+  /**
+   * How WhatsApp reaches the assistant:
+   * cloud  – Meta's official Business API (webhook; needs a public address).
+   * linked – the assistant's own number linked as a device with a pairing code (local trial; unofficial).
+   */
+  whatsapp?: 'cloud' | 'linked';
 }

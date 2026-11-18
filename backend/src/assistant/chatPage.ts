@@ -38,6 +38,23 @@ export const CHAT_PAGE = `<!doctype html>
 </main>
 <aside>
   <div class="st" id="st"></div>
+  <section id="wa" style="display:none;margin-bottom:18px;padding:12px;border:1px solid var(--line);border-radius:10px">
+    <h3>חיבור וואטסאפ</h3>
+    <div id="waOk" style="display:none;color:var(--accent);font-size:14px">מחובר ✓ אפשר לכתוב לעוזר בוואטסאפ.</div>
+    <div id="waSetup">
+      <label style="font-size:12px;color:var(--muted)">המספר שלך (רק ממנו הוא יקבל פקודות)</label>
+      <input id="own" inputmode="tel" placeholder="05X-XXXXXXX" style="width:100%;margin:4px 0 8px;border-radius:8px">
+      <label style="font-size:12px;color:var(--muted)">המספר של העוזר (הפנוי)</label>
+      <input id="bot" inputmode="tel" placeholder="05X-XXXXXXX" style="width:100%;margin:4px 0 8px;border-radius:8px">
+      <button id="getCode" style="width:100%;padding:9px">קבל קוד חיבור</button>
+      <div id="codeBox" style="display:none;margin-top:12px;text-align:center">
+        <div style="font-size:12px;color:var(--muted)">הקוד לחיבור:</div>
+        <div id="code" style="font-size:30px;font-weight:700;letter-spacing:3px;direction:ltr;margin:4px 0"></div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.5;text-align:right">בטלפון של המספר הפנוי: וואטסאפ ← ⋮ / הגדרות ← <b>מכשירים מקושרים</b> ← <b>קישור מכשיר</b> ← <b>קישור באמצעות מספר טלפון</b> ← הקלד את הקוד.<br>הקוד תקף כמה דקות. אם פג, לחץ שוב.</div>
+      </div>
+      <div id="waErr" style="color:#dc2626;font-size:12px;margin-top:6px"></div>
+    </div>
+  </section>
   <h3>מה הוא זוכר עליך</h3>
   <ul id="mem"></ul>
 </aside>
@@ -57,7 +74,32 @@ async function load() {
   r.messages.forEach((m) => add(m.role, m.text, m.createdAt));
   document.getElementById('mem').innerHTML = r.memories.length ? r.memories.map((m) => '<li>' + esc(m.fact) + '</li>').join('') : '<li style="color:var(--muted)">עוד לא למד כלום</li>';
   document.getElementById('st').textContent = 'מנוי Claude: ' + (r.brain ? 'מחובר ✓' : 'לא מחובר') + ' · וואטסאפ: ' + (r.whatsapp ? 'מחובר ✓' : 'עוד לא');
+  showWa(r.wa);
 }
+function showWa(wa) {
+  if (!wa) return;
+  document.getElementById('wa').style.display = 'block';
+  const ok = wa.state === 'connected';
+  document.getElementById('waOk').style.display = ok ? 'block' : 'none';
+  document.getElementById('waSetup').style.display = ok ? 'none' : 'block';
+  const own = document.getElementById('own'), bot = document.getElementById('bot');
+  if (wa.ownerNumber && !own.value) own.value = wa.ownerNumber;
+  if (wa.botNumber && !bot.value) bot.value = wa.botNumber;
+  document.getElementById('codeBox').style.display = wa.code ? 'block' : 'none';
+  document.getElementById('code').textContent = wa.code || '';
+  document.getElementById('waErr').textContent = wa.error ? 'שגיאה: ' + wa.error : '';
+}
+document.getElementById('getCode').onclick = async () => {
+  const b = document.getElementById('getCode');
+  b.disabled = true; b.textContent = 'מבקש קוד…';
+  const wa = await fetch('/api/assistant/wa/numbers', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ owner: document.getElementById('own').value, bot: document.getElementById('bot').value }) }).then((x) => x.json()).catch(() => null);
+  b.disabled = false; b.textContent = 'קבל קוד חדש';
+  showWa(wa || { state:'off', error:'לא הצלחתי לבקש קוד' });
+};
+setInterval(async () => {
+  const r = await fetch('/api/assistant/chat/history').then((x) => x.json()).catch(() => null);
+  if (r && r.wa) { showWa(r.wa); document.getElementById('st').textContent = 'מנוי Claude: ' + (r.brain ? 'מחובר ✓' : 'לא מחובר') + ' · וואטסאפ: ' + (r.whatsapp ? 'מחובר ✓' : 'עוד לא'); }
+}, 5000);
 document.getElementById('f').onsubmit = async (e) => {
   e.preventDefault();
   const q = document.getElementById('q'), b = document.getElementById('b');

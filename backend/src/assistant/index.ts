@@ -7,6 +7,7 @@ import OpenAI, { toFile } from 'openai';
 import type { HostOptions } from './host';
 import { db } from './store';
 import { CHAT_PAGE } from './chatPage';
+import { relink, requestCode, saveNumbers, startWaWeb, waWebState } from './waweb';
 import { brainConfigured, handleOwnerMessage } from './brain';
 import { finishGoogleConnect, googleAuthUrlFor, googleCallbackPath } from './google';
 import { downloadMedia, isOwner, markReadAndTyping, sendText, validSignature, waConfigured } from './whatsapp';
@@ -151,10 +152,26 @@ export function mountAssistant(app: Express, host: HostOptions = {}) {
         db.assistantMessage.findMany({ orderBy: { createdAt: 'desc' }, take: 60 }),
         db.assistantMemory.findMany({ orderBy: { createdAt: 'asc' } }),
       ]);
-      res.json({ messages: messages.reverse(), memories, brain: brainConfigured(), whatsapp: waConfigured() });
+      const wa = host.whatsapp === 'linked' ? waWebState() : null;
+      res.json({ messages: messages.reverse(), memories, brain: brainConfigured(), whatsapp: wa ? wa.state === 'connected' : waConfigured(), wa });
     });
+    if (host.whatsapp === 'linked') {
+      // Link the assistant's WhatsApp from the chat window: save both numbers, then get a pairing code.
+      r.post('/wa/numbers', express.json(), async (req, res) => {
+        if (!local(req)) return res.sendStatus(404);
+        await saveNumbers(String(req.body?.owner || ''), String(req.body?.bot || ''));
+        await relink();
+        res.json(await requestCode());
+      });
+      r.post('/wa/code', async (req, res) => {
+        if (!local(req)) return res.sendStatus(404);
+        res.json(await requestCode());
+      });
+    }
     app.get('/', (req, res) => (local(req) ? res.type('html').send(CHAT_PAGE) : res.sendStatus(404)));
   }
+
+  if (host.whatsapp === 'linked') startWaWeb(host).catch((err) => console.error('[ASSISTANT] WhatsApp start failed:', err?.message || err));
 
   app.use('/api/assistant', r);
 }

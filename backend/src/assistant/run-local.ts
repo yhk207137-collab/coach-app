@@ -5,5 +5,5 @@ import { mountAssistant } from './index';
 
 const app = express();
 const port = Number(process.env.ASSISTANT_PORT || 4790);
-mountAssistant(app, { localChat: true });
+mountAssistant(app, { localChat: true, whatsapp: 'linked' });
 app.listen(port, '127.0.0.1', () => console.log(`[ASSISTANT] ready: http://localhost:${port}/`));
