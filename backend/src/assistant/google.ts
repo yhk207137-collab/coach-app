@@ -1,13 +1,70 @@
-// Google Calendar and Gmail for the assistant, on the same grant the CRM already uses.
+// Google Calendar and Gmail for the assistant. It has its own Google grant, separate from any host app.
+import crypto from 'crypto';
 import { google } from 'googleapis';
-import { getAuthorizedClient } from '../calendar';
+import { kvGet, kvSet, kvDelete } from './store';
 
 const TZ = 'Asia/Jerusalem';
+const TOKENS = 'google_tokens';
+const SCOPES = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/gmail.modify'];
+
+export const googleCallbackPath = '/api/assistant/google/callback';
+const redirectUri = () => `${process.env.ASSISTANT_PUBLIC_URL || process.env.PUBLIC_URL || ''}${googleCallbackPath}`;
+const oauth = () => new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, redirectUri());
+
+// One-time links the assistant sends the owner on WhatsApp ("חבר גוגל"). Valid 15 minutes.
+const linkTokens = new Map<string, number>();
+const states = new Map<string, number>();
+
+export function googleConnectLink() {
+  if (!process.env.GOOGLE_CLIENT_ID) throw new Error('Google OAuth is not configured on the server');
+  const t = crypto.randomBytes(18).toString('base64url');
+  linkTokens.set(t, Date.now() + 15 * 60_000);
+  return `${process.env.ASSISTANT_PUBLIC_URL || process.env.PUBLIC_URL || ''}/api/assistant/google/start?t=${t}`;
+}
+
+// Called by the /start route: trades the one-time link for Google's consent page.
+export function googleAuthUrlFor(linkToken: string) {
+  const until = linkTokens.get(linkToken);
+  linkTokens.delete(linkToken);
+  if (!until || until < Date.now()) return null;
+  const state = crypto.randomBytes(16).toString('hex');
+  states.set(state, Date.now() + 15 * 60_000);
+  return oauth().generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: SCOPES, state });
+}
+
+export async function finishGoogleConnect(code: string, state: string) {
+  const until = states.get(state);
+  states.delete(state);
+  if (!until || until < Date.now()) throw new Error('הקישור פג תוקף. בקש מהעוזר קישור חדש.');
+  const { tokens } = await oauth().getToken(code);
+  await kvSet(TOKENS, JSON.stringify(tokens));
+}
+
+export async function googleStatus(): Promise<{ calendar: boolean; gmail: boolean }> {
+  const raw = await kvGet(TOKENS);
+  if (!raw) return { calendar: false, gmail: false };
+  try {
+    const client = oauth();
+    client.setCredentials(JSON.parse(raw));
+    await client.getAccessToken();
+    const scope = String(JSON.parse(raw).scope || '');
+    return { calendar: scope.includes('auth/calendar'), gmail: scope.includes('gmail.modify') };
+  } catch (err: any) {
+    if (String(err?.message || '').includes('invalid_grant')) await kvDelete(TOKENS);
+    return { calendar: false, gmail: false };
+  }
+}
 
 async function auth() {
-  const a = await getAuthorizedClient();
-  if (!a) throw new Error('גוגל לא מחובר. צריך ללחוץ "חבר יומן גוגל" בהגדרות המערכת.');
-  return a;
+  const raw = await kvGet(TOKENS);
+  if (!raw) throw new Error('גוגל עוד לא מחובר לעוזר. אפשר לבקש ממני "קישור לחיבור גוגל".');
+  const tokens = JSON.parse(raw);
+  const client = oauth();
+  client.setCredentials(tokens);
+  client.on('tokens', (fresh) => {
+    kvSet(TOKENS, JSON.stringify({ ...tokens, ...fresh })).catch(() => undefined);
+  });
+  return client;
 }
 
 const fmt = new Intl.DateTimeFormat('he-IL', {

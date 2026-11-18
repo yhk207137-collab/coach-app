@@ -594,7 +594,7 @@ model ConsultBooking {
   @@index([phone])
 }
 
-// ── WhatsApp personal assistant ─────────────────────────────────────────────
+// ── WhatsApp personal assistant (self-contained module: src/assistant) ────────
 // One conversation with the owner. Only the visible text is kept between turns.
 model AssistantMessage {
   id        String   @id @default(cuid())
@@ -623,7 +623,13 @@ model AssistantPending {
   resolvedAt DateTime?
 }
 
-// Spend per request, so the monthly cost is visible.
+// The assistant's own settings (e.g. its Google grant), separate from the host app's settings.
+model AssistantKV {
+  key   String @id
+  value String
+}
+
+// Estimated use per request (on the owner's subscription this is not billed; kept to see how heavy it is).
 model AssistantUsage {
   id         String   @id @default(cuid())
   model      String

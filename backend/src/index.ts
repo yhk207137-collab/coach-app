@@ -38,15 +38,17 @@ import settingsRoutes from './routes/settings';
 import leadRoutes from './routes/leads';
 import invoiceRoutes from './routes/invoices';
 import serviceRoutes from './routes/services';
-import assistantRoutes, { whatsappWebhook } from './routes/assistant';
+import { mountAssistant } from './assistant';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-// rawBody: the WhatsApp webhook checks Meta's signature over the exact bytes.
-app.use(express.json({ limit: '10mb', verify: (req: any, _res, buf) => { req.rawBody = buf; } }));
+// Personal WhatsApp assistant: a separate module with its own data, not connected to this app.
+// Mounted before express.json() so its webhook can verify Meta's signature on the raw body.
+mountAssistant(app);
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Called from landing pages on other domains and from inside emails, so these get their own open CORS.
@@ -65,8 +67,6 @@ app.use('/api/public', cors({ origin: true }), publicLimiter, publicRouter);
 // Landing-page views; generous, since one person browsing loads it once per page.
 app.use('/api/t/v.gif', rateLimit({ windowMs: 15 * 60 * 1000, max: 1500, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/t', trackingRouter);
-// Meta calls this; it checks the signature itself.
-app.use('/api/whatsapp/webhook', whatsappWebhook);
 
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true }));
 
@@ -148,7 +148,6 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/marketing', marketingRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/consults', consultRoutes);
-app.use('/api/assistant', assistantRoutes);
 
 app.get('/api/health', (_, res) =>
   res.json({ ok: true, version: (process.env.RAILWAY_GIT_COMMIT_SHA || 'dev').slice(0, 7) })
