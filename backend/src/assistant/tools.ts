@@ -2,8 +2,18 @@
 // another person in the owner's name becomes a pending action that only the owner's "yes" releases.
 import { z } from 'zod';
 import type { HostTool } from './host';
-import { db } from './store';
+import { db, kvGet, kvSet } from './store';
 import * as g from './google';
+import { afterQuiet, fromIsraelLocal, isQuietTime, nextOccurrence, showWhen } from './time';
+
+export const DEFAULT_DAILY_LIMIT = 60;
+export async function readSettings() {
+  return {
+    morningBrief: (await kvGet('brief_on')) !== '0',
+    morningBriefTime: (await kvGet('brief_time')) || '07:30',
+    dailyLimit: Number((await kvGet('daily_limit')) || process.env.ASSISTANT_DAILY_LIMIT || DEFAULT_DAILY_LIMIT),
+  };
+}
 import { createZoomMeeting, deleteZoomMeeting, listZoomMeetings, zoomConfigured } from './zoom';
 
 const LOCAL = 'Israel local time, format YYYY-MM-DDTHH:mm';
@@ -197,6 +207,121 @@ export function buildTools(hostTools: HostTool[], turnStartedAt: Date): ToolSpec
       shape: {},
       readOnly: false,
       run: async () => ({ link: await g.googleConnectLink() }),
+    },
+    // ── Reminders ──
+    {
+      name: 'reminder_set',
+      description:
+        'Set a reminder for the owner. It arrives on WhatsApp (and on his computer) at that time. Times are Israel local. Reminders that fall on Shabbat or Yom Tov are moved to right after it ends — tell him when that happens.',
+      shape: {
+        text: z.string().describe('What to remind him, in Hebrew, written as the reminder he will read'),
+        at: z.string().describe(LOCAL),
+        repeat: z.enum(['none', 'daily', 'weekly', 'monthly']).optional().describe('Default none'),
+      },
+      readOnly: false,
+      run: async (i) => {
+        const wanted = fromIsraelLocal(i.at);
+        if (wanted.getTime() < Date.now() - 60e3) return { error: 'This time has already passed. Ask him for a future time.' };
+        const repeat = i.repeat || 'none';
+        // A one-time reminder that falls on Shabbat comes right after it; a repeating one skips to its next regular time.
+        const dueAt = !isQuietTime(wanted) ? wanted : repeat === 'none' ? afterQuiet(wanted) : nextOccurrence(wanted, repeat, wanted) || afterQuiet(wanted);
+        const r = await db.assistantReminder.create({ data: { text: String(i.text).trim(), dueAt, repeat } });
+        return { done: true, id: r.id, when: showWhen(dueAt), movedBecauseOfShabbat: dueAt.getTime() !== wanted.getTime() };
+      },
+    },
+    {
+      name: 'reminder_list',
+      description: 'List the reminders that are still waiting.',
+      shape: {},
+      readOnly: true,
+      run: async () =>
+        (await db.assistantReminder.findMany({ where: { status: 'WAITING' }, orderBy: { dueAt: 'asc' } })).map((r) => ({
+          id: r.id,
+          text: r.text,
+          when: showWhen(r.dueAt),
+          repeat: r.repeat,
+        })),
+    },
+    {
+      name: 'reminder_cancel',
+      description: 'Cancel a waiting reminder (also stops a repeating one).',
+      shape: { id: z.string() },
+      readOnly: false,
+      run: async (i) => {
+        const n = await db.assistantReminder.updateMany({ where: { id: i.id, status: 'WAITING' }, data: { status: 'CANCELLED' } });
+        return n.count ? { done: true } : { error: 'אין תזכורת כזו שממתינה' };
+      },
+    },
+
+    // ── Personal tasks ──
+    {
+      name: 'task_add',
+      description: "Add an item to the owner's personal to-do list.",
+      shape: { title: z.string(), dueDay: z.string().optional().describe('YYYY-MM-DD, optional') },
+      readOnly: false,
+      run: async (i) => {
+        const title = String(i.title || '').trim();
+        if (!title) return { error: 'empty task' };
+        const t = await db.assistantTask.create({ data: { title, dueDay: i.dueDay || null } });
+        return { done: true, id: t.id };
+      },
+    },
+    {
+      name: 'task_list',
+      description: "The owner's personal to-do list. Open items by default; includeDone shows the last week's finished ones too.",
+      shape: { includeDone: z.boolean().optional() },
+      readOnly: true,
+      run: async (i) => {
+        const weekAgo = new Date(Date.now() - 7 * 24 * 3600e3);
+        const rows = await db.assistantTask.findMany({
+          where: i.includeDone ? { OR: [{ done: false }, { doneAt: { gte: weekAgo } }] } : { done: false },
+          orderBy: [{ done: 'asc' }, { dueDay: 'asc' }, { createdAt: 'asc' }],
+        });
+        return rows.map((t) => ({ id: t.id, title: t.title, dueDay: t.dueDay, done: t.done }));
+      },
+    },
+    {
+      name: 'task_done',
+      description: 'Mark a personal task as done (or not done with done=false).',
+      shape: { id: z.string(), done: z.boolean().optional() },
+      readOnly: false,
+      run: async (i) => {
+        const done = i.done !== false;
+        const n = await db.assistantTask.updateMany({ where: { id: i.id }, data: { done, doneAt: done ? new Date() : null } });
+        return n.count ? { done: true } : { error: 'אין משימה כזו' };
+      },
+    },
+    {
+      name: 'task_delete',
+      description: 'Delete a personal task.',
+      shape: { id: z.string() },
+      readOnly: false,
+      run: async (i) => {
+        const n = await db.assistantTask.deleteMany({ where: { id: i.id } });
+        return n.count ? { done: true } : { error: 'אין משימה כזו' };
+      },
+    },
+
+    // ── Morning brief and daily limit ──
+    {
+      name: 'assistant_settings',
+      description:
+        'Change how the assistant works for him: the morning brief (on/off and time, Israel local HH:mm) and the daily limit of messages it handles (protects his Claude plan quota). Call with no fields to read the current values.',
+      shape: {
+        morningBrief: z.boolean().optional(),
+        morningBriefTime: z.string().optional().describe('HH:mm'),
+        dailyLimit: z.number().int().optional().describe('Messages per day, 5 to 500'),
+      },
+      readOnly: false,
+      run: async (i) => {
+        if (i.morningBrief !== undefined) await kvSet('brief_on', i.morningBrief ? '1' : '0');
+        if (i.morningBriefTime) {
+          if (!/^\d{2}:\d{2}$/.test(i.morningBriefTime)) return { error: 'time must be HH:mm' };
+          await kvSet('brief_time', i.morningBriefTime);
+        }
+        if (i.dailyLimit !== undefined) await kvSet('daily_limit', String(Math.min(500, Math.max(5, i.dailyLimit))));
+        return await readSettings();
+      },
     },
     {
       name: 'memory_save',

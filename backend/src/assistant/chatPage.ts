@@ -76,6 +76,14 @@ export const CHAT_PAGE = `<!doctype html>
       <div class="msg" id="zMsg"></div>
     </details>
   </section>
+  <section style="margin-bottom:18px;padding:12px;border:1px solid var(--line);border-radius:10px">
+    <h3>הגדרות</h3>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px"><input type="checkbox" id="pBrief" style="width:auto"> סיכום בוקר בשעה <input id="pTime" type="time" style="width:auto;padding:4px 6px;border-radius:6px"></label>
+    <label style="display:block;font-size:13px;margin-top:8px">מכסת הודעות ביום <input id="pLimit" type="number" min="5" max="500" style="width:70px;padding:4px 6px;border-radius:6px"></label>
+    <div id="pUsed" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
+    <button id="pSave" class="fb">שמור הגדרות</button>
+    <div class="msg" id="pMsg"></div>
+  </section>
   <h3>מה הוא זוכר עליך</h3>
   <ul id="mem"></ul>
 </aside>
@@ -157,6 +165,27 @@ document.getElementById('zGo').onclick = async () => {
 };
 loadConn();
 setInterval(loadConn, 10000);
+function showPrefs(p) {
+  document.getElementById('pBrief').checked = !!p.morningBrief;
+  document.getElementById('pTime').value = p.morningBriefTime;
+  document.getElementById('pLimit').value = p.dailyLimit;
+  document.getElementById('pUsed').textContent = 'היום: ' + p.usedToday + ' מתוך ' + p.dailyLimit + ' הודעות';
+}
+fetch('/api/assistant/prefs').then((x) => x.json()).then(showPrefs).catch(() => {});
+document.getElementById('pSave').onclick = async () => {
+  const p = await fetch('/api/assistant/prefs', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ morningBrief: document.getElementById('pBrief').checked, morningBriefTime: document.getElementById('pTime').value, dailyLimit: Number(document.getElementById('pLimit').value) }) }).then((x) => x.json());
+  showPrefs(p);
+  const m = document.getElementById('pMsg'); m.style.color = 'var(--accent)'; m.textContent = 'נשמר ✓';
+  setTimeout(() => (m.textContent = ''), 2500);
+};
+// Reminders and the morning brief arrive on their own: refresh the chat when something new shows up.
+let seen = -1;
+setInterval(async () => {
+  const r = await fetch('/api/assistant/chat/history').then((x) => x.json()).catch(() => null);
+  if (!r) return;
+  if (seen >= 0 && r.messages.length !== seen && !document.getElementById('b').disabled) load();
+  seen = r.messages.length;
+}, 15000);
 setInterval(async () => {
   const r = await fetch('/api/assistant/chat/history').then((x) => x.json()).catch(() => null);
   if (r && r.wa) { showWa(r.wa); document.getElementById('st').textContent = 'מנוי Claude: ' + (r.brain ? 'מחובר ✓' : 'לא מחובר') + ' · וואטסאפ: ' + (r.whatsapp ? 'מחובר ✓' : 'עוד לא'); }

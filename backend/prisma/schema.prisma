@@ -640,3 +640,24 @@ model AssistantUsage {
   costUsd    Float
   createdAt  DateTime @default(now())
 }
+
+// Reminders the owner asked for ("תזכיר לי מחר ב-9..."). repeat: none | daily | weekly | monthly.
+model AssistantReminder {
+  id        String    @id @default(cuid())
+  text      String
+  dueAt     DateTime
+  repeat    String    @default("none")
+  status    String    @default("WAITING") // WAITING | SENT | CANCELLED
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+// The owner's personal to-do list (separate from any business app).
+model AssistantTask {
+  id        String    @id @default(cuid())
+  title     String
+  dueDay    String? // YYYY-MM-DD, Israel time
+  done      Boolean   @default(false)
+  doneAt    DateTime?
+  createdAt DateTime  @default(now())
+}

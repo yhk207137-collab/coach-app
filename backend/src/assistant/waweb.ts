@@ -67,6 +67,8 @@ async function onMessage(m: any) {
     return;
   }
   if (await db.assistantMessage.findUnique({ where: { waId: m.key.id } })) return;
+  // Remember the chat the owner writes from, so reminders and the morning brief reach the same chat.
+  if ((await kvGet('owner_jid')) !== jid) await kvSet('owner_jid', jid);
 
   const msg = m.message.ephemeralMessage?.message || m.message.viewOnceMessage?.message || m.message;
   let text = msg.conversation || msg.extendedTextMessage?.text || '';
@@ -214,4 +216,12 @@ export async function requestCode() {
   for (let i = 0; i < 50 && !st.code && !st.error; i++) await new Promise((r) => setTimeout(r, 500));
   if (!st.code && !st.error) st.error = 'וואטסאפ לא החזיר קוד. נסה שוב בעוד דקה.';
   return waWebState();
+}
+
+/** Sends a message the assistant starts on its own (reminder, morning brief). False when WhatsApp isn't linked. */
+export async function sendToOwner(text: string) {
+  if (!sock || st.state !== 'connected') return false;
+  const jid = (await kvGet('owner_jid')) || `${await ownerNumber()}@s.whatsapp.net`;
+  await sock.sendMessage(jid, { text });
+  return true;
 }

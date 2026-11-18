@@ -7,8 +7,12 @@ import OpenAI, { toFile } from 'openai';
 import type { HostOptions } from './host';
 import { db } from './store';
 import { CHAT_PAGE } from './chatPage';
-import { requestCode, saveNumbers, startWaWeb, waWebState } from './waweb';
-import { brainConfigured, handleOwnerMessage } from './brain';
+import { requestCode, saveNumbers, sendToOwner, startWaWeb, waWebState } from './waweb';
+import { setWhatsappSender } from './notify';
+import { startScheduler } from './scheduler';
+import { readSettings } from './tools';
+import { kvSet } from './store';
+import { brainConfigured, handleOwnerMessage, messagesToday } from './brain';
 import { finishGoogleConnect, googleAuthUrlFor, googleCallbackPath, googleConnectLink, googleRedirectUri, googleStatus } from './google';
 import { saveSettings, settingsFilled } from './settings';
 import { listZoomMeetings, resetZoomLogin, zoomConfigured } from './zoom';
@@ -170,6 +174,19 @@ export function mountAssistant(app: Express, host: HostOptions = {}) {
       });
     }
     // Connections panel: Google and Zoom details are pasted here, then Google is connected with one click.
+    // Morning brief and the daily message limit (protects the owner's Claude plan).
+    r.get('/prefs', async (req, res) => {
+      if (!local(req)) return res.sendStatus(404);
+      res.json({ ...(await readSettings()), usedToday: await messagesToday() });
+    });
+    r.post('/prefs', express.json(), async (req, res) => {
+      if (!local(req)) return res.sendStatus(404);
+      const b = req.body || {};
+      if (b.morningBrief !== undefined) await kvSet('brief_on', b.morningBrief ? '1' : '0');
+      if (/^\d{2}:\d{2}$/.test(String(b.morningBriefTime || ''))) await kvSet('brief_time', b.morningBriefTime);
+      if (Number(b.dailyLimit) >= 5) await kvSet('daily_limit', String(Math.min(500, Math.round(Number(b.dailyLimit)))));
+      res.json({ ...(await readSettings()), usedToday: await messagesToday() });
+    });
     r.get('/connections', async (req, res) => {
       if (!local(req)) return res.sendStatus(404);
       const [filled, google, zoom] = await Promise.all([settingsFilled(), googleStatus(), zoomConfigured()]);
@@ -201,7 +218,12 @@ export function mountAssistant(app: Express, host: HostOptions = {}) {
     app.get('/', (req, res) => (local(req) ? res.type('html').send(CHAT_PAGE) : res.sendStatus(404)));
   }
 
-  if (host.whatsapp === 'linked') startWaWeb(host).catch((err) => console.error('[ASSISTANT] WhatsApp start failed:', err?.message || err));
+  if (host.whatsapp === 'linked') {
+    setWhatsappSender(sendToOwner);
+    startWaWeb(host).catch((err) => console.error('[ASSISTANT] WhatsApp start failed:', err?.message || err));
+  }
+  // Reminders and the morning brief.
+  startScheduler(host);
 
   app.use('/api/assistant', r);
 }

@@ -9,7 +9,8 @@ import type * as Sdk from '@anthropic-ai/claude-agent-sdk';
 import type { HostOptions } from './host';
 import { db } from './store';
 import { googleStatus } from './google';
-import { buildTools, runSafely } from './tools';
+import { buildTools, readSettings, runSafely } from './tools';
+import { showWhen, israelDay } from './time';
 import { zoomConfigured } from './zoom';
 
 // The SDK is ESM-only; this server is CommonJS, so load it with a real dynamic import.
@@ -34,7 +35,9 @@ How you work:
 - Memory: when you learn something lasting about him (preferences, people in his life and work, how he likes things done, recurring commitments), save it with memory_save without asking, one fact per call. If a saved fact is wrong or he asks you to forget, memory_forget it. He can ask "מה אתה זוכר עליי?" — list it from the memory below.
 - If Google is not connected and he needs calendar or mail, send him the link from google_connect_link.
 - You are the manager, and his Claude plan has limited capacity, so be frugal. Do quick things yourself. For jobs that mean reading a lot (many emails, long threads) use the "reader" agent; for web research use the "researcher" agent. Give them the full task, since they don't see this chat.
-- He observes Shabbat and Yom Tov.`;
+- Reminders (reminder_set / reminder_list / reminder_cancel) and his personal to-do list (task_*) are yours to keep. "תזכיר לי..." means reminder_set; "תוסיף למשימות..." means task_add. When you set a reminder, confirm the exact day and time in one short line.
+- assistant_settings changes the morning brief (time, on/off) and the daily message limit that protects his Claude plan.
+- He observes Shabbat and Yom Tov: nothing is sent then; reminders that fall then arrive right after.`;
 
 function israelNow(now: Date) {
   const greg = new Intl.DateTimeFormat('he-IL', { timeZone: 'Asia/Jerusalem', dateStyle: 'full', timeStyle: 'short' }).format(now);
@@ -44,6 +47,12 @@ function israelNow(now: Date) {
 }
 
 async function contextText(now: Date, host: HostOptions) {
+  const [reminders, tasks, settings, usedToday] = await Promise.all([
+    db.assistantReminder.findMany({ where: { status: 'WAITING' }, orderBy: { dueAt: 'asc' }, take: 8 }),
+    db.assistantTask.findMany({ where: { done: false }, orderBy: [{ dueDay: 'asc' }, { createdAt: 'asc' }], take: 15 }),
+    readSettings(),
+    messagesToday(now),
+  ]);
   const [memories, pending, google, history] = await Promise.all([
     db.assistantMemory.findMany({ orderBy: { createdAt: 'asc' } }),
     db.assistantPending.findMany({ where: { status: 'WAITING', createdAt: { gte: new Date(now.getTime() - 24 * 3600e3) } }, orderBy: { createdAt: 'asc' } }),
@@ -60,6 +69,14 @@ async function contextText(now: Date, host: HostOptions) {
     '',
     'Actions waiting for his yes (id: what):',
     ...(pending.length ? pending.map((p) => `- ${p.id}: ${p.summary.replace(/\n/g, ' ⏎ ').slice(0, 600)}`) : ['- (none)']),
+    '',
+    'Upcoming reminders (id: when — text):',
+    ...(reminders.length ? reminders.map((r) => `- ${r.id}: ${showWhen(r.dueAt)} — ${r.text}${r.repeat !== 'none' ? ` (חוזר: ${r.repeat})` : ''}`) : ['- (none)']),
+    '',
+    'Open personal tasks (id: task):',
+    ...(tasks.length ? tasks.map((t) => `- ${t.id}: ${t.title}${t.dueDay ? ` (עד ${t.dueDay})` : ''}`) : ['- (none)']),
+    '',
+    `Settings: morning brief ${settings.morningBrief ? 'on at ' + settings.morningBriefTime : 'off'}; daily limit ${settings.dailyLimit} messages, ${usedToday} used today.`,
     '',
     'Recent conversation (oldest first):',
     ...history.reverse().map((m) => `${m.role === 'user' ? 'יהושע' : 'אתה'}: ${m.text.slice(0, 1500)}`),
@@ -87,6 +104,13 @@ const workDir = path.join(os.tmpdir(), 'assistant-work');
 async function think(msg: Incoming, host: HostOptions): Promise<string> {
   if (!brainConfigured()) return 'העוזר עוד לא מחובר למנוי Claude (חסר הטוקן בשרת).';
   const now = msg.at || new Date();
+  const { dailyLimit } = await readSettings();
+  if ((await messagesToday(now)) >= dailyLimit) {
+    await db.assistantMessage.create({ data: { role: 'user', text: msg.text || '(קובץ)', waId: msg.waId, createdAt: now } });
+    const stop = `הגעתי למכסה היומית שקבעת (${dailyLimit} הודעות), כדי לשמור על המנוי שלך. נמשיך מחר. אפשר להגדיל את המכסה בחלון העוזר.`;
+    await db.assistantMessage.create({ data: { role: 'assistant', text: stop } });
+    return stop;
+  }
   const system = `${SYSTEM}\n\n${await contextText(now, host)}`;
   await db.assistantMessage.create({ data: { role: 'user', text: msg.text || '(קובץ)', waId: msg.waId, createdAt: now } });
 
@@ -100,6 +124,32 @@ async function think(msg: Incoming, host: HostOptions): Promise<string> {
   reply = reply.trim() || 'בוצע.';
   await db.assistantMessage.create({ data: { role: 'assistant', text: reply } });
   return reply;
+}
+
+/** Owner messages handled since midnight Israel time (the morning brief doesn't count). */
+export async function messagesToday(now = new Date()) {
+  const day = israelDay(now);
+  const since = new Date(now.getTime() - 26 * 3600e3);
+  const rows = await db.assistantMessage.findMany({ where: { role: 'user', createdAt: { gte: since } }, select: { createdAt: true } });
+  return rows.filter((r) => israelDay(r.createdAt) === day).length;
+}
+
+/** Writes the morning brief with the same brain and tools (read-only use). */
+export async function writeMorningBrief(host: HostOptions, now = new Date()) {
+  if (!brainConfigured()) return null;
+  const system = `${SYSTEM}
+
+${await contextText(now, host)}`;
+  const prompt =
+    'Write his morning brief for today, to send on WhatsApp. Check his calendar for today and his unread email from the last day (if connected), plus the reminders for today and the open tasks listed above. ' +
+    'Order: meetings today with times; emails that need him (one line each, skip newsletters and spam, warn about suspicious ones); reminders and tasks for today. ' +
+    'Open with "בוקר טוב יהושע" and keep it under 15 lines. Do not take any action and do not prepare anything — only report. If something is not connected, skip it silently.';
+  try {
+    return (await runAgent({ text: prompt }, system, host, now)).trim() || null;
+  } catch (err: any) {
+    console.error('[ASSISTANT] morning brief failed:', err?.message || err);
+    return null;
+  }
 }
 
 function friendlyError(text: string) {
