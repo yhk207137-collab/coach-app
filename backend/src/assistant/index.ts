@@ -7,7 +7,7 @@ import OpenAI, { toFile } from 'openai';
 import type { HostOptions } from './host';
 import { db } from './store';
 import { CHAT_PAGE } from './chatPage';
-import { relink, requestCode, saveNumbers, startWaWeb, waWebState } from './waweb';
+import { requestCode, saveNumbers, startWaWeb, waWebState } from './waweb';
 import { brainConfigured, handleOwnerMessage } from './brain';
 import { finishGoogleConnect, googleAuthUrlFor, googleCallbackPath } from './google';
 import { downloadMedia, isOwner, markReadAndTyping, sendText, validSignature, waConfigured } from './whatsapp';
@@ -160,7 +160,6 @@ export function mountAssistant(app: Express, host: HostOptions = {}) {
       r.post('/wa/numbers', express.json(), async (req, res) => {
         if (!local(req)) return res.sendStatus(404);
         await saveNumbers(String(req.body?.owner || ''), String(req.body?.bot || ''));
-        await relink();
         res.json(await requestCode());
       });
       r.post('/wa/code', async (req, res) => {

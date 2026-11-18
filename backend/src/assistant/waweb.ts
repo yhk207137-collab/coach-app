@@ -28,7 +28,10 @@ export const waWebState = () => ({ ...st });
 let sock: any = null;
 let B: any = null;
 let host: HostOptions = {};
-let starting = false;
+// Every socket gets a generation number. Events from an older socket (one we replaced on purpose)
+// are ignored, so closing the old link can never break the new one.
+let gen = 0;
+let wantCode = false;
 
 export async function ownerNumber() {
   return normalizePhone((await kvGet('owner_number')) || process.env.WHATSAPP_OWNER_NUMBER || '');
@@ -106,96 +109,109 @@ async function onMessage(m: any) {
   }
 }
 
-/** Connects (or reconnects) the assistant's WhatsApp. Safe to call again. */
+/** Connects (or reconnects) the assistant's WhatsApp. */
 export async function startWaWeb(h: HostOptions) {
   host = h;
-  if (starting) return;
-  starting = true;
-  try {
-    B ||= await importEsm('baileys');
-    const makeWASocket = B.default || B.makeWASocket;
-    fs.mkdirSync(authDir(), { recursive: true });
-    const { state, saveCreds } = await B.useMultiFileAuthState(authDir());
-    const { version } = await B.fetchLatestBaileysVersion().catch(() => ({ version: undefined }));
-    st.state = 'connecting';
-    st.botNumber = await botNumber();
-    st.ownerNumber = await ownerNumber();
-
-    sock = makeWASocket({
-      version,
-      auth: state,
-      logger: pino({ level: 'silent' }),
-      browser: B.Browsers.windows('Chrome'),
-      markOnlineOnConnect: false,
-      syncFullHistory: false,
-    });
-    sock.ev.on('creds.update', saveCreds);
-
-    let asked = false;
-    sock.ev.on('connection.update', async (u: any) => {
-      if (u.qr && !state.creds.registered && !asked) {
-        asked = true;
-        await requestCode(false);
-      }
-      if (u.connection === 'open') {
-        st.state = 'connected';
-        st.code = undefined;
-        console.log('[ASSISTANT] WhatsApp connected ✓');
-      }
-      if (u.connection === 'close') {
-        const code = u.lastDisconnect?.error?.output?.statusCode;
-        sock = null;
-        if (code === B.DisconnectReason.loggedOut) {
-          st.state = 'logged_out';
-          fs.rmSync(authDir(), { recursive: true, force: true });
-          console.warn('[ASSISTANT] WhatsApp was unlinked from the phone. Link again from the chat window.');
-          return;
-        }
-        st.state = 'connecting';
-        setTimeout(() => startWaWeb(host).catch(() => undefined), 3000);
-      }
-    });
-    sock.ev.on('messages.upsert', ({ messages, type }: any) => {
-      if (type !== 'notify') return;
-      for (const m of messages) onMessage(m).catch((err) => console.error('[ASSISTANT] WhatsApp message failed:', err?.message || err));
-    });
-  } finally {
-    starting = false;
+  const my = ++gen;
+  B ||= await importEsm('baileys');
+  const makeWASocket = B.default || B.makeWASocket;
+  fs.mkdirSync(authDir(), { recursive: true });
+  const { state, saveCreds } = await B.useMultiFileAuthState(authDir());
+  const { version } = await B.fetchLatestBaileysVersion().catch(() => ({ version: undefined }));
+  if (my !== gen) return; // replaced while starting
+  st.botNumber = await botNumber();
+  st.ownerNumber = await ownerNumber();
+  // Not linked yet and nobody asked for a code: wait for the owner to press the button.
+  if (!state.creds.registered && !wantCode) {
+    st.state = 'waiting_for_code';
+    return;
   }
+  st.state = state.creds.registered ? 'connecting' : 'waiting_for_code';
+
+  const s = makeWASocket({
+    version,
+    auth: state,
+    logger: pino({ level: 'silent' }),
+    browser: B.Browsers.windows('Chrome'),
+    markOnlineOnConnect: false,
+    syncFullHistory: false,
+  });
+  sock = s;
+  s.ev.on('creds.update', saveCreds);
+
+  s.ev.on('connection.update', async (u: any) => {
+    if (my !== gen) return;
+    // The socket is ready to pair once WhatsApp offers a QR; that is when a code can be asked for.
+    if (u.qr && !state.creds.registered && wantCode) {
+      wantCode = false;
+      await askForCode(s);
+    }
+    if (u.connection === 'open') {
+      st.state = 'connected';
+      st.code = undefined;
+      st.error = undefined;
+      console.log('[ASSISTANT] WhatsApp connected ✓');
+    }
+    if (u.connection === 'close') {
+      const status = u.lastDisconnect?.error?.output?.statusCode;
+      if (sock === s) sock = null;
+      if (status === B.DisconnectReason.loggedOut && state.creds.registered) {
+        st.state = 'logged_out';
+        fs.rmSync(authDir(), { recursive: true, force: true });
+        console.warn('[ASSISTANT] WhatsApp was unlinked from the phone. Link again from the chat window.');
+        return;
+      }
+      // Includes the normal restart WhatsApp asks for right after a successful pairing.
+      setTimeout(() => {
+        if (my === gen) startWaWeb(host).catch((err) => console.error('[ASSISTANT] reconnect failed:', err?.message || err));
+      }, 2000);
+    }
+  });
+  s.ev.on('messages.upsert', ({ messages, type }: any) => {
+    if (my !== gen || type !== 'notify') return;
+    for (const m of messages) onMessage(m).catch((err) => console.error('[ASSISTANT] WhatsApp message failed:', err?.message || err));
+  });
 }
 
-/** Asks WhatsApp for a fresh 8-character pairing code for the assistant's number. */
-export async function requestCode(fromOwner = true) {
-  const bot = await botNumber();
-  st.botNumber = bot;
-  if (!bot) {
-    st.state = 'waiting_for_code';
-    st.error = fromOwner ? 'חסר המספר של העוזר' : undefined;
-    return st;
-  }
-  if (!sock) await startWaWeb(host);
+async function askForCode(s: any) {
   try {
-    const code: string = await sock.requestPairingCode(bot);
+    const code: string = await s.requestPairingCode(st.botNumber);
     st.state = 'waiting_for_code';
     st.code = code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
     st.codeAt = Date.now();
     st.error = undefined;
-    console.log(`\n[ASSISTANT] WhatsApp pairing code for ${bot}: ${st.code}\n`);
+    console.log(`\n[ASSISTANT] WhatsApp pairing code for ${st.botNumber}: ${st.code}\n`);
   } catch (err: any) {
     st.error = String(err?.message || err);
     console.error('[ASSISTANT] pairing code failed:', st.error);
   }
-  return st;
 }
 
-/** After the owner changes numbers or the link was removed: start over with a clean link. */
-export async function relink() {
+/**
+ * Starts a clean link and waits (up to 25 s) for WhatsApp to hand out a pairing code.
+ * Used for the first link and for "give me a new code".
+ */
+export async function requestCode() {
+  const bot = await botNumber();
+  st.botNumber = bot;
+  st.code = undefined;
+  if (!bot) {
+    st.error = 'חסר המספר של העוזר';
+    return waWebState();
+  }
+  st.error = undefined;
+  const old = sock;
+  gen++; // silence the old socket before closing it
+  sock = null;
   try {
-    sock?.end?.(undefined);
+    old?.end?.(undefined);
   } catch {
     /* ignore */
   }
-  sock = null;
   fs.rmSync(authDir(), { recursive: true, force: true });
+  wantCode = true;
   await startWaWeb(host);
+  for (let i = 0; i < 50 && !st.code && !st.error; i++) await new Promise((r) => setTimeout(r, 500));
+  if (!st.code && !st.error) st.error = 'וואטסאפ לא החזיר קוד. נסה שוב בעוד דקה.';
+  return waWebState();
 }
