@@ -24,7 +24,7 @@ export const brainConfigured = () => !!process.env.CLAUDE_CODE_OAUTH_TOKEN || pr
 const SYSTEM = `You are the private personal assistant of יהושע כהן, a strategy and guidance consultant for nonprofit managers in Israel. He writes to you on WhatsApp like he would to a trusted chief of staff. You don't only answer — you act, through your tools: his Google Calendar, his Gmail and his Zoom.
 
 How you work:
-- Every reply to him is in Hebrew only — never English, also after a tool error or a cancellation. Never open with labels like "Bottom line".
+- Every reply to him is in Hebrew only — never English, also after a tool error or a cancellation. Never open with labels like "Bottom line", and never write notes to yourself in the reply — everything you write is sent to him.
 - Reply short and warm, like a capable person texting. WhatsApp formatting only: *bold*, _italic_, lists with "•". No markdown headers, tables or links in [text](url) form — paste plain URLs.
 - Act first when the request is clear; ask one short question only when something essential is missing. Resolve "tomorrow", "Sunday", "next week" yourself from the current date. All times are Israel time.
 - Before you say something is done, the tool must have returned done. Never claim an action you didn't take. If a tool fails, say so plainly and what to do next.
@@ -121,7 +121,7 @@ async function think(msg: Incoming, host: HostOptions): Promise<string> {
     console.error('[ASSISTANT] failed:', err?.message || err);
     reply = friendlyError(String(err?.message || err));
   }
-  reply = reply.trim() || 'בוצע.';
+  reply = cleanReply(reply) || 'בוצע.';
   await db.assistantMessage.create({ data: { role: 'assistant', text: reply } });
   return reply;
 }
@@ -143,13 +143,22 @@ ${await contextText(now, host)}`;
   const prompt =
     'Write his morning brief for today, to send on WhatsApp. Check his calendar for today and his unread email from the last day (if connected), plus the reminders for today and the open tasks listed above. ' +
     'Order: meetings today with times; emails that need him (one line each, skip newsletters and spam, warn about suspicious ones); reminders and tasks for today. ' +
-    'Open with "בוקר טוב יהושע" and keep it under 15 lines. Do not take any action and do not prepare anything — only report. If something is not connected, skip it silently.';
+    'Open with "בוקר טוב יהושע" and keep it under 15 lines. If an email mentions a meeting on another day, check the calendar for that day before saying anything about it. Do not take any action and do not prepare anything — only report. If something is not connected, skip it silently.';
   try {
     return (await runAgent({ text: prompt }, system, host, now)).trim() || null;
   } catch (err: any) {
     console.error('[ASSISTANT] morning brief failed:', err?.message || err);
     return null;
   }
+}
+
+/** Drops lines at the start that have no Hebrew (the model's notes to itself), when Hebrew follows. */
+const HEBREW = /[\u0590-\u05FF]/;
+export function cleanReply(text: string) {
+  const lines = text.trim().split(/\r?\n/);
+  if (!HEBREW.test(text)) return text.trim();
+  while (lines.length && !HEBREW.test(lines[0]) && !/https?:\/\//.test(lines[0])) lines.shift();
+  return lines.join('\n').trim();
 }
 
 function friendlyError(text: string) {
