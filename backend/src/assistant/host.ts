@@ -29,4 +29,6 @@ export interface HostOptions {
   hostTools?: HostTool[];
   /** One or two sentences telling the assistant what the app is, e.g. "the owner's CRM for clients, meetings and payments". */
   hostDescription?: string;
+  /** Local trial only: serve a chat window at http://localhost:<port>/ (never through the public tunnel). */
+  localChat?: boolean;
 }

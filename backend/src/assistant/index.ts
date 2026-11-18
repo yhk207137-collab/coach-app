@@ -6,6 +6,7 @@ import express, { Express, Router } from 'express';
 import OpenAI, { toFile } from 'openai';
 import type { HostOptions } from './host';
 import { db } from './store';
+import { CHAT_PAGE } from './chatPage';
 import { brainConfigured, handleOwnerMessage } from './brain';
 import { finishGoogleConnect, googleAuthUrlFor, googleCallbackPath } from './google';
 import { downloadMedia, isOwner, markReadAndTyping, sendText, validSignature, waConfigured } from './whatsapp';
@@ -133,6 +134,27 @@ export function mountAssistant(app: Express, host: HostOptions = {}) {
 
   // Health check without secrets.
   r.get('/health', (_req, res) => res.json({ brain: brainConfigured(), whatsapp: waConfigured() }));
+
+  // Local trial: a chat window on the owner's computer, same brain as WhatsApp.
+  // Answers only requests addressed to localhost, so it is never reachable through the public tunnel.
+  if (host.localChat) {
+    const local = (req: express.Request) => /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.get('host') || '');
+    r.post('/chat', express.json(), async (req, res) => {
+      if (!local(req)) return res.sendStatus(404);
+      const text = String(req.body?.text || '').trim();
+      if (!text) return res.status(400).json({ error: 'empty' });
+      res.json({ reply: await handleOwnerMessage({ text }, host) });
+    });
+    r.get('/chat/history', async (req, res) => {
+      if (!local(req)) return res.sendStatus(404);
+      const [messages, memories] = await Promise.all([
+        db.assistantMessage.findMany({ orderBy: { createdAt: 'desc' }, take: 60 }),
+        db.assistantMemory.findMany({ orderBy: { createdAt: 'asc' } }),
+      ]);
+      res.json({ messages: messages.reverse(), memories, brain: brainConfigured(), whatsapp: waConfigured() });
+    });
+    app.get('/', (req, res) => (local(req) ? res.type('html').send(CHAT_PAGE) : res.sendStatus(404)));
+  }
 
   app.use('/api/assistant', r);
 }

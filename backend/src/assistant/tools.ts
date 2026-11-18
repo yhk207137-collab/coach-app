@@ -195,7 +195,11 @@ export function buildTools(hostTools: HostTool[], turnStartedAt: Date): ToolSpec
       description: 'Remember a lasting fact about the owner, his people, preferences or how he likes things done. One short fact per call, in Hebrew.',
       shape: { fact: z.string(), topic: z.string().optional().describe('e.g. העדפות, אנשים, עבודה, משפחה') },
       readOnly: false,
-      run: async (i) => ({ done: true, id: (await db.assistantMemory.create({ data: { fact: i.fact, topic: i.topic || 'כללי' } })).id }),
+      run: async (i) => {
+        const fact = String(i.fact || '').trim();
+        if (fact.length < 3) return { error: 'Nothing to save: write the fact itself.' };
+        return { done: true, id: (await db.assistantMemory.create({ data: { fact, topic: i.topic || 'כללי' } })).id };
+      },
     },
     {
       name: 'memory_forget',
