@@ -52,7 +52,7 @@ async function contextText(now: Date, host: HostOptions) {
   ]);
   return [
     `Now: ${israelNow(now)}`,
-    `Connected: calendar=${google.calendar ? 'yes' : 'NO'}, gmail=${google.gmail ? 'yes' : 'NO'}, zoom=${zoomConfigured() ? 'yes' : 'NO'}`,
+    `Connected: calendar=${google.calendar ? 'yes' : 'NO'}, gmail=${google.gmail ? 'yes' : 'NO'}, zoom=${(await zoomConfigured()) ? 'yes' : 'NO'}`,
     host.hostTools?.length ? `Business app: ${host.hostDescription || 'the owner’s business app'} — use the app_* tools for it.` : 'Business app: not connected.',
     '',
     'What you remember about him (id: fact):',

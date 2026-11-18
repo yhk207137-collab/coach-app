@@ -1,15 +1,17 @@
 // Zoom through a Server-to-Server OAuth app in the owner's Zoom account.
-const configured = () => !!(process.env.ZOOM_ACCOUNT_ID && process.env.ZOOM_CLIENT_ID && process.env.ZOOM_CLIENT_SECRET);
+import { cfg } from './settings';
+
+const configured = async () => !!((await cfg('ZOOM_ACCOUNT_ID')) && (await cfg('ZOOM_CLIENT_ID')) && (await cfg('ZOOM_CLIENT_SECRET')));
 export const zoomConfigured = configured;
 
 let cached: { token: string; until: number } | null = null;
 
 async function token() {
-  if (!configured()) throw new Error('זום עדיין לא מחובר.');
+  if (!(await configured())) throw new Error('זום עדיין לא מחובר.');
   if (cached && cached.until > Date.now() + 60_000) return cached.token;
-  const basic = Buffer.from(`${process.env.ZOOM_CLIENT_ID}:${process.env.ZOOM_CLIENT_SECRET}`).toString('base64');
+  const basic = Buffer.from(`${await cfg('ZOOM_CLIENT_ID')}:${await cfg('ZOOM_CLIENT_SECRET')}`).toString('base64');
   const res = await fetch(
-    `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(process.env.ZOOM_ACCOUNT_ID!)}`,
+    `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(await cfg('ZOOM_ACCOUNT_ID'))}`,
     { method: 'POST', headers: { Authorization: `Basic ${basic}` } }
   );
   if (!res.ok) throw new Error(`Zoom login ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -28,6 +30,11 @@ async function api(path: string, init: RequestInit = {}) {
 }
 
 // start: Israel local time, YYYY-MM-DDTHH:mm
+/** Forgets the cached login, e.g. after the owner changes the Zoom details. */
+export function resetZoomLogin() {
+  cached = null;
+}
+
 export async function createZoomMeeting(topic: string, start: string, durationMinutes: number) {
   const m: any = await api('/users/me/meetings', {
     method: 'POST',

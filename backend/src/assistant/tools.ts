@@ -102,7 +102,7 @@ export function buildTools(hostTools: HostTool[], turnStartedAt: Date): ToolSpec
       description: "List the owner's upcoming Zoom meetings.",
       shape: {},
       readOnly: true,
-      run: async () => (zoomConfigured() ? listZoomMeetings() : { error: 'זום עוד לא מחובר' }),
+      run: async () => ((await zoomConfigured()) ? listZoomMeetings() : { error: 'זום עוד לא מחובר' }),
     },
 
     // act
@@ -188,7 +188,7 @@ export function buildTools(hostTools: HostTool[], turnStartedAt: Date): ToolSpec
       description: 'Get a one-time link (valid 15 minutes) for the owner to connect or reconnect his Google calendar and Gmail. Send it to him as is.',
       shape: {},
       readOnly: false,
-      run: async () => ({ link: g.googleConnectLink() }),
+      run: async () => ({ link: await g.googleConnectLink() }),
     },
     {
       name: 'memory_save',

@@ -9,7 +9,9 @@ import { db } from './store';
 import { CHAT_PAGE } from './chatPage';
 import { requestCode, saveNumbers, startWaWeb, waWebState } from './waweb';
 import { brainConfigured, handleOwnerMessage } from './brain';
-import { finishGoogleConnect, googleAuthUrlFor, googleCallbackPath } from './google';
+import { finishGoogleConnect, googleAuthUrlFor, googleCallbackPath, googleConnectLink, googleRedirectUri, googleStatus } from './google';
+import { saveSettings, settingsFilled } from './settings';
+import { listZoomMeetings, resetZoomLogin, zoomConfigured } from './zoom';
 import { downloadMedia, isOwner, markReadAndTyping, sendText, validSignature, waConfigured } from './whatsapp';
 
 export type { HostTool, HostOptions } from './host';
@@ -119,8 +121,8 @@ export function mountAssistant(app: Express, host: HostOptions = {}) {
   });
 
   // Google connect: the assistant sends the owner a one-time link on WhatsApp.
-  r.get('/google/start', (req, res) => {
-    const url = googleAuthUrlFor(String(req.query.t || ''));
+  r.get('/google/start', async (req, res) => {
+    const url = await googleAuthUrlFor(String(req.query.t || ''));
     if (!url) return res.status(410).send(page('הקישור פג תוקף', 'בקש מהעוזר בוואטסאפ קישור חדש לחיבור גוגל.'));
     res.redirect(url);
   });
@@ -167,6 +169,35 @@ export function mountAssistant(app: Express, host: HostOptions = {}) {
         res.json(await requestCode());
       });
     }
+    // Connections panel: Google and Zoom details are pasted here, then Google is connected with one click.
+    r.get('/connections', async (req, res) => {
+      if (!local(req)) return res.sendStatus(404);
+      const [filled, google, zoom] = await Promise.all([settingsFilled(), googleStatus(), zoomConfigured()]);
+      res.json({ filled, google, zoom, redirectUri: googleRedirectUri() });
+    });
+    r.post('/connections', express.json(), async (req, res) => {
+      if (!local(req)) return res.sendStatus(404);
+      await saveSettings(req.body || {});
+      resetZoomLogin();
+      res.json({ ok: true });
+    });
+    r.get('/google/link', async (req, res) => {
+      if (!local(req)) return res.sendStatus(404);
+      try {
+        res.json({ link: await googleConnectLink() });
+      } catch (err: any) {
+        res.status(400).json({ error: String(err?.message || err) });
+      }
+    });
+    r.post('/zoom/test', async (req, res) => {
+      if (!local(req)) return res.sendStatus(404);
+      try {
+        const meetings = await listZoomMeetings();
+        res.json({ ok: true, upcoming: meetings.length });
+      } catch (err: any) {
+        res.status(400).json({ error: String(err?.message || err) });
+      }
+    });
     app.get('/', (req, res) => (local(req) ? res.type('html').send(CHAT_PAGE) : res.sendStatus(404)));
   }
 

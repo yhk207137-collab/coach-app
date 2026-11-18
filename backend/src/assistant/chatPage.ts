@@ -28,6 +28,10 @@ export const CHAT_PAGE = `<!doctype html>
   aside li { font-size:13px; margin-bottom:6px; }
   .st { font-size:13px; margin-bottom:14px; color:var(--muted); }
   @media (max-width: 760px) { aside { display:none; } }
+  .lb { display:block; font-size:12px; color:var(--muted); margin-top:8px; }
+  .fi { width:100%; margin-top:3px; border-radius:8px; padding:8px 10px; font-size:13px; }
+  .fb { width:100%; margin-top:10px; padding:9px; }
+  .msg { font-size:12px; margin-top:6px; line-height:1.5; }
 </style>
 </head>
 <body>
@@ -54,6 +58,23 @@ export const CHAT_PAGE = `<!doctype html>
       </div>
       <div id="waErr" style="color:#dc2626;font-size:12px;margin-top:6px"></div>
     </div>
+  </section>
+  <section style="margin-bottom:18px;padding:12px;border:1px solid var(--line);border-radius:10px">
+    <h3>חיבורים</h3>
+    <div style="font-size:13px;margin-bottom:10px" id="conn"></div>
+    <details id="gBox"><summary style="cursor:pointer;font-size:14px;font-weight:600">גוגל (יומן ומייל)</summary>
+      <label class="lb">Client ID</label><input class="fi" id="gId" dir="ltr" autocomplete="off">
+      <label class="lb">Client secret</label><input class="fi" id="gSecret" dir="ltr" type="password" autocomplete="off">
+      <button id="gGo" class="fb">שמור וחבר את גוגל</button>
+      <div class="msg" id="gMsg"></div>
+    </details>
+    <details id="zBox" style="margin-top:10px"><summary style="cursor:pointer;font-size:14px;font-weight:600">זום</summary>
+      <label class="lb">Account ID</label><input class="fi" id="zAcc" dir="ltr" autocomplete="off">
+      <label class="lb">Client ID</label><input class="fi" id="zId" dir="ltr" autocomplete="off">
+      <label class="lb">Client secret</label><input class="fi" id="zSecret" dir="ltr" type="password" autocomplete="off">
+      <button id="zGo" class="fb">שמור ובדוק את זום</button>
+      <div class="msg" id="zMsg"></div>
+    </details>
   </section>
   <h3>מה הוא זוכר עליך</h3>
   <ul id="mem"></ul>
@@ -96,6 +117,46 @@ document.getElementById('getCode').onclick = async () => {
   b.disabled = false; b.textContent = 'קבל קוד חדש';
   showWa(wa || { state:'off', error:'לא הצלחתי לבקש קוד' });
 };
+async function loadConn() {
+  const c = await fetch('/api/assistant/connections').then((x) => x.json()).catch(() => null);
+  if (!c) return;
+  const row = (ok, label, hint) => '<div>' + (ok ? '✅ ' : '⚪ ') + label + (ok ? '' : ' <span style="color:var(--muted)">– ' + hint + '</span>') + '</div>';
+  document.getElementById('conn').innerHTML =
+    row(c.google.calendar, 'יומן גוגל', c.filled.GOOGLE_CLIENT_ID ? 'לחץ "חבר את גוגל"' : 'חסרים פרטים') +
+    row(c.google.gmail, 'ג׳ימייל', c.filled.GOOGLE_CLIENT_ID ? 'לחץ "חבר את גוגל"' : 'חסרים פרטים') +
+    row(c.zoom, 'זום', 'חסרים פרטים');
+  if (c.filled.GOOGLE_CLIENT_ID) document.getElementById('gId').placeholder = 'שמור ✓ (אפשר להחליף)';
+  if (c.filled.GOOGLE_CLIENT_SECRET) document.getElementById('gSecret').placeholder = 'שמור ✓';
+  if (c.filled.ZOOM_ACCOUNT_ID) document.getElementById('zAcc').placeholder = 'שמור ✓';
+  if (c.filled.ZOOM_CLIENT_ID) document.getElementById('zId').placeholder = 'שמור ✓';
+  if (c.filled.ZOOM_CLIENT_SECRET) document.getElementById('zSecret').placeholder = 'שמור ✓';
+}
+const v = (id) => document.getElementById(id).value.trim();
+async function save(fields) {
+  await fetch('/api/assistant/connections', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(fields) });
+  ['gId','gSecret','zAcc','zId','zSecret'].forEach((id) => (document.getElementById(id).value = ''));
+}
+document.getElementById('gGo').onclick = async () => {
+  const msg = document.getElementById('gMsg');
+  await save({ GOOGLE_CLIENT_ID: v('gId'), GOOGLE_CLIENT_SECRET: v('gSecret') });
+  const r = await fetch('/api/assistant/google/link').then((x) => x.json());
+  if (r.error) { msg.style.color = '#dc2626'; msg.textContent = r.error; return loadConn(); }
+  msg.style.color = 'var(--muted)';
+  msg.textContent = 'נפתח חלון של גוגל. בחר את החשבון, אשר את ההרשאות, ובסוף תחזור לכאן.';
+  window.open(r.link, '_blank');
+  loadConn();
+};
+document.getElementById('zGo').onclick = async () => {
+  const msg = document.getElementById('zMsg');
+  await save({ ZOOM_ACCOUNT_ID: v('zAcc'), ZOOM_CLIENT_ID: v('zId'), ZOOM_CLIENT_SECRET: v('zSecret') });
+  msg.style.color = 'var(--muted)'; msg.textContent = 'בודק…';
+  const r = await fetch('/api/assistant/zoom/test', { method:'POST' }).then((x) => x.json());
+  msg.style.color = r.ok ? 'var(--accent)' : '#dc2626';
+  msg.textContent = r.ok ? 'זום מחובר ✓' : 'זום לא התחבר: ' + r.error;
+  loadConn();
+};
+loadConn();
+setInterval(loadConn, 10000);
 setInterval(async () => {
   const r = await fetch('/api/assistant/chat/history').then((x) => x.json()).catch(() => null);
   if (r && r.wa) { showWa(r.wa); document.getElementById('st').textContent = 'מנוי Claude: ' + (r.brain ? 'מחובר ✓' : 'לא מחובר') + ' · וואטסאפ: ' + (r.whatsapp ? 'מחובר ✓' : 'עוד לא'); }

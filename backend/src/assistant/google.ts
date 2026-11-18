@@ -2,41 +2,42 @@
 import crypto from 'crypto';
 import { google } from 'googleapis';
 import { kvGet, kvSet, kvDelete } from './store';
+import { cfg } from './settings';
 
 const TZ = 'Asia/Jerusalem';
 const TOKENS = 'google_tokens';
 const SCOPES = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/gmail.modify'];
 
 export const googleCallbackPath = '/api/assistant/google/callback';
-const redirectUri = () => `${process.env.ASSISTANT_PUBLIC_URL || process.env.PUBLIC_URL || ''}${googleCallbackPath}`;
-const oauth = () => new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, redirectUri());
+export const googleRedirectUri = () => `${process.env.ASSISTANT_PUBLIC_URL || process.env.PUBLIC_URL || ''}${googleCallbackPath}`;
+const oauth = async () => new google.auth.OAuth2(await cfg('GOOGLE_CLIENT_ID'), await cfg('GOOGLE_CLIENT_SECRET'), googleRedirectUri());
 
 // One-time links the assistant sends the owner on WhatsApp ("חבר גוגל"). Valid 15 minutes.
 const linkTokens = new Map<string, number>();
 const states = new Map<string, number>();
 
-export function googleConnectLink() {
-  if (!process.env.GOOGLE_CLIENT_ID) throw new Error('Google OAuth is not configured on the server');
+export async function googleConnectLink() {
+  if (!(await cfg('GOOGLE_CLIENT_ID')) || !(await cfg('GOOGLE_CLIENT_SECRET'))) throw new Error('פרטי החיבור לגוגל עוד לא הוזנו בחלון העוזר ("חיבורים").');
   const t = crypto.randomBytes(18).toString('base64url');
   linkTokens.set(t, Date.now() + 15 * 60_000);
   return `${process.env.ASSISTANT_PUBLIC_URL || process.env.PUBLIC_URL || ''}/api/assistant/google/start?t=${t}`;
 }
 
 // Called by the /start route: trades the one-time link for Google's consent page.
-export function googleAuthUrlFor(linkToken: string) {
+export async function googleAuthUrlFor(linkToken: string) {
   const until = linkTokens.get(linkToken);
   linkTokens.delete(linkToken);
   if (!until || until < Date.now()) return null;
   const state = crypto.randomBytes(16).toString('hex');
   states.set(state, Date.now() + 15 * 60_000);
-  return oauth().generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: SCOPES, state });
+  return (await oauth()).generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: SCOPES, state });
 }
 
 export async function finishGoogleConnect(code: string, state: string) {
   const until = states.get(state);
   states.delete(state);
   if (!until || until < Date.now()) throw new Error('הקישור פג תוקף. בקש מהעוזר קישור חדש.');
-  const { tokens } = await oauth().getToken(code);
+  const { tokens } = await (await oauth()).getToken(code);
   await kvSet(TOKENS, JSON.stringify(tokens));
 }
 
@@ -44,7 +45,7 @@ export async function googleStatus(): Promise<{ calendar: boolean; gmail: boolea
   const raw = await kvGet(TOKENS);
   if (!raw) return { calendar: false, gmail: false };
   try {
-    const client = oauth();
+    const client = await oauth();
     client.setCredentials(JSON.parse(raw));
     await client.getAccessToken();
     const scope = String(JSON.parse(raw).scope || '');
@@ -59,7 +60,7 @@ async function auth() {
   const raw = await kvGet(TOKENS);
   if (!raw) throw new Error('גוגל עוד לא מחובר לעוזר. אפשר לבקש ממני "קישור לחיבור גוגל".');
   const tokens = JSON.parse(raw);
-  const client = oauth();
+  const client = await oauth();
   client.setCredentials(tokens);
   client.on('tokens', (fresh) => {
     kvSet(TOKENS, JSON.stringify({ ...tokens, ...fresh })).catch(() => undefined);
