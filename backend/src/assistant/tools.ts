@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { HostTool } from './host';
 import { db } from './store';
 import * as g from './google';
-import { createZoomMeeting, listZoomMeetings, zoomConfigured } from './zoom';
+import { createZoomMeeting, deleteZoomMeeting, listZoomMeetings, zoomConfigured } from './zoom';
 
 const LOCAL = 'Israel local time, format YYYY-MM-DDTHH:mm';
 type Out = { content: { type: 'text'; text: string }[]; isError?: boolean };
@@ -36,12 +36,15 @@ async function prepare(kind: string, summary: string, payload: unknown) {
 async function createEventWithLink(input: any) {
   let location = input.location;
   let description = input.description || '';
+  let zoomId: string | undefined;
   if (input.meetingLink === 'zoom') {
     const zm = await createZoomMeeting(input.title, input.start, input.durationMinutes);
+    zoomId = String(zm.id);
     location = zm.joinUrl;
     description = `קישור לזום: ${zm.joinUrl}${zm.password ? `\nסיסמה: ${zm.password}` : ''}${description ? `\n\n${description}` : ''}`;
   }
-  return g.createEvent({
+  try {
+    return await g.createEvent({
     title: input.title,
     start: input.start,
     durationMinutes: input.durationMinutes,
@@ -50,6 +53,11 @@ async function createEventWithLink(input: any) {
     description: description || undefined,
     googleMeet: input.meetingLink === 'google_meet',
   });
+  } catch (err) {
+    // No calendar event means no invite: don't leave an orphan Zoom meeting behind.
+    if (zoomId) await deleteZoomMeeting(zoomId).catch(() => undefined);
+    throw err;
+  }
 }
 
 // ── The tool set ────────────────────────────────────────────────────────────

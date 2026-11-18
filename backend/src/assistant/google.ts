@@ -8,6 +8,10 @@ const TZ = 'Asia/Jerusalem';
 const TOKENS = 'google_tokens';
 const SCOPES = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/gmail.modify'];
 
+// Tests only: point Google calls at a fake local server and skip the real sign-in.
+const FAKE_GOOGLE = process.env.ASSISTANT_FAKE_GOOGLE_URL;
+const fakeRoot = FAKE_GOOGLE ? { rootUrl: FAKE_GOOGLE } : {};
+
 export const googleCallbackPath = '/api/assistant/google/callback';
 export const googleRedirectUri = () => `${process.env.ASSISTANT_PUBLIC_URL || process.env.PUBLIC_URL || ''}${googleCallbackPath}`;
 const oauth = async () => new google.auth.OAuth2(await cfg('GOOGLE_CLIENT_ID'), await cfg('GOOGLE_CLIENT_SECRET'), googleRedirectUri());
@@ -42,6 +46,7 @@ export async function finishGoogleConnect(code: string, state: string) {
 }
 
 export async function googleStatus(): Promise<{ calendar: boolean; gmail: boolean }> {
+  if (FAKE_GOOGLE) return { calendar: true, gmail: true };
   const raw = await kvGet(TOKENS);
   if (!raw) return { calendar: false, gmail: false };
   try {
@@ -57,6 +62,11 @@ export async function googleStatus(): Promise<{ calendar: boolean; gmail: boolea
 }
 
 async function auth() {
+  if (FAKE_GOOGLE) {
+    const fake = new google.auth.OAuth2();
+    fake.setCredentials({ access_token: 'test', expiry_date: Date.now() + 3600e3 });
+    return fake;
+  }
   const raw = await kvGet(TOKENS);
   if (!raw) throw new Error('גוגל עוד לא מחובר לעוזר. אפשר לבקש ממני "קישור לחיבור גוגל".');
   const tokens = JSON.parse(raw);
@@ -84,7 +94,7 @@ const at = (local: string) => (/[zZ]|[+-]\d\d:?\d\d$/.test(local) ? { dateTime: 
 // ── Calendar ────────────────────────────────────────────────────────────────
 
 export async function listEvents(from: string, to: string) {
-  const calendar = google.calendar({ version: 'v3', auth: await auth() });
+  const calendar = google.calendar({ version: 'v3', auth: await auth(), ...fakeRoot });
   const toIso = (s: string) => (s.length <= 10 ? new Date(`${s}T00:00:00+02:00`).toISOString() : new Date(s).toISOString());
   const res = await calendar.events.list({
     calendarId: 'primary',
@@ -117,7 +127,7 @@ export interface EventInput {
 }
 
 export async function createEvent(input: EventInput) {
-  const calendar = google.calendar({ version: 'v3', auth: await auth() });
+  const calendar = google.calendar({ version: 'v3', auth: await auth(), ...fakeRoot });
   const start = at(input.start);
   const endDate = new Date(new Date(input.start).getTime() + input.durationMinutes * 60000);
   // For Israel local times the end is computed on the same wall clock, so a DST change never shifts it.
@@ -144,13 +154,13 @@ export async function createEvent(input: EventInput) {
 }
 
 export async function getEvent(eventId: string) {
-  const calendar = google.calendar({ version: 'v3', auth: await auth() });
+  const calendar = google.calendar({ version: 'v3', auth: await auth(), ...fakeRoot });
   const { data } = await calendar.events.get({ calendarId: 'primary', eventId });
   return data;
 }
 
 export async function moveEvent(eventId: string, start: string, durationMinutes?: number) {
-  const calendar = google.calendar({ version: 'v3', auth: await auth() });
+  const calendar = google.calendar({ version: 'v3', auth: await auth(), ...fakeRoot });
   const old = await getEvent(eventId);
   const oldLen =
     old.start?.dateTime && old.end?.dateTime
@@ -170,7 +180,7 @@ export async function moveEvent(eventId: string, start: string, durationMinutes?
 }
 
 export async function deleteEvent(eventId: string) {
-  const calendar = google.calendar({ version: 'v3', auth: await auth() });
+  const calendar = google.calendar({ version: 'v3', auth: await auth(), ...fakeRoot });
   const old = await getEvent(eventId);
   const hasGuests = (old.attendees || []).some((a) => !a.self);
   await calendar.events.delete({ calendarId: 'primary', eventId, sendUpdates: hasGuests ? 'all' : 'none' });
@@ -187,7 +197,7 @@ const header = (h: { name?: string | null; value?: string | null }[] | undefined
   h?.find((x) => x.name?.toLowerCase() === name.toLowerCase())?.value || '';
 
 export async function searchMail(query: string, max = 10) {
-  const gmail = google.gmail({ version: 'v1', auth: await auth() });
+  const gmail = google.gmail({ version: 'v1', auth: await auth(), ...fakeRoot });
   const list = await gmail.users.messages.list({ userId: 'me', q: query, maxResults: Math.min(max, 25) });
   const ids = (list.data.messages || []).map((m) => m.id!);
   const out = [];
@@ -233,7 +243,7 @@ function bodyText(part: any): string {
 }
 
 export async function readMail(id: string) {
-  const gmail = google.gmail({ version: 'v1', auth: await auth() });
+  const gmail = google.gmail({ version: 'v1', auth: await auth(), ...fakeRoot });
   const { data } = await gmail.users.messages.get({ userId: 'me', id, format: 'full' });
   const h = data.payload?.headers || [];
   const attachments: string[] = [];
@@ -291,20 +301,20 @@ async function buildRaw(input: MailInput) {
 }
 
 export async function createDraft(input: MailInput) {
-  const gmail = google.gmail({ version: 'v1', auth: await auth() });
+  const gmail = google.gmail({ version: 'v1', auth: await auth(), ...fakeRoot });
   const { raw, threadId } = await buildRaw(input);
   const { data } = await gmail.users.drafts.create({ userId: 'me', requestBody: { message: { raw, threadId } } });
   return { draftId: data.id };
 }
 
 export async function sendMail(input: MailInput) {
-  const gmail = google.gmail({ version: 'v1', auth: await auth() });
+  const gmail = google.gmail({ version: 'v1', auth: await auth(), ...fakeRoot });
   const { raw, threadId } = await buildRaw(input);
   const { data } = await gmail.users.messages.send({ userId: 'me', requestBody: { raw, threadId } });
   return { id: data.id };
 }
 
 export async function markMailRead(id: string) {
-  const gmail = google.gmail({ version: 'v1', auth: await auth() });
+  const gmail = google.gmail({ version: 'v1', auth: await auth(), ...fakeRoot });
   await gmail.users.messages.modify({ userId: 'me', id, requestBody: { removeLabelIds: ['UNREAD'] } });
 }

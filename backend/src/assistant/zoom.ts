@@ -1,7 +1,12 @@
 // Zoom through a Server-to-Server OAuth app in the owner's Zoom account.
 import { cfg } from './settings';
 
-const configured = async () => !!((await cfg('ZOOM_ACCOUNT_ID')) && (await cfg('ZOOM_CLIENT_ID')) && (await cfg('ZOOM_CLIENT_SECRET')));
+// Tests only: a fake local Zoom.
+const FAKE_ZOOM = process.env.ASSISTANT_FAKE_ZOOM_URL;
+const ZOOM_AUTH = FAKE_ZOOM || 'https://zoom.us';
+const ZOOM_API = FAKE_ZOOM ? `${FAKE_ZOOM}/v2` : 'https://api.zoom.us/v2';
+
+const configured = async () => !!FAKE_ZOOM || !!((await cfg('ZOOM_ACCOUNT_ID')) && (await cfg('ZOOM_CLIENT_ID')) && (await cfg('ZOOM_CLIENT_SECRET')));
 export const zoomConfigured = configured;
 
 let cached: { token: string; until: number } | null = null;
@@ -11,7 +16,7 @@ async function token() {
   if (cached && cached.until > Date.now() + 60_000) return cached.token;
   const basic = Buffer.from(`${await cfg('ZOOM_CLIENT_ID')}:${await cfg('ZOOM_CLIENT_SECRET')}`).toString('base64');
   const res = await fetch(
-    `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(await cfg('ZOOM_ACCOUNT_ID'))}`,
+    `${ZOOM_AUTH}/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(await cfg('ZOOM_ACCOUNT_ID'))}`,
     { method: 'POST', headers: { Authorization: `Basic ${basic}` } }
   );
   if (!res.ok) throw new Error(`Zoom login ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -21,7 +26,7 @@ async function token() {
 }
 
 async function api(path: string, init: RequestInit = {}) {
-  const res = await fetch(`https://api.zoom.us/v2${path}`, {
+  const res = await fetch(`${ZOOM_API}${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
   });
