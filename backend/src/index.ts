@@ -38,16 +38,12 @@ import settingsRoutes from './routes/settings';
 import leadRoutes from './routes/leads';
 import invoiceRoutes from './routes/invoices';
 import serviceRoutes from './routes/services';
-import { mountAssistant } from './assistant';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-// Personal WhatsApp assistant: a separate module with its own data, not connected to this app.
-// Mounted before express.json() so its webhook can verify Meta's signature on the raw body.
-mountAssistant(app);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
