@@ -44,7 +44,7 @@ export interface ConsultSettings {
 
 export const DEFAULT_CONSULT_SETTINGS: ConsultSettings = {
   open: true,
-  maxMeetings: 15,
+  maxMeetings: 0, // 0 = no limit
   duration: 40,
   step: 60,
   minNoticeHours: 3,
@@ -103,6 +103,8 @@ export async function getConsultSettings(): Promise<ConsultSettings> {
   // Reminders go by email only: an old saved text that asked to reply "1" gets the button wording.
   if (typeof saved.confirmText === 'string') saved.confirmText = saved.confirmText.replace('השיבו 1 לאישור.', 'לחצו על הכפתור לאישור.');
   for (const [k, v] of Object.entries(OLD_DEFAULT_TEXTS)) if (saved[k] === v) delete saved[k];
+  // The first offer was capped at 15; the owner asked for no cap (a number other than 15 he set himself stays).
+  if (saved.maxMeetings === 15) delete saved.maxMeetings;
   return { ...DEFAULT_CONSULT_SETTINGS, ...saved };
 }
 
@@ -253,8 +255,10 @@ export async function freeSlots(now = new Date(), opts: { fresh?: boolean; ignor
 export async function placesLeft() {
   const s = await getConsultSettings();
   const taken = await prisma.consultBooking.count({ where: { status: { not: 'CANCELED' } } });
-  const left = Math.max(0, s.maxMeetings - taken);
-  return { max: s.maxMeetings, taken, left, open: s.open && left > 0, duration: s.duration };
+  // maxMeetings 0 = no limit: only the on/off switch and the closed days decide.
+  const limited = s.maxMeetings > 0;
+  const left = limited ? Math.max(0, s.maxMeetings - taken) : null;
+  return { max: limited ? s.maxMeetings : null, taken, left, open: s.open && (left === null || left > 0), duration: s.duration };
 }
 
 // ── Google Calendar event ───────────────────────────────────────────────────
@@ -381,7 +385,7 @@ export async function bookConsult(input: BookingInput, now = new Date()) {
   const created = await prisma.$transaction(async (tx) => {
     // Re-check inside the transaction so two people can't take the last place or the same time.
     const taken = await tx.consultBooking.count({ where: { status: { not: 'CANCELED' } } });
-    if (taken >= s.maxMeetings) throw new ConsultError('full');
+    if (s.maxMeetings > 0 && taken >= s.maxMeetings) throw new ConsultError('full');
     const clash = await tx.consultBooking.findFirst({ where: { status: { in: ACTIVE }, start: input.start } });
     if (clash) throw new ConsultError('slot-taken');
     return tx.consultBooking.create({ data: { leadId: lead!.id, name: input.name, phone: input.phone, email: input.email, org: input.org, role: input.role || null, about: input.about || null, start: input.start, duration: s.duration, source: input.source || null, visitorId: input.visitorId || null } });
@@ -392,7 +396,7 @@ export async function bookConsult(input: BookingInput, now = new Date()) {
   const booking = await prisma.consultBooking.update({ where: { id: created.id }, data: { googleEventId: ev.eventId, meetLink: ev.meetLink } });
   await logToCard(booking, 'פגישת הקפצה נקבעה', `${dayName(booking.start)} ${dateLabel(booking.start)} בשעה ${hhmm(booking.start)} · ${booking.duration} דקות · ${booking.org}${booking.role ? ` · ${booking.name}, ${booking.role}` : ''}${booking.about ? `
 רקע: ${booking.about}` : ''}${ev.eventId ? ' · נוסף ליומן גוגל' : ' · לא נוסף ליומן גוגל (היומן לא מחובר)'}`);
-  await tellOwner(`נקבעה פגישת הקפצה: ${booking.org}`, `${booking.name} שריין/ה מקום. נשארו ${Math.max(0, places.left - 1)} מקומות.`, ownerRows(booking), '/consults').catch((e) => console.error('[CONSULT] owner email failed:', e?.message || e));
+  await tellOwner(`נקבעה פגישת הקפצה: ${booking.org}`, `${booking.name} קבע/ה פגישה.`, ownerRows(booking), '/consults').catch((e) => console.error('[CONSULT] owner email failed:', e?.message || e));
   // The warm-up email goes out at once when the meeting is less than 50 hours away.
   await runSequence(booking, now);
   return prisma.consultBooking.findUniqueOrThrow({ where: { id: booking.id } });
@@ -430,8 +434,8 @@ export async function cancelConsult(where: { token?: string; id?: string }, by: 
     await cal?.events.delete({ calendarId: 'primary', eventId: b.googleEventId, sendUpdates: 'all' }).catch((e: any) => console.error('[CONSULT] Google delete failed:', e?.message || e));
   }
   const who = by === 'client' ? 'בוטלה על ידי הפונה' : by === 'owner' ? 'בוטלה מהמערכת' : 'האירוע נמחק מיומן גוגל';
-  await logToCard(canceled, 'פגישת הקפצה בוטלה', `${who}. התזכורות שנותרו בוטלו והמקום חזר למונה.`);
-  if (by !== 'owner') await tellOwner(`פגישת הקפצה בוטלה: ${b.org}`, `${who}. המקום חזר למונה.`, ownerRows(b), '/consults').catch(() => {});
+  await logToCard(canceled, 'פגישת הקפצה בוטלה', `${who}. התזכורות שנותרו בוטלו והמועד התפנה.`);
+  if (by !== 'owner') await tellOwner(`פגישת הקפצה בוטלה: ${b.org}`, `${who}. המועד התפנה.`, ownerRows(b), '/consults').catch(() => {});
   return canceled;
 }
 

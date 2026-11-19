@@ -16,7 +16,7 @@ interface Booking {
   plan: { warm: string; confirm: string; noReply: string; final: string };
   log: LogItem[];
 }
-interface Data { places: { max: number; taken: number; left: number; open: boolean }; google: boolean; bookings: Booking[] }
+interface Data { places: { max: number | null; taken: number; left: number | null; open: boolean }; google: boolean; bookings: Booking[] }
 interface Hours { day: number; on: boolean; from: string; to: string }
 interface Settings {
   open: boolean; maxMeetings: number; duration: number; step: number; minNoticeHours: number; horizonDays: number; hours: Hours[]; closedDays: string[];
@@ -78,7 +78,7 @@ function BookingCard({ b, onChange }: { b: Booking; onChange: () => void }) {
         <Link to={`/leads?open=${b.leadId}`} className="text-xs text-slate-500 hover:underline">לכרטיס הליד</Link>
         {active && b.status !== 'CONFIRMED' && <button className="text-xs text-emerald-700 hover:underline" onClick={() => act(() => api.post(`/consults/${b.id}/status`, { status: 'CONFIRMED' }), 'סומן: אישר הגעה')}>אישר בטלפון</button>}
         {b.status !== 'DONE' && b.status !== 'CANCELED' && new Date(b.start) < new Date() && <button className="text-xs text-primary-700 hover:underline" onClick={() => act(() => api.post(`/consults/${b.id}/status`, { status: 'DONE' }), 'סומן: התקיימה')}>התקיימה</button>}
-        {active && <button className="text-xs text-red-600 hover:underline mr-auto" onClick={() => { if (confirm(`לבטל את הפגישה עם ${b.org}? התזכורות שנותרו יבוטלו, האירוע יימחק מהיומן והמקום יחזור למונה.`)) act(() => api.post(`/consults/${b.id}/cancel`), 'הפגישה בוטלה'); }}>ביטול פגישה</button>}
+        {active && <button className="text-xs text-red-600 hover:underline mr-auto" onClick={() => { if (confirm(`לבטל את הפגישה עם ${b.org}? התזכורות שנותרו יבוטלו, והאירוע יימחק מהיומן.`)) act(() => api.post(`/consults/${b.id}/cancel`), 'הפגישה בוטלה'); }}>ביטול פגישה</button>}
       </div>
 
       {open && (
@@ -228,7 +228,7 @@ function SettingsPanel() {
     <div className="card p-5 space-y-5" data-consult-settings>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <label className="flex items-center gap-2 text-sm col-span-2 md:col-span-4"><input type="checkbox" checked={s.open} onChange={(e) => set({ open: e.target.checked })} />ההצעה פתוחה בדף התודה</label>
-        <div><label className="label">מספר מקומות</label><input className="input" type="number" value={s.maxMeetings} onChange={(e) => set({ maxMeetings: Number(e.target.value) })} /></div>
+        <div><label className="label">הגבלת מספר פגישות (0 = בלי הגבלה)</label><input className="input" type="number" value={s.maxMeetings} onChange={(e) => set({ maxMeetings: Number(e.target.value) })} /></div>
         <div><label className="label">משך פגישה (דקות)</label><input className="input" type="number" value={s.duration} onChange={(e) => set({ duration: Number(e.target.value) })} /></div>
         <div><label className="label">מרווח בין מועדים (דקות)</label><input className="input" type="number" value={s.step} onChange={(e) => set({ step: Number(e.target.value) })} /></div>
         <div><label className="label">התראה מינימלית (שעות)</label><input className="input" type="number" value={s.minNoticeHours} onChange={(e) => set({ minNoticeHours: Number(e.target.value) })} /></div>
@@ -282,7 +282,7 @@ export default function ConsultsPage() {
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2"><CalendarCheck className="w-6 h-6 text-primary-600" />פגישות הקפצה</h1>
-          <p className="page-subtitle">פגישות ייעוץ חינם שנקבעו מדף התודה, התזכורות שיצאו והמקומות שנותרו</p>
+          <p className="page-subtitle">פגישות ייעוץ חינם שנקבעו מדף התודה ומדף הפגישה, והתזכורות שיצאו</p>
         </div>
         <div className="flex gap-2">
           <button className={clsx('text-sm px-3 py-1.5 rounded-lg', tab === 'list' ? 'btn-primary' : 'btn-secondary')} onClick={() => setTab('list')}><CalendarCheck className="w-4 h-4" />פגישות</button>
@@ -293,7 +293,7 @@ export default function ConsultsPage() {
 
       {data && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <div className="card p-4"><p className="text-xs text-slate-500">מקומות שנותרו</p><p data-places-left className="text-2xl font-bold text-slate-900">{data.places.left} <span className="text-sm font-normal text-slate-400">מתוך {data.places.max}</span></p></div>
+          <div className="card p-4"><p className="text-xs text-slate-500">פגישות קרובות</p><p data-upcoming className="text-2xl font-bold text-slate-900">{data.bookings.filter((b) => ['BOOKED', 'CONFIRMED', 'NOT_CONFIRMED'].includes(b.status) && new Date(b.start) > new Date()).length}{data.places.max !== null && <span className="text-sm font-normal text-slate-400"> · נשארו {data.places.left} מתוך {data.places.max}</span>}</p></div>
           <div className="card p-4"><p className="text-xs text-slate-500">נקבעו (בלי ביטולים)</p><p className="text-2xl font-bold text-slate-900">{data.places.taken}</p></div>
           <div className={clsx('card p-4', !data.google && 'ring-1 ring-red-200')}><p className="text-xs text-slate-500">יומן גוגל</p><p className={clsx('text-sm font-semibold mt-1', data.google ? 'text-emerald-700' : 'text-red-600')}>{data.google ? 'מחובר: רואים רק שעות פנויות' : 'לא מחובר: חברו בהגדרות'}</p></div>
         </div>
@@ -302,7 +302,7 @@ export default function ConsultsPage() {
       {tab === 'settings' ? <SettingsPanel /> : tab === 'visits' ? <VisitsPanel /> : isLoading ? null : (
         <>
           <ClosedDays bookings={data?.bookings || []} />
-          {!data?.places.open && <div className="card p-4 flex items-center gap-2 text-sm text-amber-800 bg-amber-50"><AlertTriangle className="w-4 h-4" />ההצעה סגורה בדף התודה. מוצגת הודעת "כל המקומות נתפסו" וטופס רשימת המתנה.</div>}
+          {!data?.places.open && <div className="card p-4 flex items-center gap-2 text-sm text-amber-800 bg-amber-50"><AlertTriangle className="w-4 h-4" />ההצעה סגורה בדף התודה. מוצגת הודעת "כרגע אין מועדים פנויים" וטופס רשימת המתנה.</div>}
           <section className="space-y-3">
             <h2 className="font-semibold text-slate-900">קרובות</h2>
             {upcoming.length === 0 ? <p className="text-sm text-slate-400">אין פגישות קרובות</p> : upcoming.map((b) => <BookingCard key={b.id} b={b} onChange={refresh} />)}

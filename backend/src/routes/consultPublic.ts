@@ -17,7 +17,7 @@ const view = (b: { token: string; name: string; org: string; start: Date; durati
   label: `${dayName(b.start)}, ${dateLabel(b.start)} בשעה ${hhmm(b.start)}`,
 });
 const MESSAGES: Record<string, string> = {
-  full: 'כל המקומות נתפסו',
+  full: 'כרגע אין מועדים פנויים',
   'slot-taken': 'המועד הזה נתפס הרגע. כדאי לבחור מועד אחר',
   'not-found': 'הפגישה לא נמצאה או שכבר בוטלה',
 };
@@ -89,7 +89,7 @@ consultPublicRouter.post('/waitlist', async (req, res) => {
   const org = str(b.org, 120);
   if (!name || (!EMAIL_RE.test(email) && phoneDigits(phone).length < 9)) return res.status(400).json({ ok: false, error: 'invalid', message: 'חסרים פרטים' });
   const lead = await prisma.lead.create({ data: { fullName: name, email: email || null, phone, company: org, source: 'רשימת המתנה לפגישת הקפצה', stage: 'WARM' } });
-  await prisma.leadActivity.create({ data: { leadId: lead.id, type: 'רשימת המתנה', notes: 'נרשם/ה לרשימת ההמתנה לפגישת הקפצה אחרי שכל המקומות נתפסו.', done: false } });
+  await prisma.leadActivity.create({ data: { leadId: lead.id, type: 'רשימת המתנה', notes: 'נרשם/ה לרשימת ההמתנה לפגישת הקפצה כשלא היו מועדים פנויים.', done: false } });
   res.json({ ok: true });
 });
 
