@@ -46,12 +46,14 @@ consultPublicRouter.post('/book', async (req, res) => {
   const phone = str(b.phone, 30) || '';
   const email = normalizeEmail(b.email);
   const org = str(b.org, 120);
+  const role = str(b.role, 80);
+  const about = str(b.about, 1000) || null;
   const start = new Date(String(b.start || ''));
-  if (!name || !org || !EMAIL_RE.test(email) || phoneDigits(phone).length < 9 || Number.isNaN(start.getTime())) {
+  if (!name || !org || !role || !EMAIL_RE.test(email) || phoneDigits(phone).length < 9 || Number.isNaN(start.getTime())) {
     return res.status(400).json({ ok: false, error: 'invalid', message: 'חסרים פרטים' });
   }
   try {
-    const booking = await bookConsult({ name, phone, email, org, start, source: str(b.source, 60), visitorId: /^[A-Za-z0-9_-]{8,40}$/.test(String(b.vid || '')) ? String(b.vid) : null });
+    const booking = await bookConsult({ name, phone, email, org, role, about, start, source: str(b.source, 60), visitorId: /^[A-Za-z0-9_-]{8,40}$/.test(String(b.vid || '')) ? String(b.vid) : null });
     res.json({ ok: true, booking: view(booking) });
   } catch (e) { fail(res, e); }
 });

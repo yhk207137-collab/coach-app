@@ -53,6 +53,25 @@ export const DEFAULT_CONSULT_SETTINGS: ConsultSettings = {
   closedDays: [],
   meetingLink: '',
   bookingPageUrl: 'https://yehoshua.co.il/book.html',
+  warmSubject: 'לקראת הפגישה שלנו ב{יום}',
+  warmBody: [
+    'שלום {שם},',
+    'שמח שקבעת. לפני שניפגש, רציתי לשתף אותך במחשבה אחת מהמדריך, שעולה הרבה בשיחות עם מנהלי עמותות.',
+    'הרבה פעמים נכנסים לשיחה עם תורם בתחושה של "אולי אני מפריע לו". ומהרגע הזה, השיחה נשמעת כמו בקשת טובה.',
+    'אפשר לראות את זה גם אחרת: התורם מקבל הזדמנות להיות שותף בעשייה שחשובה לו.',
+    'אם מתאים לך, לפני השיחה הבאה עם תורם נסה לכתוב משפט אחד שמתחיל במילים "אני מציע לך להיות שותף ב...", ותראה איך זה מרגיש.',
+    'ולקראת הפגישה, אם בא לך לחשוב על זה: מה הכי מעסיק אותך היום ב{שם_העמותה}?',
+    'נתראה ב{יום} ב-{שעה}.',
+    'יהושע כהן',
+  ].join('\n\n'),
+  confirmSubject: '{מתי} ב-{שעה} נפגשים. מאשרים הגעה?',
+  confirmText: 'שלום {שם}, {מתי} ב-{שעה} אנחנו נפגשים לשיחה על {שם_העמותה}.\nמגיעים? לחצו על הכפתור לאישור.\nצריך להזיז? לחצו כאן: {קישור_לשינוי}',
+  finalSubject: 'עוד שעתיים נפגשים, ב-{שעה}',
+  finalText: '{שם}, עוד שעתיים נפגשים, ב-{שעה}. הקישור לפגישה: {קישור_לפגישה}. אם יש שאלה שמעסיקה אותך עכשיו בעמותה, אפשר להביא אותה איתך.',
+};
+
+// The earlier default texts: a saved copy nobody edited switches to the current wording.
+const OLD_DEFAULT_TEXTS: Partial<ConsultSettings> = {
   warmSubject: 'לפני שאנחנו נפגשים, הדבר האחד שמשנה כל פגישה עם תורם',
   warmBody: [
     'שלום {שם},',
@@ -83,6 +102,7 @@ export async function getConsultSettings(): Promise<ConsultSettings> {
   const saved = row ? JSON.parse(row.value) : {};
   // Reminders go by email only: an old saved text that asked to reply "1" gets the button wording.
   if (typeof saved.confirmText === 'string') saved.confirmText = saved.confirmText.replace('השיבו 1 לאישור.', 'לחצו על הכפתור לאישור.');
+  for (const [k, v] of Object.entries(OLD_DEFAULT_TEXTS)) if (saved[k] === v) delete saved[k];
   return { ...DEFAULT_CONSULT_SETTINGS, ...saved };
 }
 
@@ -245,16 +265,16 @@ async function calendarApi() {
   return auth ? google.calendar({ version: 'v3', auth }) : null;
 }
 
-const eventBody = (b: { name: string; phone: string; email: string; org: string; start: Date; duration: number }, link: string) => ({
+const eventBody = (b: { name: string; phone: string; email: string; org: string; role?: string | null; about?: string | null; start: Date; duration: number }, link: string) => ({
   summary: `פגישת הקפצה – ${b.org} (${b.name})`,
-  description: [`פגישת ייעוץ חינם, ${b.duration} דקות`, `שם: ${b.name}`, `עמותה: ${b.org}`, `טלפון: ${b.phone}`, `מייל: ${b.email}`, link ? `קישור: ${link}` : ''].filter(Boolean).join('\n'),
+  description: [`פגישת ייעוץ חינם, ${b.duration} דקות`, `שם: ${b.name}${b.role ? `, ${b.role}` : ''}`, `עמותה: ${b.org}`, b.about ? `רקע: ${b.about}` : '', `טלפון: ${b.phone}`, `מייל: ${b.email}`, link ? `קישור: ${link}` : ''].filter(Boolean).join('\n'),
   start: { dateTime: b.start.toISOString(), timeZone: TZ },
   end: { dateTime: new Date(b.start.getTime() + b.duration * MIN).toISOString(), timeZone: TZ },
   attendees: [{ email: b.email, displayName: b.name }],
   ...(link ? { location: link } : {}),
 });
 
-async function createEvent(b: { name: string; phone: string; email: string; org: string; start: Date; duration: number }, fixedLink: string) {
+async function createEvent(b: { name: string; phone: string; email: string; org: string; role?: string | null; about?: string | null; start: Date; duration: number }, fixedLink: string) {
   const cal = await calendarApi();
   if (!cal) return { eventId: null as string | null, meetLink: fixedLink || null };
   try {
@@ -333,13 +353,13 @@ async function tellOwner(title: string, intro: string, rows: [string, string][],
   const body = ownerEmailSection('פרטים', rows.map(([k, v]) => `<tr><td style="padding:9px 0;border-bottom:1px solid #e2e8f0;text-align:right;font-size:14px;"><span style="color:#64748b;">${esc(k)}:</span> <b>${esc(v)}</b></td></tr>`).join(''));
   await sendEmail(settings.email, title, ownerEmailFrame(title, intro, body, { href: `${base}${href}`, label: 'לרשימת הפגישות' }), [], { fromName: OWNER_SENDER_NAME });
 }
-const ownerRows = (b: ConsultBooking): [string, string][] => [['עמותה', b.org], ['מועד', `${dayName(b.start)} ${dateLabel(b.start)} ${hhmm(b.start)}`], ['טלפון', b.phone], ['מייל', b.email]];
+const ownerRows = (b: ConsultBooking): [string, string][] => [['עמותה', b.org], ['שם', b.role ? `${b.name}, ${b.role}` : b.name], ...(b.about ? [['רקע', b.about] as [string, string]] : []), ['מועד', `${dayName(b.start)} ${dateLabel(b.start)} ${hhmm(b.start)}`], ['טלפון', b.phone], ['מייל', b.email]];
 
 // ── Booking, moving, canceling ──────────────────────────────────────────────
 
 export class ConsultError extends Error { constructor(public code: string) { super(code); } }
 
-export interface BookingInput { name: string; phone: string; email: string; org: string; start: Date; source?: string | null; visitorId?: string | null }
+export interface BookingInput { name: string; phone: string; email: string; org: string; role?: string | null; about?: string | null; start: Date; source?: string | null; visitorId?: string | null }
 
 export async function bookConsult(input: BookingInput, now = new Date()) {
   const s = await getConsultSettings();
@@ -364,13 +384,14 @@ export async function bookConsult(input: BookingInput, now = new Date()) {
     if (taken >= s.maxMeetings) throw new ConsultError('full');
     const clash = await tx.consultBooking.findFirst({ where: { status: { in: ACTIVE }, start: input.start } });
     if (clash) throw new ConsultError('slot-taken');
-    return tx.consultBooking.create({ data: { leadId: lead!.id, name: input.name, phone: input.phone, email: input.email, org: input.org, start: input.start, duration: s.duration, source: input.source || null, visitorId: input.visitorId || null } });
+    return tx.consultBooking.create({ data: { leadId: lead!.id, name: input.name, phone: input.phone, email: input.email, org: input.org, role: input.role || null, about: input.about || null, start: input.start, duration: s.duration, source: input.source || null, visitorId: input.visitorId || null } });
   });
   slotCache = null;
 
   const ev = await createEvent({ ...created }, s.meetingLink);
   const booking = await prisma.consultBooking.update({ where: { id: created.id }, data: { googleEventId: ev.eventId, meetLink: ev.meetLink } });
-  await logToCard(booking, 'פגישת הקפצה נקבעה', `${dayName(booking.start)} ${dateLabel(booking.start)} בשעה ${hhmm(booking.start)} · ${booking.duration} דקות · ${booking.org}${ev.eventId ? ' · נוסף ליומן גוגל' : ' · לא נוסף ליומן גוגל (היומן לא מחובר)'}`);
+  await logToCard(booking, 'פגישת הקפצה נקבעה', `${dayName(booking.start)} ${dateLabel(booking.start)} בשעה ${hhmm(booking.start)} · ${booking.duration} דקות · ${booking.org}${booking.role ? ` · ${booking.name}, ${booking.role}` : ''}${booking.about ? `
+רקע: ${booking.about}` : ''}${ev.eventId ? ' · נוסף ליומן גוגל' : ' · לא נוסף ליומן גוגל (היומן לא מחובר)'}`);
   await tellOwner(`נקבעה פגישת הקפצה: ${booking.org}`, `${booking.name} שריין/ה מקום. נשארו ${Math.max(0, places.left - 1)} מקומות.`, ownerRows(booking), '/consults').catch((e) => console.error('[CONSULT] owner email failed:', e?.message || e));
   // The warm-up email goes out at once when the meeting is less than 50 hours away.
   await runSequence(booking, now);

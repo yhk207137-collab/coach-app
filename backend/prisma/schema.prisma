@@ -571,6 +571,8 @@ model ConsultBooking {
   phone         String
   email         String
   org           String
+  role          String? // their role in the nonprofit
+  about         String? // optional background they wrote about the nonprofit
   start         DateTime
   duration      Int           @default(40)
   status        ConsultStatus @default(BOOKED)

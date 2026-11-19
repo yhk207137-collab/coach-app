@@ -10,7 +10,7 @@ import api from '../../services/api';
 
 interface LogItem { id: string; type: string; notes: string; done: boolean; createdAt: string }
 interface Booking {
-  id: string; leadId: string; name: string; phone: string; email: string; org: string; start: string; duration: number;
+  id: string; leadId: string; name: string; phone: string; email: string; org: string; role?: string | null; about?: string | null; start: string; duration: number;
   status: 'BOOKED' | 'CONFIRMED' | 'NOT_CONFIRMED' | 'CANCELED' | 'DONE'; meetLink: string | null; googleEventId: string | null;
   warmSentAt: string | null; confirmSentAt: string | null; finalSentAt: string | null; noReplyAt: string | null;
   plan: { warm: string; confirm: string; noReply: string; final: string };
@@ -55,9 +55,10 @@ function BookingCard({ b, onChange }: { b: Booking; onChange: () => void }) {
     <div data-consult={b.id} className="card p-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <p className="font-semibold text-slate-900">{b.org} <span className="font-normal text-slate-500">· {b.name}</span></p>
+          <p className="font-semibold text-slate-900">{b.org} <span className="font-normal text-slate-500">· {b.name}{b.role ? `, ${b.role}` : ''}</span></p>
           <p className="text-sm text-slate-600 mt-0.5">{when(b.start)} · {b.duration} דק׳</p>
           <p className="text-xs text-slate-500 mt-1"><a href={`tel:${b.phone}`} dir="ltr">{b.phone}</a> · <a href={`mailto:${b.email}`}>{b.email}</a>{b.meetLink && <> · <a className="text-primary-600" href={b.meetLink} target="_blank" rel="noreferrer">קישור לפגישה</a></>}</p>
+          {b.about && <p className="text-sm text-slate-700 mt-2 whitespace-pre-wrap bg-slate-50 rounded-lg px-3 py-2"><span className="text-slate-500">רקע: </span>{b.about}</p>}
         </div>
         <span className={clsx('badge', STATUS[b.status].cls)}>{STATUS[b.status].label}</span>
       </div>
