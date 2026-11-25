@@ -13,6 +13,8 @@ export interface EmailOptions {
   idempotencyKey?: string;
   // The "מיילים שנשלחו" page keeps a copy under this label; false = no copy (login codes).
   logAs?: string | false;
+  // Copies of the same content share it (a campaign, a reminder step); default: label + subject.
+  logGroup?: string;
 }
 
 export class EmailError extends Error {
@@ -78,7 +80,7 @@ async function keepCopy(to: string, subject: string, html: string, options: Emai
   if (options.logAs === false) return;
   try {
     const { prisma } = await import('./prisma');
-    await prisma.sentEmail.create({ data: { to, subject: subject.slice(0, 300), html, kind: options.logAs || 'אחר', ok: result.ok, providerId: result.id || null, error: result.error ? result.error.slice(0, 500) : null } });
+    await prisma.sentEmail.create({ data: { to, subject: subject.slice(0, 300), html, kind: options.logAs || 'אחר', groupKey: (options.logGroup || `${options.logAs || 'אחר'}|${subject.slice(0, 300)}`).slice(0, 400), ok: result.ok, providerId: result.id || null, error: result.error ? result.error.slice(0, 500) : null } });
   } catch (e: any) {
     console.error('[EMAIL] could not keep a copy:', e?.message || e);
   }

@@ -5,14 +5,20 @@ import clsx from 'clsx';
 import { Search, Loader2, X, AlertTriangle, MailCheck } from 'lucide-react';
 import api from '../../services/api';
 
-// "מיילים שנשלחו": every email the system sent (login codes excepted), to read exactly what went out.
-interface Row { id: string; to: string; subject: string; kind: string; ok: boolean; error: string | null; createdAt: string }
+// "מיילים שנשלחו": what the system sent (login codes excepted), one row per content, to read exactly what went out.
+interface Row { id: string; subject: string; kind: string; sent: number; people: number; failed: number; first: string; last: string }
 interface ListData { rows: Row[]; total: number; pageSize: number; kinds: { kind: string; count: number }[] }
-interface Full extends Row { html: string }
+interface Full { id: string; to: string; subject: string; kind: string; ok: boolean; error: string | null; createdAt: string; html: string }
 
 const when = (d: string) => format(new Date(d), 'dd/MM/yy HH:mm');
 
-function Reader({ id, onClose }: { id: string; onClose: () => void }) {
+const sentTo = (r: Row) => (r.people === 1 ? 'נשלח לאדם אחד' : `נשלח ל-${r.people} אנשים`);
+const span = (r: Row) => {
+  const a = format(new Date(r.first), 'dd/MM/yy'); const b = format(new Date(r.last), 'dd/MM/yy');
+  return a === b ? when(r.last) : `${a} עד ${b}`;
+};
+
+function Reader({ id, row, onClose }: { id: string; row: Row; onClose: () => void }) {
   const { data, isLoading } = useQuery<Full>({ queryKey: ['sent-email', id], queryFn: () => api.get(`/sent-emails/${id}`).then((r) => r.data) });
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -25,8 +31,8 @@ function Reader({ id, onClose }: { id: string; onClose: () => void }) {
         <div className="flex items-start gap-3 p-4 border-b">
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-slate-900 break-words">{data?.subject || '...'}</p>
-            {data && <p className="text-xs text-slate-500 mt-1">אל <span dir="ltr">{data.to}</span> · {when(data.createdAt)} · {data.kind}</p>}
-            {data && !data.ok && <p className="text-xs text-red-600 mt-1">לא נשלח: {data.error}</p>}
+            <p className="text-xs text-slate-500 mt-1">{row.kind} · {sentTo(row)} · {span(row)}</p>
+            {row.failed > 0 && <p className="text-xs text-red-600 mt-1">{row.failed} לא נשלחו</p>}
           </div>
           <button className="p-1.5 rounded-lg hover:bg-slate-100" onClick={onClose} aria-label="סגירה"><X className="w-5 h-5" /></button>
         </div>
@@ -46,7 +52,7 @@ export default function SentEmailsPage() {
   const [q, setQ] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<Row | null>(null);
   useEffect(() => { const t = setTimeout(() => { setSearch(q); setPage(0); }, 350); return () => clearTimeout(t); }, [q]);
 
   const { data, isLoading } = useQuery<ListData>({
@@ -62,7 +68,7 @@ export default function SentEmailsPage() {
       <div className="page-header mb-0">
         <div>
           <h1 className="page-title flex items-center gap-2"><MailCheck className="w-6 h-6 text-primary-600" />מיילים שנשלחו</h1>
-          <p className="page-subtitle">כל מייל שהמערכת שלחה, בדיוק כפי שנשלח. לוחצים על שורה כדי לקרוא.</p>
+          <p className="page-subtitle">כל תוכן שנשלח מופיע פעם אחת, עם מספר האנשים שקיבלו אותו. לוחצים על שורה כדי לקרוא.</p>
         </div>
       </div>
 
@@ -75,7 +81,7 @@ export default function SentEmailsPage() {
 
       <div className="relative max-w-md">
         <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-        <input className="input pr-9" placeholder="חיפוש לפי מייל של נמען או נושא" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className="input pr-9" placeholder="חיפוש לפי נושא" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
 
       <div className="card divide-y">
@@ -84,15 +90,15 @@ export default function SentEmailsPage() {
         ) : !data?.rows.length ? (
           <p className="p-8 text-center text-sm text-slate-500">{search || kind ? 'לא נמצאו מיילים.' : 'עוד לא נשלחו מיילים מאז שהעמוד הזה נוסף. מכאן והלאה כל מייל יופיע כאן.'}</p>
         ) : data.rows.map((r) => (
-          <button key={r.id} data-sent-row onClick={() => setOpen(r.id)} className="w-full text-right p-3 md:p-4 hover:bg-slate-50 flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
-            <span className="text-xs text-slate-400 md:w-28 shrink-0">{when(r.createdAt)}</span>
+          <button key={r.id} data-sent-row onClick={() => setOpen(r)} className="w-full text-right p-3 md:p-4 hover:bg-slate-50 flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
+            <span className="text-xs text-slate-400 md:w-36 shrink-0">{span(r)}</span>
             <span className="flex-1 min-w-0">
               <span className="block font-medium text-slate-900 truncate">{r.subject}</span>
-              <span className="block text-xs text-slate-500 truncate" dir="ltr" style={{ textAlign: 'right' }}>{r.to}</span>
+              <span className="block text-xs text-slate-500">{sentTo(r)}</span>
             </span>
             <span className="flex items-center gap-2 shrink-0">
               <span className="badge bg-slate-100 text-slate-600">{r.kind}</span>
-              {!r.ok && <span className="badge bg-red-50 text-red-700 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />לא נשלח</span>}
+              {r.failed > 0 && <span className="badge bg-red-50 text-red-700 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{r.failed} לא נשלחו</span>}
             </span>
           </button>
         ))}
@@ -106,7 +112,7 @@ export default function SentEmailsPage() {
         </div>
       )}
 
-      {open && <Reader id={open} onClose={() => setOpen(null)} />}
+      {open && <Reader id={open.id} row={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }

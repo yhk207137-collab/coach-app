@@ -461,7 +461,7 @@ async function sendEmailStep(b: ConsultBooking, field: 'warmSentAt' | 'confirmSe
   const subject = fillText(subjectT, b, s, now);
   const body = fillText(bodyT, b, s, now);
   try {
-    await sendEmail(b.email, subject, emailHtml(fillText(bodyT, b, s, now, true), b, s, button), [], { fromName: 'יהושע כהן', logAs: 'פגישת הקפצה', idempotencyKey: `consult-${field}-${b.id}-${b.start.getTime()}` });
+    await sendEmail(b.email, subject, emailHtml(fillText(bodyT, b, s, now, true), b, s, button), [], { fromName: 'יהושע כהן', logAs: 'פגישת הקפצה', logGroup: `consult:${field}`, idempotencyKey: `consult-${field}-${b.id}-${b.start.getTime()}` });
     await logToCard(b, `${label} נשלח`, `אל ${b.email}\nנושא: ${subject}\n\n${body}`);
   } catch (e: any) {
     // Not sent: free the step so the next tick tries again.

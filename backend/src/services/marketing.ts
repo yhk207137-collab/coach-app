@@ -263,6 +263,7 @@ export async function processQueue() {
         const attachments = send.campaign.kind === 'WELCOME' ? (guideFiles ??= await guideAttachment(settings)) : [];
         const resendId = await sendEmail(send.email, built.subject, built.html, attachments, {
           logAs: send.campaign.kind === 'WELCOME' ? 'המדריך (מייל ברוכים הבאים)' : 'דיוור',
+          logGroup: `campaign:${send.campaign.id}`,
           fromName: send.campaign.fromName || settings.senderName,
           replyTo: settings.replyTo || undefined,
           text: built.text,

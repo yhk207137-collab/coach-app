@@ -676,8 +676,12 @@ model SentEmail {
   ok         Boolean  @default(true)
   error      String?
   providerId String?
+  // Copies of the same email (one campaign, one reminder step) share this key, so the page
+  // lists each content once. Older rows have none and group by kind + subject.
+  groupKey   String?
   createdAt  DateTime @default(now())
 
   @@index([createdAt])
   @@index([kind, createdAt])
+  @@index([groupKey])
 }
