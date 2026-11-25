@@ -254,6 +254,7 @@ export async function processQueue() {
         // The welcome email carries the guide itself, besides the download button.
         const attachments = send.campaign.kind === 'WELCOME' ? (guideFiles ??= await guideAttachment(settings)) : [];
         const resendId = await sendEmail(send.email, built.subject, built.html, attachments, {
+          logAs: send.campaign.kind === 'WELCOME' ? 'המדריך (מייל ברוכים הבאים)' : 'דיוור',
           fromName: send.campaign.fromName || settings.senderName,
           replyTo: settings.replyTo || undefined,
           text: built.text,

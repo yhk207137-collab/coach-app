@@ -11,6 +11,8 @@ export interface EmailOptions {
   text?: string;
   headers?: Record<string, string>;
   idempotencyKey?: string;
+  // The "מיילים שנשלחו" page keeps a copy under this label; false = no copy (login codes).
+  logAs?: string | false;
 }
 
 export class EmailError extends Error {
@@ -71,7 +73,35 @@ export async function sendingDomainStatus() {
   return { ready: true, from, domain, reason: 'ok' as const };
 }
 
+// A copy for the "מיילים שנשלחו" page. Never fails the send itself.
+async function keepCopy(to: string, subject: string, html: string, options: EmailOptions, result: { ok: boolean; id?: string; error?: string }) {
+  if (options.logAs === false) return;
+  try {
+    const { prisma } = await import('./prisma');
+    await prisma.sentEmail.create({ data: { to, subject: subject.slice(0, 300), html, kind: options.logAs || 'אחר', ok: result.ok, providerId: result.id || null, error: result.error ? result.error.slice(0, 500) : null } });
+  } catch (e: any) {
+    console.error('[EMAIL] could not keep a copy:', e?.message || e);
+  }
+}
+
 export async function sendEmail(
+  to: string,
+  subject: string,
+  html: string,
+  attachments: EmailAttachment[] = [],
+  options: EmailOptions = {}
+): Promise<string | undefined> {
+  try {
+    const id = await deliver(to, subject, html, attachments, options);
+    await keepCopy(to, subject, html, options, { ok: true, id });
+    return id;
+  } catch (e: any) {
+    await keepCopy(to, subject, html, options, { ok: false, error: e?.message || String(e) });
+    throw e;
+  }
+}
+
+async function deliver(
   to: string,
   subject: string,
   html: string,

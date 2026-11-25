@@ -355,7 +355,7 @@ async function tellOwner(title: string, intro: string, rows: [string, string][],
   if (!settings.email) return;
   const base = await ownerAppUrl();
   const body = ownerEmailSection('פרטים', rows.map(([k, v]) => `<tr><td style="padding:9px 0;border-bottom:1px solid #e2e8f0;text-align:right;font-size:14px;"><span style="color:#64748b;">${esc(k)}:</span> <b>${esc(v)}</b></td></tr>`).join(''));
-  await sendEmail(settings.email, title, ownerEmailFrame(title, intro, body, { href: `${base}${href}`, label: 'לרשימת הפגישות' }), [], { fromName: OWNER_SENDER_NAME });
+  await sendEmail(settings.email, title, ownerEmailFrame(title, intro, body, { href: `${base}${href}`, label: 'לרשימת הפגישות' }), [], { fromName: OWNER_SENDER_NAME, logAs: 'התראה אליך' });
 }
 const ownerRows = (b: ConsultBooking): [string, string][] => [['עמותה', b.org], ['שם', b.role ? `${b.name}, ${b.role}` : b.name], ...(b.about ? [['רקע', b.about] as [string, string]] : []), ['מועד', `${dayName(b.start)} ${dateLabel(b.start)} ${hhmm(b.start)}`], ['טלפון', b.phone], ['מייל', b.email]];
 
@@ -441,7 +441,12 @@ export async function cancelConsult(where: { token?: string; id?: string }, by: 
 
 // ── The reminder sequence ───────────────────────────────────────────────────
 
-export const plan = (b: Pick<ConsultBooking, 'start'>) => ({
+// Booked (or moved) less than 24 hours ahead: they just chose this time, so no warm-up and no
+// confirmation request, only the 2-hour reminder.
+export const isLastMinute = (b: Pick<ConsultBooking, 'start' | 'createdAt' | 'rescheduledAt'>) => b.start.getTime() - (b.rescheduledAt || b.createdAt).getTime() < 24 * HOUR;
+
+export const plan = (b: Pick<ConsultBooking, 'start' | 'createdAt' | 'rescheduledAt'>) => ({
+  lastMinute: isLastMinute(b),
   warm: beforeRest(new Date(b.start.getTime() - 50 * HOUR)),
   confirm: beforeRest(new Date(b.start.getTime() - 24 * HOUR)),
   noReply: new Date(b.start.getTime() - 4 * HOUR),
@@ -456,7 +461,7 @@ async function sendEmailStep(b: ConsultBooking, field: 'warmSentAt' | 'confirmSe
   const subject = fillText(subjectT, b, s, now);
   const body = fillText(bodyT, b, s, now);
   try {
-    await sendEmail(b.email, subject, emailHtml(fillText(bodyT, b, s, now, true), b, s, button), [], { fromName: 'יהושע כהן', idempotencyKey: `consult-${field}-${b.id}-${b.start.getTime()}` });
+    await sendEmail(b.email, subject, emailHtml(fillText(bodyT, b, s, now, true), b, s, button), [], { fromName: 'יהושע כהן', logAs: 'פגישת הקפצה', idempotencyKey: `consult-${field}-${b.id}-${b.start.getTime()}` });
     await logToCard(b, `${label} נשלח`, `אל ${b.email}\nנושא: ${subject}\n\n${body}`);
   } catch (e: any) {
     // Not sent: free the step so the next tick tries again.
@@ -471,14 +476,15 @@ export async function runSequence(b: ConsultBooking, now = new Date()) {
   const p = plan(b);
   const quiet = isQuietTime(now);
   const left = b.start.getTime() - now.getTime();
+  const lastMinute = p.lastMinute;
 
   // ① 50 hours before: the warm-up email (at once if booked later than that).
-  if (!b.warmSentAt && now >= p.warm && !quiet) {
+  if (!b.warmSentAt && !lastMinute && now >= p.warm && !quiet) {
     await sendEmailStep(b, 'warmSentAt', 'מייל חימום', s.warmSubject, s.warmBody, s, now);
   }
 
   // ② 24 hours before: an email asking to confirm, with a button. Not sent if the meeting is already under 4 hours away.
-  if (!b.confirmSentAt && b.status !== 'CONFIRMED' && now >= p.confirm && left > 4 * HOUR && !quiet) {
+  if (!b.confirmSentAt && !lastMinute && b.status !== 'CONFIRMED' && now >= p.confirm && left > 4 * HOUR && !quiet) {
     await sendEmailStep(b, 'confirmSentAt', 'מייל בקשת אישור הגעה', s.confirmSubject, s.confirmText, s, now, { href: confirmUrl(b, s), label: 'מגיע/ה, מאשר/ת' });
   }
 
@@ -505,6 +511,8 @@ export async function confirmByToken(token: string, now = new Date()) {
   if (b.status === 'CONFIRMED') return b;
   const confirmed = await prisma.consultBooking.update({ where: { id: b.id }, data: { status: 'CONFIRMED', confirmedAt: now } });
   await logToCard(confirmed, 'אישר הגעה', 'לחץ/ה על כפתור האישור במייל.');
+  // The owner hears at once: some confirm only an hour (or less) before.
+  await tellOwner(`אישר/ה הגעה: ${confirmed.org}`, `${confirmed.name} אישר/ה שמגיע/ה לפגישה ${relativeDay(confirmed.start, now)} ב-${hhmm(confirmed.start)}.`, ownerRows(confirmed), '/consults').catch((e) => console.error('[CONSULT] owner confirm email failed:', e?.message || e));
   return confirmed;
 }
 

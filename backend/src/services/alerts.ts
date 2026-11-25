@@ -515,7 +515,7 @@ export async function buildBrief(now = new Date()) {
 export async function sendBrief(now = new Date()) {
   const settings = await getAlertSettings();
   const brief = await buildBrief(now);
-  await sendEmail(settings.email, brief.subject, brief.html, [], { fromName: SENDER_NAME });
+  await sendEmail(settings.email, brief.subject, brief.html, [], { fromName: SENDER_NAME, logAs: 'התראה אליך' });
   return { to: settings.email, subject: brief.subject };
 }
 
@@ -536,7 +536,7 @@ async function sendMeetingHeadsUp(meeting: { id: string; date: Date; type: strin
   ].join('');
   const title = `פגישה ב-${hhmm(meeting.date)} עם ${meeting.client.fullName}`;
   const html = frame(title, 'כמה פרטים שיעזרו לך להגיע מוכן.', section('לפני הפגישה', rows), { href: `${base}/clients/${meeting.clientId}`, label: 'לכרטיס הלקוח' });
-  await sendEmail(settings.email, title, html, [], { fromName: SENDER_NAME });
+  await sendEmail(settings.email, title, html, [], { fromName: SENDER_NAME, logAs: 'התראה אליך' });
 }
 
 // ── The clock: one tick a minute, safe across restarts and deploys ──────────

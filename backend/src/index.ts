@@ -14,6 +14,7 @@ import { alertsTick } from './services/alerts';
 import { chargeDueMeetings } from './services/meetingBilling';
 import { consultTick } from './services/consult';
 import consultRoutes from './routes/consults';
+import sentEmailRoutes from './routes/sentEmails';
 import { consultPublicRouter } from './routes/consultPublic';
 import marketingRoutes from './routes/marketing';
 import alertRoutes from './routes/alerts';
@@ -144,6 +145,7 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/marketing', marketingRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/consults', consultRoutes);
+app.use('/api/sent-emails', sentEmailRoutes);
 
 app.get('/api/health', (_, res) =>
   res.json({ ok: true, version: (process.env.RAILWAY_GIT_COMMIT_SHA || 'dev').slice(0, 7) })

@@ -30,6 +30,7 @@ import ContactsPage from './pages/Marketing/Contacts';
 import CampaignsPage from './pages/Marketing/Campaigns';
 import CampaignReport from './pages/Marketing/Report';
 import TrackingPage from './pages/Marketing/Tracking';
+import SentEmailsPage from './pages/Marketing/SentEmails';
 import AlertsPage from './pages/Alerts';
 import CampaignEditor from './pages/Marketing/Editor';
 import Unsubscribe from './pages/Unsubscribe';
@@ -105,6 +106,7 @@ export default function App() {
           <Route path="/marketing/campaigns" element={<CampaignsPage />} />
           <Route path="/marketing/campaigns/:id/report" element={<CampaignReport />} />
           <Route path="/marketing/tracking" element={<TrackingPage />} />
+          <Route path="/marketing/sent" element={<SentEmailsPage />} />
         </Route>
         <Route path="/marketing/campaigns/:id/edit" element={<RequireCoach><CampaignEditor /></RequireCoach>} />
         <Route path="/unsubscribe/:token" element={<Unsubscribe />} />

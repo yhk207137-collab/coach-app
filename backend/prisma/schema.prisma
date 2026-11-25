@@ -663,3 +663,19 @@ model AssistantTask {
   doneAt    DateTime?
   createdAt DateTime  @default(now())
 }
+
+// Every email the system sends (except login codes), so the owner can read what went out.
+model SentEmail {
+  id         String   @id @default(cuid())
+  to         String
+  subject    String
+  html       String
+  kind       String   // פגישת הקפצה / דיוור / התראה אליך / ...
+  ok         Boolean  @default(true)
+  error      String?
+  providerId String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([kind, createdAt])
+}

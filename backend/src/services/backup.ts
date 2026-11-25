@@ -80,7 +80,7 @@ export async function emailBackup() {
     </div>
   `;
   for (const { email } of coaches) {
-    await sendEmail(email, `גיבוי יומי – ליוי שיווק ופרסום – ${date}`, html, [{ filename: backupFileName(), content: file }]);
+    await sendEmail(email, `גיבוי יומי – ליוי שיווק ופרסום – ${date}`, html, [{ filename: backupFileName(), content: file }], { logAs: 'גיבוי יומי' });
   }
   return { sentTo: coaches.map((u) => u.email), counts: backup.counts, sizeKB: Math.round(file.length / 1024) };
 }

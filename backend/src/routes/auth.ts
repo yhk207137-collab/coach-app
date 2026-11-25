@@ -52,7 +52,9 @@ async function sendCodeEmail(to: string, code: string, link: string) {
         <p style="color:#94a3b8; font-size:13px;">או כניסה ישירה בלחיצה:</p>
         <a href="${link}" style="color:#007f91; font-size:13px;">${link}</a>
       </div>
-    `
+    `,
+    [],
+    { logAs: false }, // login codes stay out of the sent-emails page
   );
 }
 

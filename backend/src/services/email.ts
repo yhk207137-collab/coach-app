@@ -17,7 +17,7 @@ export async function sendClientWelcomeEmail(email: string, name: string) {
       <p>תוכל להתחבר לאזור האישי שלך ולצפות בפגישות, משימות וסיכומים.</p>
       <p>בברכה,<br/>${fromName()}</p>
     </div>
-  `);
+  `, [], { logAs: 'ללקוחות' });
 }
 
 export async function sendMeetingConfirmation(email: string, name: string, meeting: any) {
@@ -34,7 +34,7 @@ export async function sendMeetingConfirmation(email: string, name: string, meeti
       </table>
       <p>בברכה,<br/>${fromName()}</p>
     </div>
-  `);
+  `, [], { logAs: 'ללקוחות' });
 }
 
 export async function sendMeetingReminder(email: string, name: string, meeting: any) {
@@ -46,5 +46,5 @@ export async function sendMeetingReminder(email: string, name: string, meeting: 
       <p><strong>${dateStr}</strong></p>
       <p>בברכה,<br/>${fromName()}</p>
     </div>
-  `);
+  `, [], { logAs: 'ללקוחות' });
 }

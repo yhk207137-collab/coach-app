@@ -13,7 +13,7 @@ interface Booking {
   id: string; leadId: string; name: string; phone: string; email: string; org: string; role?: string | null; about?: string | null; start: string; duration: number;
   status: 'BOOKED' | 'CONFIRMED' | 'NOT_CONFIRMED' | 'CANCELED' | 'DONE'; meetLink: string | null; googleEventId: string | null;
   warmSentAt: string | null; confirmSentAt: string | null; finalSentAt: string | null; noReplyAt: string | null;
-  plan: { warm: string; confirm: string; noReply: string; final: string };
+  plan: { lastMinute?: boolean; warm: string; confirm: string; noReply: string; final: string };
   log: LogItem[];
 }
 interface Data { places: { max: number | null; taken: number; left: number | null; open: boolean }; google: boolean; bookings: Booking[] }
@@ -35,12 +35,14 @@ const when = (iso: string) => format(new Date(iso), "EEEE d/M 'בשעה' HH:mm",
 const short = (iso: string) => format(new Date(iso), 'd/M HH:mm');
 const PLACEHOLDERS = '{שם} {שם_מלא} {שם_העמותה} {יום} {תאריך} {שעה} {מתי} {קישור_לשינוי} {קישור_לפגישה} {משך}';
 
-function Step({ label, at, sent, skipped }: { label: string; at: string; sent: string | null; skipped?: boolean }) {
+const LATE = 'נקבעה פחות מ-24 שעות מראש';
+
+function Step({ label, at, sent, skipped }: { label: string; at: string; sent: string | null; skipped?: boolean | string }) {
   return (
     <li className="flex items-center gap-2 text-xs">
       {sent ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : skipped ? <XCircle className="w-3.5 h-3.5 text-slate-300" /> : <Clock className="w-3.5 h-3.5 text-slate-400" />}
       <span className="text-slate-700">{label}</span>
-      <span className="text-slate-400">{sent ? `נשלח ${short(sent)}` : skipped ? 'לא נשלח' : `מתוכנן ${short(at)}`}</span>
+      <span className="text-slate-400">{sent ? `נשלח ${short(sent)}` : skipped ? (skipped === true ? 'לא נשלח' : `לא נשלח (${skipped})`) : `מתוכנן ${short(at)}`}</span>
     </li>
   );
 }
@@ -65,8 +67,8 @@ function BookingCard({ b, onChange }: { b: Booking; onChange: () => void }) {
 
       {active && (
         <ul className="mt-3 space-y-1">
-          <Step label="① מייל חימום (50 שעות לפני)" at={b.plan.warm} sent={b.warmSentAt} />
-          <Step label="② מייל אישור הגעה (24 שעות לפני)" at={b.plan.confirm} sent={b.confirmSentAt} skipped={b.status === 'CONFIRMED' && !b.confirmSentAt} />
+          <Step label="① מייל חימום (50 שעות לפני)" at={b.plan.warm} sent={b.warmSentAt} skipped={b.plan.lastMinute && !b.warmSentAt ? LATE : false} />
+          <Step label="② מייל אישור הגעה (24 שעות לפני)" at={b.plan.confirm} sent={b.confirmSentAt} skipped={b.confirmSentAt ? false : b.plan.lastMinute ? LATE : b.status === 'CONFIRMED'} />
           <Step label="③ מייל תזכורת (שעתיים לפני)" at={b.plan.final} sent={b.finalSentAt} />
         </ul>
       )}

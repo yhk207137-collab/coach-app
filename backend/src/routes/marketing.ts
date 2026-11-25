@@ -464,6 +464,7 @@ router.post('/campaigns/:id/test', async (req: AuthRequest, res) => {
     const built = buildForSend(campaign, { name: ownerName(coach?.name, settings), email, unsubToken: 'preview' }, null, base, settings);
     try {
       await sendEmail(email, `[בדיקה] ${built.subject}`, built.html, attachments, {
+        logAs: 'מייל בדיקה',
         fromName: campaign.fromName || settings.senderName,
         replyTo: settings.replyTo || undefined,
         text: built.text,
