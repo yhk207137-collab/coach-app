@@ -541,11 +541,15 @@ router.get('/campaigns/:id/report', async (req, res) => {
       take: 2000,
       include: { contact: { select: { id: true, name: true, email: true, status: true } } },
     }),
-    prisma.$queryRaw<{ url: string; clicks: number; people: number }[]>`
-      SELECT e.url, count(*)::int AS clicks, count(DISTINCT e."sendId")::int AS people
+    // One row per link and place in the email (top / mid / bottom button of the same link).
+    prisma.$queryRaw<{ url: string; pos: string | null; clicks: number; people: number }[]>`
+      SELECT e.url, e.pos, count(*)::int AS clicks, count(DISTINCT e."sendId")::int AS people
       FROM "CampaignEvent" e JOIN "CampaignSend" s ON s.id = e."sendId"
       WHERE s."campaignId" = ${campaign.id} AND e.type IN ('click', 'download') AND e.url IS NOT NULL
-      GROUP BY e.url ORDER BY clicks DESC LIMIT 50`,
+      GROUP BY e.url, e.pos
+      ORDER BY sum(count(*)) OVER (PARTITION BY e.url) DESC, e.url,
+        CASE e.pos WHEN 'top' THEN 0 WHEN 'mid' THEN 1 WHEN 'bottom' THEN 2 ELSE 3 END
+      LIMIT 50`,
   ]);
   const [sent24h, domain] = await Promise.all([sentInLast24h(), sendingDomainStatus()]);
   res.json({
@@ -563,7 +567,7 @@ router.get('/campaigns/:id/report', async (req, res) => {
 // ── Tracking: landing visits → sign-ups → guide email → opens → downloads ───
 
 const SOURCE_NAMES: Record<string, string> = {
-  share: 'שיתוף מהדף', whatsapp: 'וואטסאפ', wa: 'וואטסאפ', email: 'מייל', mail: 'מייל', newsletter: 'מייל',
+  share: 'שיתוף מהדף', 'mail-top': 'מייל, כפתור עליון', 'mail-mid': 'מייל, כפתור באמצע', 'mail-bottom': 'מייל, כפתור תחתון', whatsapp: 'וואטסאפ', wa: 'וואטסאפ', email: 'מייל', mail: 'מייל', newsletter: 'מייל',
   facebook: 'פייסבוק', fb: 'פייסבוק', instagram: 'אינסטגרם', ig: 'אינסטגרם', sms: 'SMS', qr: 'קוד QR', video: 'סרטון', direct: 'כניסה ישירה',
 };
 export function sourceLabel(source: string | null, referrer: string | null) {

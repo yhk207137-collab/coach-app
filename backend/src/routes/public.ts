@@ -203,11 +203,12 @@ trackingRouter.get('/c/:sendId', async (req, res) => {
   if (!target || !/^https?:/i.test(target) || !verifyClick(req.params.sendId, url, sig)) {
     return res.status(400).send('קישור לא תקין');
   }
+  const pos = ['top', 'mid', 'bottom'].includes(String(req.query.p)) ? String(req.query.p) : null;
   let location = target;
   try {
     const u = new URL(target);
     if (await isLandingHost(u.host)) {
-      if (!u.searchParams.has('src') && !u.searchParams.has('utm_source')) u.searchParams.set('src', 'email');
+      if (!u.searchParams.has('src') && !u.searchParams.has('utm_source')) u.searchParams.set('src', pos ? `mail-${pos}` : 'email');
       u.searchParams.set('ys', req.params.sendId);
       location = u.toString();
     }
@@ -227,5 +228,5 @@ trackingRouter.get('/c/:sendId', async (req, res) => {
       ...(send.status === 'SENT' ? { status: 'DELIVERED', deliveredAt: now } : {}),
     },
   });
-  await prisma.campaignEvent.create({ data: { sendId: send.id, type: guide ? 'download' : 'click', url: target.slice(0, 1000) } });
+  await prisma.campaignEvent.create({ data: { sendId: send.id, type: guide ? 'download' : 'click', url: target.slice(0, 1000), pos } });
 });

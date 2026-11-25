@@ -8,6 +8,7 @@ import { ArrowRight, Send, CheckCircle2, MailOpen, MousePointerClick, UserMinus,
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { Campaign, CampaignStats, CAMPAIGN_STATUS, pct } from './shared';
+const POS_LABEL: Record<string, string> = { top: 'כפתור עליון', mid: 'כפתור באמצע', bottom: 'כפתור תחתון' };
 
 interface Recipient {
   id: string; status: string; email: string; name: string | null; contactId: string; contactStatus: string;
@@ -16,7 +17,7 @@ interface Recipient {
 interface ReportData {
   campaign: Campaign;
   stats: CampaignStats;
-  links: { url: string; clicks: number; people: number }[];
+  links: { url: string; pos: string | null; clicks: number; people: number }[];
   recipients: Recipient[];
   queue: { dailyLimit: number; sentLast24h: number; domainReady: boolean };
 }
@@ -156,13 +157,19 @@ export default function CampaignReport() {
 
       {data.links.length > 0 && (
         <div className="card p-0 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100"><h3 className="font-semibold text-slate-900">על מה לחצו</h3></div>
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h3 className="font-semibold text-slate-900">על מה לחצו</h3>
+            {data.links.some((l) => l.pos) && <p className="text-xs text-slate-500 mt-1">קישור שמופיע במייל כמה פעמים מסומן לבד לפי המקום שלו. מי שלחץ על הכפתור התחתון קרא עד הסוף.</p>}
+          </div>
           <table className="w-full">
             <thead className="bg-slate-50"><tr><th className="table-header">קישור</th><th className="table-header w-28">הקלקות</th><th className="table-header w-28">אנשים</th></tr></thead>
             <tbody>
               {data.links.map((l) => (
-                <tr key={l.url} className="table-row">
-                  <td className="table-cell"><a href={l.url} target="_blank" rel="noreferrer" dir="ltr" className="text-primary-600 hover:underline break-all text-sm">{l.url}</a></td>
+                <tr key={`${l.url}|${l.pos || ''}`} className="table-row">
+                  <td className="table-cell">
+                    {l.pos && <span className={clsx('badge ml-2 mb-1 inline-block', l.pos === 'bottom' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700')}>{POS_LABEL[l.pos] || l.pos}</span>}
+                    <a href={l.url} target="_blank" rel="noreferrer" dir="ltr" className="text-primary-600 hover:underline break-all text-sm">{l.url}</a>
+                  </td>
                   <td className="table-cell font-semibold">{l.clicks}</td>
                   <td className="table-cell">{l.people}</td>
                 </tr>

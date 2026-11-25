@@ -486,6 +486,8 @@ model CampaignEvent {
   send      CampaignSend @relation(fields: [sendId], references: [id], onDelete: Cascade)
   type      String
   url       String?
+  // Where the link sat in the email when the same link appears more than once: top / mid / bottom.
+  pos       String?
   createdAt DateTime     @default(now())
 
   @@index([sendId])

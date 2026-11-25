@@ -155,14 +155,22 @@ export function buildForSend(
   const unsubscribeUrl = sendId
     ? `${base}/unsubscribe/${contact.unsubToken}?s=${sendId}`
     : `${base}/unsubscribe/preview`;
-  const { html, text } = renderEmail(onEmailAddress(withGuideLink(campaign.design, settings.guideUrl), base), {
-    merge,
-    footer: footerFrom(settings),
-    unsubscribeUrl,
-    preheader: campaign.preheader,
-    title: campaign.subject,
-    trackLink: sendId ? (url) => `${base}/api/t/c/${sendId}?u=${encodeURIComponent(url)}&s=${sign(`${sendId}|${url}`)}` : undefined,
-    openPixelUrl: sendId ? `${base}/api/t/o/${sendId}.gif` : undefined,
+  const design = onEmailAddress(withGuideLink(campaign.design, settings.guideUrl), base);
+  const ctx = { merge, footer: footerFrom(settings), unsubscribeUrl, preheader: campaign.preheader, title: campaign.subject, openPixelUrl: sendId ? `${base}/api/t/o/${sendId}.gif` : undefined };
+  // A link that appears more than once is marked by its place (top / mid / bottom), so the
+  // report shows who clicked the top button and who reached the bottom one.
+  const counts = new Map<string, number>();
+  if (sendId) renderEmail(design, { ...ctx, trackLink: (url) => { counts.set(url, (counts.get(url) || 0) + 1); return url; } });
+  const seen = new Map<string, number>();
+  const { html, text } = renderEmail(design, {
+    ...ctx,
+    trackLink: sendId ? (url) => {
+      const n = counts.get(url) || 1;
+      const i = seen.get(url) || 0;
+      seen.set(url, i + 1);
+      const pos = n < 2 ? '' : i === 0 ? 'top' : i === n - 1 ? 'bottom' : 'mid';
+      return `${base}/api/t/c/${sendId}?u=${encodeURIComponent(url)}&s=${sign(`${sendId}|${url}`)}${pos ? `&p=${pos}` : ''}`;
+    } : undefined,
   });
   return {
     subject: renderSubject(campaign.subject, campaign.markAsAd, merge),
