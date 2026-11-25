@@ -5,6 +5,8 @@ import { ArrowRight, AlignRight, AlignCenter, AlignLeft, ImagePlus, Trash2, Pale
 import api from '../../../services/api';
 import { BLOCKS, Block, Design, DesignSettings, MarketingSettings, blockLabel, COLOR_SWATCHES } from '../shared';
 import { DRAG_NEW } from './Canvas';
+import { makeBold } from './RichText';
+import { Bold } from 'lucide-react';
 
 // Points a button at the uploaded guide; clicks on that link count as downloads in the tracking page.
 function GuideLink({ url, onPick }: { url: string; onPick: (url: string) => void }) {
@@ -121,6 +123,19 @@ function ImageFields({ b, onUpdate, onPickImage, showWidth = true }: { b: Block;
   );
 }
 
+// A clear bold button: mark words on the email, then click here.
+function BoldField() {
+  return (
+    <Field label="הדגשה">
+      <button type="button" data-bold-btn onMouseDown={(e) => e.preventDefault()} onClick={makeBold}
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 hover:border-primary-400 hover:bg-primary-50 text-slate-800 font-bold">
+        <Bold className="w-4 h-4" />טקסט מודגש
+      </button>
+      <p className="text-xs text-slate-500 mt-1.5">מסמנים מילים במייל ולוחצים. לחיצה נוספת מבטלת את ההדגשה. אפשר גם Ctrl+B.</p>
+    </Field>
+  );
+}
+
 function BlockSettings({ b, onUpdate, onPickImage }: { b: Block; onUpdate: Props['onUpdate']; onPickImage: Props['onPickImage'] }) {
   const up = (patch: Partial<Block>) => onUpdate(b.id, patch);
   switch (b.type) {
@@ -139,13 +154,19 @@ function BlockSettings({ b, onUpdate, onPickImage }: { b: Block; onUpdate: Props
       return (
         <>
           <p className="text-sm text-slate-500 bg-slate-50 rounded-xl p-3">את הטקסט עורכים ישירות על המייל. סמנו מילים כדי להדגיש, להוסיף קישור או צבע.</p>
+          <BoldField />
           <AlignField value={b.align} onChange={(v) => up({ align: v })} />
           <Range label="גודל טקסט" value={b.fontSize ?? 16} min={12} max={22} suffix="px" onChange={(v) => up({ fontSize: v })} />
           <ColorField label="צבע" value={b.color} onChange={(v) => up({ color: v })} allowEmpty="רגיל" />
         </>
       );
     case 'quote':
-      return <p className="text-sm text-slate-500 bg-slate-50 rounded-xl p-3">מסגרת צבעונית להדגשת טיפ, ציטוט או משפט חשוב. הצבע לפי צבע המותג. את הטקסט עורכים על המייל.</p>;
+      return (
+        <>
+          <p className="text-sm text-slate-500 bg-slate-50 rounded-xl p-3">מסגרת צבעונית להדגשת טיפ, ציטוט או משפט חשוב. הצבע לפי צבע המותג. את הטקסט עורכים על המייל.</p>
+          <BoldField />
+        </>
+      );
     case 'image':
       return (
         <>
@@ -202,6 +223,7 @@ function BlockSettings({ b, onUpdate, onPickImage }: { b: Block; onUpdate: Props
             <Segmented value={b.imageSide || 'right'} onChange={(v) => up({ imageSide: v })} options={[{ value: 'right', label: 'ימין' }, { value: 'left', label: 'שמאל' }]} />
           </Field>
           <p className="text-xs text-slate-400">בטלפון התמונה והטקסט מוצגים אחד מעל השני.</p>
+          <BoldField />
         </>
       );
     default:

@@ -21,6 +21,9 @@ function restoreSelection() {
   return true;
 }
 
+// Bold for the words marked in the email (used by the side panel too).
+export function makeBold() { exec('bold'); }
+
 function exec(command: string, value?: string) {
   if (!restoreSelection()) return;
   document.execCommand('styleWithCSS', false, 'true');
@@ -111,7 +114,10 @@ export function FormatToolbar() {
 
   return (
     <div className="relative flex items-center gap-0.5 flex-wrap p-1 bg-white rounded-xl border border-slate-200 shadow-sm">
-      {btn('מודגש', Bold, () => exec('bold'))}
+      <button type="button" title="מודגש: סמנו מילים ולחצו" onMouseDown={keep} onClick={() => exec('bold')}
+        className="px-2.5 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors flex items-center gap-1 text-sm font-bold">
+        <Bold className="w-4 h-4" />מודגש
+      </button>
       {btn('נטוי', Italic, () => exec('italic'))}
       {btn('קו תחתון', Underline, () => exec('underline'))}
       <span className="w-px h-5 bg-slate-200 mx-1" />
