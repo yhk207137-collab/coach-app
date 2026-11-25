@@ -567,7 +567,7 @@ router.get('/campaigns/:id/report', async (req, res) => {
 // ── Tracking: landing visits → sign-ups → guide email → opens → downloads ───
 
 const SOURCE_NAMES: Record<string, string> = {
-  share: 'שיתוף מהדף', 'mail-top': 'מייל, כפתור עליון', 'mail-mid': 'מייל, כפתור באמצע', 'mail-bottom': 'מייל, כפתור תחתון', whatsapp: 'וואטסאפ', wa: 'וואטסאפ', email: 'מייל', mail: 'מייל', newsletter: 'מייל',
+  share: 'שיתוף מהדף', status: 'סטטוס וואטסאפ', 'mail-top': 'מייל, כפתור עליון', 'mail-mid': 'מייל, כפתור באמצע', 'mail-bottom': 'מייל, כפתור תחתון', whatsapp: 'וואטסאפ', wa: 'וואטסאפ', email: 'מייל', mail: 'מייל', newsletter: 'מייל',
   facebook: 'פייסבוק', fb: 'פייסבוק', instagram: 'אינסטגרם', ig: 'אינסטגרם', sms: 'SMS', qr: 'קוד QR', video: 'סרטון', direct: 'כניסה ישירה',
 };
 export function sourceLabel(source: string | null, referrer: string | null) {
