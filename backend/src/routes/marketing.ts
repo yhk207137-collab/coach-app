@@ -583,6 +583,116 @@ export function sourceLabel(source: string | null, referrer: string | null) {
   return r.replace(/^www\./, '');
 }
 
+// ---- Promotions: each one gets its own link (?src=<code>); its visits, sign-ups and downloads are counted ----
+
+const israelDay = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+const PROMO_CODE = /^[a-z0-9][a-z0-9-]{1,29}$/;
+const RESERVED_CODES = new Set(Object.keys(SOURCE_NAMES).concat(['email', 'direct']));
+
+function promoLink(url: string, code: string) {
+  return url + (url.includes('?') ? '&' : '?') + 'src=' + encodeURIComponent(code);
+}
+
+async function defaultLandingUrl() {
+  const rows = await prisma.$queryRaw<{ host: string }[]>`
+    SELECT split_part(page, '/', 1) AS host FROM "PageVisit"
+    WHERE "createdAt" > now() - interval '90 days' AND page NOT LIKE 'localhost%'
+      AND page NOT LIKE '%/thank-you%' AND page NOT LIKE '%/pgisha%' AND page NOT LIKE '%/book%'
+    GROUP BY 1 ORDER BY count(*) DESC LIMIT 1`;
+  return rows[0]?.host ? `https://${rows[0].host}/` : 'https://yehoshua.co.il/';
+}
+
+async function newPromoCode(name: string) {
+  const latin = name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 20);
+  for (let i = 0; i < 20; i++) {
+    const rand = Math.random().toString(36).slice(2, 5);
+    const code = latin.length >= 2 && i === 0 && !RESERVED_CODES.has(latin) ? latin : `${latin.length >= 2 ? latin : 'ad'}-${rand}`;
+    if (!(await prisma.promotion.findUnique({ where: { code } }))) return code;
+  }
+  return `ad-${Date.now().toString(36)}`;
+}
+
+function parseDay(v: unknown) {
+  const d = String(v || '');
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(`${d}T12:00:00Z`) : null;
+}
+
+// Visitors who came through each code, and the people who signed up after arriving through it
+// (or whose sign-up itself carried the code), and how many of them downloaded the guide.
+async function promoStats(codes: string[]) {
+  const out = new Map<string, { visitors: number; signups: number; downloads: number }>();
+  if (!codes.length) return out;
+  const [visits, people] = await Promise.all([
+    prisma.$queryRaw<{ code: string; visitors: number }[]>`
+      SELECT lower(source) AS code, count(DISTINCT "visitorId")::int AS visitors FROM "PageVisit"
+      WHERE lower(source) = ANY(${codes}) AND page NOT LIKE '%/thank-you%' AND page NOT LIKE '%/pgisha%' AND page NOT LIKE '%/book%'
+      GROUP BY 1`,
+    prisma.$queryRaw<{ code: string; signups: number; downloads: number }[]>`
+      WITH a AS (
+        SELECT lower(c.source) AS code, c.id FROM "Contact" c WHERE lower(c.source) = ANY(${codes})
+        UNION
+        SELECT lower(v.source), c.id FROM "PageVisit" v JOIN "Contact" c ON c.id = v."contactId"
+        WHERE lower(v.source) = ANY(${codes}) AND v."createdAt" <= c."createdAt" + interval '2 minutes'
+      )
+      SELECT a.code, count(DISTINCT a.id)::int AS signups,
+        count(DISTINCT a.id) FILTER (WHERE EXISTS (SELECT 1 FROM "CampaignSend" s WHERE s."contactId" = a.id AND s."downloadedAt" IS NOT NULL))::int AS downloads
+      FROM a GROUP BY a.code`,
+  ]);
+  for (const c of codes) out.set(c, { visitors: 0, signups: 0, downloads: 0 });
+  for (const v of visits) out.get(v.code)!.visitors = v.visitors;
+  for (const p of people) Object.assign(out.get(p.code)!, { signups: p.signups, downloads: p.downloads });
+  return out;
+}
+
+router.get('/promotions', async (_req, res) => {
+  const [rows, defaultUrl] = await Promise.all([prisma.promotion.findMany({ orderBy: [{ date: 'desc' }, { createdAt: 'desc' }] }), defaultLandingUrl()]);
+  const stats = await promoStats(rows.map((r) => r.code));
+  res.json({
+    defaultUrl,
+    promotions: rows.map((r) => ({ ...r, day: israelDay(r.date), link: promoLink(r.url, r.code), ...stats.get(r.code)! })),
+  });
+});
+
+router.post('/promotions', async (req, res) => {
+  const name = String(req.body.name || '').trim().slice(0, 80);
+  const date = parseDay(req.body.date);
+  if (!name) return res.status(400).json({ error: 'צריך לתת לפרסום שם' });
+  if (!date) return res.status(400).json({ error: 'צריך לבחור תאריך' });
+  let url = String(req.body.url || '').trim() || await defaultLandingUrl();
+  try { const u = new URL(url); if (!/^https?:$/.test(u.protocol)) throw 0; url = u.toString(); } catch { return res.status(400).json({ error: 'הכתובת של הדף לא תקינה' }); }
+  let code = String(req.body.code || '').trim().toLowerCase();
+  if (code) {
+    if (!PROMO_CODE.test(code)) return res.status(400).json({ error: 'הקוד יכול להכיל רק אותיות באנגלית, מספרים ומקף' });
+    if (RESERVED_CODES.has(code)) return res.status(400).json({ error: 'הקוד הזה כבר בשימוש של המערכת, בחר אחר' });
+    if (await prisma.promotion.findUnique({ where: { code } })) return res.status(400).json({ error: 'כבר יש פרסום עם הקוד הזה' });
+  } else code = await newPromoCode(name);
+  const row = await prisma.promotion.create({ data: { name, code, url, date, note: String(req.body.note || '').trim().slice(0, 300) || null } });
+  res.json({ ...row, day: israelDay(row.date), link: promoLink(row.url, row.code) });
+});
+
+// The code stays as it was: the link is already out in the world.
+router.put('/promotions/:id', async (req, res) => {
+  const data: { name?: string; date?: Date; note?: string | null } = {};
+  if (req.body.name !== undefined) {
+    const name = String(req.body.name).trim().slice(0, 80);
+    if (!name) return res.status(400).json({ error: 'צריך לתת לפרסום שם' });
+    data.name = name;
+  }
+  if (req.body.date !== undefined) {
+    const date = parseDay(req.body.date);
+    if (!date) return res.status(400).json({ error: 'צריך לבחור תאריך' });
+    data.date = date;
+  }
+  if (req.body.note !== undefined) data.note = String(req.body.note || '').trim().slice(0, 300) || null;
+  const row = await prisma.promotion.update({ where: { id: req.params.id }, data });
+  res.json(row);
+});
+
+router.delete('/promotions/:id', async (req, res) => {
+  await prisma.promotion.delete({ where: { id: req.params.id } });
+  res.json({ ok: true });
+});
+
 router.get('/tracking', async (req, res) => {
   const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 0;
   const from = days ? new Date(Date.now() - days * 24 * 3600_000) : new Date(0);
@@ -627,22 +737,48 @@ router.get('/tracking', async (req, res) => {
   ]);
 
   // Sources: unique visitors per channel, and how many signed up after arriving through it.
+  const promos = await prisma.promotion.findMany({ select: { code: true, name: true, date: true } });
+  const promoName = new Map(promos.map((p) => [p.code, p.name]));
+  const label = (source: string | null, referrer: string | null) => (source && promoName.get(source.trim().toLowerCase())) || sourceLabel(source, referrer);
+
   const signedUpAt = new Map(signups.map((s) => [s.id, s.createdAt.getTime()]));
   const bySource = new Map<string, { visitors: Set<string>; signups: Set<string> }>();
   for (const v of visits) {
-    const label = sourceLabel(v.source, v.referrer);
-    const row = bySource.get(label) || { visitors: new Set(), signups: new Set() };
+    const label_ = label(v.source, v.referrer);
+    const row = bySource.get(label_) || { visitors: new Set(), signups: new Set() };
     row.visitors.add(v.visitorId);
     const signedAt = v.contactId ? signedUpAt.get(v.contactId) : undefined;
     if (signedAt !== undefined && v.createdAt.getTime() <= signedAt) row.signups.add(v.contactId!);
-    bySource.set(label, row);
+    bySource.set(label_, row);
   }
   const sources = [...bySource.entries()]
     .map(([source, r]) => ({ source, visitors: r.visitors.size, signups: r.signups.size }))
     .sort((a, b) => b.visitors - a.visitors);
 
+  // Day by day (Israel dates): unique visitors, sign-ups, first downloads, and the promotions run that day.
+  const firstDownloads = await prisma.$queryRaw<{ at: Date }[]>`
+    SELECT min("downloadedAt") AS at FROM "CampaignSend" WHERE "downloadedAt" IS NOT NULL GROUP BY "contactId"
+    HAVING min("downloadedAt") >= ${from}`;
+  const byDay = new Map<string, { visitors: Set<string>; signups: number; downloads: number; promotions: string[] }>();
+  const dayRow = (k: string) => {
+    let r = byDay.get(k);
+    if (!r) { r = { visitors: new Set(), signups: 0, downloads: 0, promotions: [] }; byDay.set(k, r); }
+    return r;
+  };
+  if (days) for (let t = Date.now(); t >= from.getTime() - 12 * 3600_000; t -= 24 * 3600_000) dayRow(israelDay(new Date(t)));
+  for (const v of visits) dayRow(israelDay(v.createdAt)).visitors.add(v.visitorId);
+  for (const s of signups) dayRow(israelDay(s.createdAt)).signups++;
+  for (const d of firstDownloads) dayRow(israelDay(d.at)).downloads++;
+  const fromDay = israelDay(from);
+  for (const p of promos) { const k = israelDay(p.date); if (k >= fromDay && k <= israelDay(new Date())) dayRow(k).promotions.push(p.name); }
+  const daily = [...byDay.entries()]
+    .filter(([k]) => !days || k >= fromDay)
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([day, r]) => ({ day, visitors: r.visitors.size, signups: r.signups, downloads: r.downloads, promotions: r.promotions }));
+
   res.json({
     days,
+    daily,
     funnel: {
       visitors: new Set(visits.map((v) => v.visitorId)).size,
       visits: visits.length,
@@ -652,7 +788,7 @@ router.get('/tracking', async (req, res) => {
       downloaded: downloadRows[0]?.downloaded ?? 0,
     },
     sources,
-    recent: recent.map((v) => ({ id: v.id, at: v.createdAt, page: v.page, source: sourceLabel(v.source, v.referrer), contact: v.contact })),
+    recent: recent.map((v) => ({ id: v.id, at: v.createdAt, page: v.page, source: label(v.source, v.referrer), contact: v.contact })),
     people,
     setup: { welcomeId: welcome.id, welcomeActive: welcome.status === 'ACTIVE', guideUrl: settings.guideUrl, guideName: settings.guideName },
   });

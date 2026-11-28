@@ -510,6 +510,18 @@ model PageVisit {
   @@index([createdAt])
 }
 
+// A promotion the owner ran (an ad, a WhatsApp post, a newsletter...). Its link carries ?src=<code>,
+// so visits and sign-ups that arrive through it are counted for it.
+model Promotion {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  url       String
+  date      DateTime
+  note      String?
+  createdAt DateTime @default(now())
+}
+
 // A reminder the owner postponed ("remind me tomorrow"); hidden until then.
 model AlertSnooze {
   key       String   @id
