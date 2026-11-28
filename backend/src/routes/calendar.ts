@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getAuthUrl, getTokensFromCode, saveTokens, isCalendarConnected } from '../services/calendar';
 import { requireAuth, requireCoach } from '../middleware/auth';
 import crypto from 'crypto';
+import { isGmailConnectState, finishGmailConnect } from '../services/gmailInbox';
 
 const router = Router();
 const pendingStates = new Set<string>();
@@ -32,6 +33,16 @@ router.get('/connect', requireAuth, requireCoach, (req, res) => {
 router.get('/callback', async (req, res) => {
   const { code, state } = req.query;
   if (!code) return res.status(400).send('No code');
+  // The Gmail connection for guide requests (marketing) comes back through this same registered address.
+  if (state && isGmailConnectState(String(state))) {
+    const page = (title: string, text: string) => `<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body dir="rtl" style="font-family:Arial;text-align:center;padding:40px 20px"><h2>${title}</h2><p>${text}</p><p><a href="/marketing/tracking" style="display:inline-block;margin-top:12px;padding:12px 22px;border-radius:12px;background:#0A1E3C;color:#fff;text-decoration:none">חזרה למעקב דיוור</a></p></body></html>`;
+    try {
+      await finishGmailConnect(String(code), String(state), callbackUrl(req));
+      return res.send(page('✅ ג׳ימייל חובר', 'מעכשיו המערכת קוראת את בקשות המדריך ושולחת את המדריך אוטומטית.'));
+    } catch (err: any) {
+      return res.status(400).send(page('החיבור לא הצליח', String(err?.message || 'נסה שוב')));
+    }
+  }
   if (!state || !pendingStates.has(state as string)) {
     return res.status(403).send('Invalid state');
   }

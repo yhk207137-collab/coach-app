@@ -248,7 +248,7 @@ export function MailButtonModal({ code, name, onClose }: { code: string | null; 
 }
 
 interface GuideMailInfo {
-  address: string; gmailAddress: string | null; ready: boolean; problems: string[]; welcomeActive: boolean;
+  address: string; gmailAddress: string | null; gmailConnected: boolean; ready: boolean; problems: string[]; welcomeActive: boolean;
   schedule: { mode: 'fast' | 'slow' | 'quiet'; label: string };
   counts: Record<string, number>;
   recent: { id: string; email: string; name: string | null; status: string; note: string | null; consent: boolean; promotion: string | null; receivedAt: string }[];
@@ -266,6 +266,19 @@ export function GuideMailCard() {
   const qc = useQueryClient();
   const [showButton, setShowButton] = useState(false);
   const [running, setRunning] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<{ error: string; redirectUri: string } | null>(null);
+  const connectGmail = async () => {
+    setConnecting(true);
+    setConnectError(null);
+    try {
+      const { data: r } = await api.get('/marketing/guide-mail/connect');
+      window.location.assign(r.link); // Google's sign-in page; it comes back to a "connected" page
+    } catch (err: any) {
+      setConnectError(err.response?.data || { error: 'לא הצלחתי להתחיל את החיבור', redirectUri: '' });
+      setConnecting(false);
+    }
+  };
   const { data, isLoading } = useQuery<GuideMailInfo>({
     queryKey: ['guide-mail'],
     queryFn: () => api.get('/marketing/guide-mail').then((r) => r.data),
@@ -307,8 +320,22 @@ export function GuideMailCard() {
               <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> פעיל: הבקשות מגיעות אל <span dir="ltr" className="font-medium">{data.address}</span>, והמדריך נשלח אוטומטית
             </p>
           ) : (
-            <div className="px-6 py-3 bg-amber-50 text-sm text-amber-900 space-y-1">
+            <div className="px-6 py-3 bg-amber-50 text-sm text-amber-900 space-y-2">
               {data.problems.map((p, i) => <p key={i} className="flex items-start gap-2"><AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" /> {p}</p>)}
+              {(!data.gmailConnected || (data.address && data.gmailAddress !== data.address)) && (
+                <div className="pt-1">
+                  <button onClick={connectGmail} disabled={connecting} className="btn-primary text-sm">
+                    {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <MailPlus className="w-4 h-4" />} {data.gmailConnected ? 'חיבור ג\'ימייל אחר' : 'חיבור ג\'ימייל'}
+                  </button>
+                  <p className="text-xs text-amber-800 mt-1.5">ייפתח דף של גוגל. בחר את החשבון <span dir="ltr" className="font-medium">{data.address || 'של כתובת המענה'}</span>, ואשר את ההרשאות ליומן ולמייל.</p>
+                  {connectError && (
+                    <div className="mt-2 rounded-xl bg-white border border-amber-200 p-3 text-xs text-slate-700 space-y-1">
+                      <p className="font-semibold text-red-700">{connectError.error}</p>
+                      {connectError.redirectUri && <p>אם גוגל מציג שגיאה של כתובת חזרה (redirect_uri_mismatch), צריך להוסיף בהגדרות החיבור לגוגל (Google Cloud ← Credentials ← Authorized redirect URIs) את הכתובת: <span dir="ltr" className="font-mono break-all">{connectError.redirectUri}</span></p>}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <p className="px-6 py-2 text-xs text-slate-500 border-b border-slate-100">{data.schedule.label} אפשר תמיד ללחוץ "בדיקה" כדי לטפל בבקשות מיד.</p>
