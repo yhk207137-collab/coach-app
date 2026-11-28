@@ -6,7 +6,7 @@ import { sendEmail, sendingDomainStatus, fromEmailAddress } from '../lib/email';
 import { gmailState, listIncomingMail, labelHandled } from './gmailInbox';
 import { isQuietTime } from '../assistant/time';
 import { getMarketingSettings, getWelcomeCampaign, buildForSend, guideAttachment, getBaseUrl, processQueue } from './marketing';
-import { GUIDE_MAIL_SUBJECT, GUIDE_MAIL_LABEL, guideMailButtonHtml } from './guideMailLink';
+import { GUIDE_MAIL_SUBJECT, GUIDE_MAIL_SUBJECT_OLD, GUIDE_MAIL_SEARCH, GUIDE_MAIL_NOTICE, GUIDE_MAIL_LABEL, guideMailButtonHtml } from './guideMailLink';
 export * from './guideMailLink';
 
 const LIST = 'המדריך לעמותה מנצחת';
@@ -45,7 +45,7 @@ function parseName(body: string) {
   return n.length >= 2 && n.length <= 60 ? n : '';
 }
 
-const consentLine = (body: string) => body.split(/\r?\n/).find((l) => l.includes('מסכים לקבל עדכונים'))?.trim().slice(0, 500) || '';
+const consentLine = (body: string) => body.split(/\r?\n/).find((l) => /(מסכים|מאשר|מאשרת|מאשר\/ת)\s+(לקבל|קבלת)\s+עדכונים/.test(l))?.trim().slice(0, 500) || '';
 
 let running = false;
 
@@ -59,7 +59,7 @@ export async function processGuideMailRequests() {
     if (!status.welcomeActive) return { handled, skipped: 'welcome-off' as const };
     if (!(await sendingDomainStatus()).ready) return { handled, skipped: 'domain' as const };
 
-    const messages = await listIncomingMail(`subject:"${GUIDE_MAIL_SUBJECT}" newer_than:14d -in:sent -in:drafts -in:chats`, 50);
+    const messages = await listIncomingMail(`subject:"${GUIDE_MAIL_SEARCH}" newer_than:14d -in:sent -in:drafts -in:chats`, 50);
     if (!messages.length) return { handled, skipped: null };
     const seen = new Set((await prisma.mailRequest.findMany({ where: { gmailId: { in: messages.map((m) => m.id) } }, select: { gmailId: true } })).map((r) => r.gmailId));
     const own = new Set([status.address, status.gmailAddress, fromEmailAddress().toLowerCase()]);
@@ -73,7 +73,9 @@ export async function processGuideMailRequests() {
       if (lastHour >= HOURLY_LIMIT) break; // the rest wait for the next round
 
       const { email, name: fromName } = parseFrom(msg.from);
-      const subjectOk = msg.subject.trim().startsWith(GUIDE_MAIL_SUBJECT);
+      const subject = msg.subject.trim();
+      const consentInSubject = subject.startsWith(GUIDE_MAIL_SUBJECT);
+      const subjectOk = consentInSubject || subject.startsWith(GUIDE_MAIL_SUBJECT_OLD);
       const record = (status: string, extra: Record<string, unknown> = {}) =>
         prisma.mailRequest.create({ data: { gmailId: msg.id, email: email.slice(0, 120), receivedAt: msg.receivedAt, status, ...extra } });
 
@@ -85,7 +87,12 @@ export async function processGuideMailRequests() {
       }
 
       const name = parseName(msg.body) || fromName || null;
-      const consent = !!consentLine(msg.body);
+      // The subject itself says "and updates by email" (with the notice under the button); an older button's
+      // request counts only when its body still has the consent sentence.
+      const consentText = consentInSubject
+        ? `שלח/ה מייל בנושא "${subject}". ליד הכפתור נכתב: "${GUIDE_MAIL_NOTICE}"${consentLine(msg.body) ? ` ובגוף המייל: "${consentLine(msg.body)}"` : ''}`.slice(0, 500)
+        : consentLine(msg.body);
+      const consent = !!consentText;
       const tag = msg.subject.match(/\[([a-z0-9-]{2,30})\]/i)?.[1]?.toLowerCase();
       const code = tag && CODE_RE.test(tag) && (await prisma.promotion.findUnique({ where: { code: tag } })) ? tag : null;
 
@@ -99,7 +106,7 @@ export async function processGuideMailRequests() {
       try {
         // The contact: the same fields a sign-up on the landing page gets, with the email itself as the consent.
         const consentData = consent
-          ? { consentAt: msg.receivedAt, consentText: consentLine(msg.body), consentPage: 'mail', consentIp: '', consentMethod: 'email-request' }
+          ? { consentAt: msg.receivedAt, consentText, consentPage: 'mail', consentIp: '', consentMethod: 'email-request' }
           : {};
         const existing = await prisma.contact.findUnique({ where: { email } });
         let contact;

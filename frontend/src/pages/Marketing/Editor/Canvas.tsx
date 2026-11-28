@@ -132,7 +132,7 @@ export default function Canvas(p: Props) {
                 onChange={(v) => p.onUpdate(b.id, { text: v.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ') })}
                 style={{ display: 'inline-block', minWidth: 40 }} />
             </span>
-            <div style={{ fontFamily: font, fontSize: 13, color: '#64748b', marginTop: 8 }}>לחיצה תפתח מייל מוכן. רק לשלוח, והמדריך יגיע אליך בתשובה.</div>
+            <div style={{ fontFamily: font, fontSize: 13, color: '#64748b', marginTop: 8 }}>לחיצה תפתח מייל מוכן. רק לשלוח, והמדריך יגיע אליך בתשובה.<br />בשליחת המייל אני מאשר/ת לקבל את המדריך ועדכונים במייל. אפשר להסיר בכל עת.</div>
             {!p.settings?.replyTo && <div className="text-xs text-amber-600 mt-2">⚠ חסרה "כתובת למענה" בהגדרות הדיוור, ובלעדיה הכפתור לא יופיע במייל</div>}
           </div>
         );
