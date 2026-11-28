@@ -10,7 +10,7 @@ import { requireAuth, requireCoach, AuthRequest } from '../middleware/auth';
 import { UPLOAD_DIR } from '../lib/uploads';
 import { sendEmail, sendingDomainStatus, EmailError, fromEmailAddress } from '../lib/email';
 import { STARTERS, StarterKey } from '../services/emailStarters';
-import { guideMailStatus, processGuideMailRequests, guideMailto, guideMailButtonHtml, guideMailText, guideMailButtonPreview } from '../services/guideMail';
+import { guideMailStatus, processGuideMailRequests, guideMailto, guideMailButtonHtml, guideMailText, guideMailButtonPreview, guideMailSchedule } from '../services/guideMail';
 import {
   getMarketingSettings, saveMarketingSettings, getBaseUrl, buildForSend, audienceWhere,
   startCampaign, statsByCampaign, emptyStats, getWelcomeCampaign, DAILY_LIMIT, sentInLast24h, processQueue,
@@ -701,14 +701,16 @@ const snippet = (to: string, code: string | null) => ({
 });
 
 router.get('/guide-mail', async (_req, res) => {
-  const [status, recent, counts] = await Promise.all([
+  const [status, recent, counts, schedule] = await Promise.all([
     guideMailStatus(),
     prisma.mailRequest.findMany({ orderBy: { createdAt: 'desc' }, take: 40 }),
     prisma.mailRequest.groupBy({ by: ['status'], _count: true }),
+    guideMailSchedule(),
   ]);
   const promoNames = new Map((await prisma.promotion.findMany({ select: { code: true, name: true } })).map((p) => [p.code, p.name]));
   res.json({
     ...status,
+    schedule: { mode: schedule.mode, label: schedule.label },
     counts: Object.fromEntries(counts.map((c) => [c.status, c._count])),
     recent: recent.map((r) => ({ ...r, promotion: r.code ? promoNames.get(r.code) || r.code : null })),
     snippet: status.address ? snippet(status.address, null) : null,

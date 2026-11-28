@@ -4,6 +4,7 @@
 import { prisma } from '../lib/prisma';
 import { sendEmail, sendingDomainStatus, fromEmailAddress } from '../lib/email';
 import { googleStatus, gmailAddress, listIncomingMail, labelHandled } from '../assistant/google';
+import { isQuietTime } from '../assistant/time';
 import { getMarketingSettings, getWelcomeCampaign, buildForSend, guideAttachment, getBaseUrl, processQueue } from './marketing';
 import { GUIDE_MAIL_SUBJECT, GUIDE_MAIL_LABEL, guideMailButtonHtml } from './guideMailLink';
 export * from './guideMailLink';
@@ -153,10 +154,36 @@ export async function processGuideMailRequests() {
   }
 }
 
+// How often to look for requests: every 5 minutes in the two days after a promotion (when most
+// requests arrive) or right after one came in, every 30 minutes otherwise, and not at all on
+// Shabbat / Yom Tov (requests from then are handled when it ends).
+const FAST = 5 * 60_000, SLOW = 30 * 60_000;
+
+export async function guideMailSchedule(now = new Date()) {
+  if (isQuietTime(now)) return { mode: 'quiet' as const, every: 0, label: 'מושהה בשבת ובחג. הבקשות יטופלו במוצאי שבת או חג.' };
+  const [promo, recent] = await Promise.all([
+    prisma.promotion.findFirst({ where: { date: { gte: new Date(now.getTime() - 2 * 24 * 3600_000), lte: new Date(now.getTime() + 12 * 3600_000) } }, select: { name: true } }),
+    prisma.mailRequest.findFirst({ where: { status: { in: ['queued', 'sent'] }, createdAt: { gte: new Date(now.getTime() - 2 * 3600_000), lte: now } }, select: { id: true } }),
+  ]);
+  if (promo) return { mode: 'fast' as const, every: FAST, label: `נבדק כל 5 דקות, כי יש פרסום מהיומיים האחרונים ("${promo.name}").` };
+  if (recent) return { mode: 'fast' as const, every: FAST, label: 'נבדק כל 5 דקות, כי הגיעו בקשות בשעתיים האחרונות.' };
+  return { mode: 'slow' as const, every: SLOW, label: 'נבדק כל חצי שעה. ביומיים שאחרי פרסום – כל 5 דקות.' };
+}
+
+let lastRound = 0;
 export function startGuideMailWorker() {
-  const run = () => void processGuideMailRequests().catch((e) => console.error('[GUIDE-MAIL] round failed:', e?.message || e));
-  setTimeout(run, 30_000);
-  setInterval(run, 3 * 60_000);
+  const tick = async () => {
+    try {
+      const { every } = await guideMailSchedule();
+      if (!every || Date.now() - lastRound < every - 30_000) return;
+      lastRound = Date.now();
+      await processGuideMailRequests();
+    } catch (e: any) {
+      console.error('[GUIDE-MAIL] round failed:', e?.message || e);
+    }
+  };
+  setTimeout(() => void tick(), 60_000);
+  setInterval(() => void tick(), FAST);
 }
 
 export const guideMailButtonPreview = (to: string, code?: string | null) =>

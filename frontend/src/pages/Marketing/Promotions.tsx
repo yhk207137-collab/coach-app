@@ -249,6 +249,7 @@ export function MailButtonModal({ code, name, onClose }: { code: string | null; 
 
 interface GuideMailInfo {
   address: string; gmailAddress: string | null; ready: boolean; problems: string[]; welcomeActive: boolean;
+  schedule: { mode: 'fast' | 'slow' | 'quiet'; label: string };
   counts: Record<string, number>;
   recent: { id: string; email: string; name: string | null; status: string; note: string | null; consent: boolean; promotion: string | null; receivedAt: string }[];
 }
@@ -303,13 +304,14 @@ export function GuideMailCard() {
         <>
           {data.ready ? (
             <p className="px-6 py-3 text-sm text-emerald-700 bg-emerald-50 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> פעיל: הבקשות מגיעות אל <span dir="ltr" className="font-medium">{data.address}</span> ומטופלות כל כמה דקות
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> פעיל: הבקשות מגיעות אל <span dir="ltr" className="font-medium">{data.address}</span>, והמדריך נשלח אוטומטית
             </p>
           ) : (
             <div className="px-6 py-3 bg-amber-50 text-sm text-amber-900 space-y-1">
               {data.problems.map((p, i) => <p key={i} className="flex items-start gap-2"><AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" /> {p}</p>)}
             </div>
           )}
+          <p className="px-6 py-2 text-xs text-slate-500 border-b border-slate-100">{data.schedule.label} אפשר תמיד ללחוץ "בדיקה" כדי לטפל בבקשות מיד.</p>
           {data.recent.length === 0 ? <p className="text-center text-slate-400 py-8 text-sm">עוד לא הגיעו בקשות במייל</p> : (
             <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
               {data.recent.map((r) => (
