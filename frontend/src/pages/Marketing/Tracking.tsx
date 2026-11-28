@@ -10,6 +10,7 @@ import {
 import api from '../../services/api';
 import { CONTACT_STATUS, ContactStatus, pct } from './shared';
 import { ContactDrawer } from './Contacts';
+import PromotionsCard, { showDay } from './Promotions';
 
 interface Person {
   id: string; name: string | null; email: string; status: ContactStatus; source: string | null; createdAt: string;
@@ -17,6 +18,7 @@ interface Person {
 }
 interface TrackingData {
   days: number;
+  daily: { day: string; visitors: number; signups: number; downloads: number; promotions: string[] }[];
   funnel: { visitors: number; visits: number; signups: number; guideSent: number; opened: number; downloaded: number };
   sources: { source: string; visitors: number; signups: number }[];
   recent: { id: string; at: string; page: string; source: string; contact: { id: string; name: string | null; email: string } | null }[];
@@ -138,6 +140,51 @@ export default function TrackingPage() {
             {i < steps.length - 1 && <ChevronLeft className="hidden xl:block w-5 h-5 text-slate-300 absolute top-1/2 -translate-y-1/2" style={{ left: -18 }} />}
           </div>
         ))}
+      </div>
+
+      <PromotionsCard />
+
+      <div className="card p-0 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100">
+          <h3 className="font-semibold text-slate-900">יום אחרי יום</h3>
+          <p className="text-xs text-slate-500">כמה נכנסו לדף, נרשמו והורידו את המדריך בכל תאריך, ואיזה פרסום יצא באותו יום</p>
+        </div>
+        {data.daily.length === 0 ? <p className="text-center text-slate-400 py-10 text-sm">עדיין אין נתונים בתקופה הזו</p> : (
+          <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50 sticky top-0 z-10">
+                <tr>
+                  <th className="table-header w-28">תאריך</th>
+                  <th className="table-header w-24">נכנסו</th>
+                  <th className="table-header w-24">נרשמו</th>
+                  <th className="table-header w-24">הורידו</th>
+                  <th className="table-header">פרסום באותו יום</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.daily.map((d) => {
+                  const empty = !d.visitors && !d.signups && !d.downloads && !d.promotions.length;
+                  return (
+                    <tr key={d.day} className={clsx('table-row', d.promotions.length > 0 && 'bg-primary-50/60')}>
+                      <td className={clsx('table-cell text-sm whitespace-nowrap', empty ? 'text-slate-300' : 'text-slate-700')}>
+                        {showDay(d.day)}
+                        <span className="block text-xs text-slate-400">{['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'][new Date(d.day + 'T12:00:00').getDay()]}</span>
+                      </td>
+                      <td className={clsx('table-cell text-sm font-semibold', !d.visitors && 'text-slate-300 font-normal')}>{d.visitors}</td>
+                      <td className={clsx('table-cell text-sm', !d.signups && 'text-slate-300')}>{d.signups}</td>
+                      <td className={clsx('table-cell text-sm', !d.downloads && 'text-slate-300')}>{d.downloads}</td>
+                      <td className="table-cell text-sm">
+                        <div className="flex flex-wrap gap-1">
+                          {d.promotions.map((n, i) => <span key={i} className="badge bg-primary-100 text-primary-700 whitespace-nowrap">{n}</span>)}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {!setup.welcomeActive && (
