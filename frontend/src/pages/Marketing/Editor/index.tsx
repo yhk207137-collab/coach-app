@@ -3,9 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import { ArrowRight, Undo2, Redo2, Eye, Monitor, Smartphone, Loader2, CheckCircle2, Save, LayoutTemplate } from 'lucide-react';
+import { ArrowRight, Undo2, Redo2, Eye, Monitor, Smartphone, Loader2, CheckCircle2, Save, LayoutTemplate, MailPlus } from 'lucide-react';
 import api from '../../../services/api';
-import { BLOCKS, Block, Campaign, Design, DesignSettings, DomainStatus, MarketingSettings, RICH_TYPES, newId } from '../shared';
+import { BLOCKS, Block, Campaign, Design, DesignSettings, DomainStatus, MarketingSettings, RICH_TYPES, newId, GUIDE_MAIL_BLOCK } from '../shared';
 import Canvas from './Canvas';
 import Panel from './Panel';
 import PreviewModal from './PreviewModal';
@@ -27,6 +27,11 @@ export default function CampaignEditor() {
   const { data: mkt } = useQuery<{ settings: MarketingSettings; domain: DomainStatus }>({
     queryKey: ['marketing-settings'],
     queryFn: () => api.get('/marketing/settings').then((r) => r.data),
+  });
+  // The landing page's address, to tell when an email carries the offer with a link to it.
+  const { data: promoInfo } = useQuery<{ defaultUrl: string }>({
+    queryKey: ['marketing-promotions'],
+    queryFn: () => api.get('/marketing/promotions').then((r) => r.data),
   });
 
   const [design, setDesign] = useState<Design | null>(null);
@@ -138,11 +143,11 @@ export default function CampaignEditor() {
     const isText = 'html' in patch || 'text' in patch;
     commit({ ...design, blocks: design.blocks.map((b) => (b.id === bid ? { ...b, ...patch } : b)) }, isText);
   };
-  const insertBlock = (type: string, index: number) => {
+  const insertBlock = (type: string, index: number, extra: Partial<Block> = {}) => {
     if (!design || readOnly) return;
-    const def = BLOCKS.find((b) => b.type === type);
+    const def = type === GUIDE_MAIL_BLOCK.type ? GUIDE_MAIL_BLOCK : BLOCKS.find((b) => b.type === type);
     if (!def) return;
-    const block = def.create(design.settings.brand);
+    const block = { ...def.create(design.settings.brand), ...extra };
     const arr = [...design.blocks];
     arr.splice(Math.max(0, Math.min(index, arr.length)), 0, block);
     commit({ ...design, blocks: arr });
@@ -210,6 +215,22 @@ export default function CampaignEditor() {
   const missingLinks = blocks.filter((b) => b.type === 'button' && !String(b.url || '').trim()).length;
   const emptyImages = blocks.filter((b) => ['image', 'logo', 'imageText'].includes(b.type) && !b.src).length;
   const richSelected = selected && RICH_TYPES.includes(selected.type);
+  const landingHost = (() => { try { return new URL(promoInfo?.defaultUrl || '').host.replace(/^www\./, ''); } catch { return ''; } })();
+  const guideUrl = mkt?.settings?.guideUrl || '';
+  const isOfferLink = (u: unknown) => {
+    const url = String(u || '').trim();
+    if (!/^https?:\/\//i.test(url)) return false;
+    if (guideUrl && url.split('?')[0] === guideUrl.split('?')[0]) return true;
+    try { return !!landingHost && new URL(url).host.replace(/^www\./, '') === landingHost; } catch { return false; }
+  };
+  const offerIndex = blocks.map((b) => isOfferLink(b.url) || isOfferLink(b.link)).lastIndexOf(true);
+  const offerWithoutMailButton = offerIndex >= 0 && !blocks.some((b) => b.type === 'guideByMail');
+  // A promotion's code on the offer link (?src=) goes on the mail button too, so its requests count for that promotion.
+  const offerCode = (() => {
+    if (offerIndex < 0) return null;
+    const b = blocks[offerIndex];
+    try { return new URL(String(isOfferLink(b.url) ? b.url : b.link)).searchParams.get('src')?.toLowerCase() || null; } catch { return null; }
+  })();
 
   return (
     <div className="h-screen flex flex-col bg-slate-100" dir="rtl">
@@ -272,6 +293,16 @@ export default function CampaignEditor() {
               // Zero-height sticky row: the toolbar floats over the canvas instead of pushing the email down.
               <div className="sticky top-3 z-40 h-0 flex justify-center pointer-events-none">
                 <div className="pointer-events-auto h-fit"><FormatToolbar /></div>
+              </div>
+            )}
+            {offerWithoutMailButton && !readOnly && (
+              <div className="max-w-[640px] mx-auto mt-4 mx-4 sm:mx-auto flex items-start gap-3 rounded-2xl border border-primary-200 bg-primary-50 p-4 text-sm text-primary-900">
+                <MailPlus className="w-5 h-5 text-primary-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-semibold">במייל הזה יש הצעה לקבל את המדריך, עם קישור.</p>
+                  <p className="text-primary-800 mt-0.5">למי שיש לו רק מייל, בלי דפדפן: כפתור שפותח מייל מוכן, והמדריך נשלח אליו אוטומטית בתשובה.</p>
+                </div>
+                <button type="button" onClick={() => insertBlock(GUIDE_MAIL_BLOCK.type, offerIndex + 1, offerCode ? { code: offerCode } : {})} className="btn-primary text-sm flex-shrink-0">הוספת הכפתור</button>
               </div>
             )}
             <div className={clsx(readOnly && 'pointer-events-none')}>

@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
-import { Megaphone, Plus, Copy, Loader2, X, Pencil, Trash2, Link2 } from 'lucide-react';
+import { Megaphone, Plus, Copy, Loader2, X, Pencil, Trash2, Link2, MailPlus, AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
+import clsx from 'clsx';
 import api from '../../services/api';
 import { pct } from './shared';
 
@@ -15,10 +16,10 @@ export interface Promotion {
 const today = () => format(new Date(), 'yyyy-MM-dd');
 export const showDay = (d: string) => { const [y, m, dd] = d.split('-'); return `${+dd}/${+m}/${y}`; };
 
-async function copy(text: string) {
+async function copy(text: string, done = 'הקישור הועתק') {
   try {
     await navigator.clipboard.writeText(text);
-    toast.success('הקישור הועתק');
+    toast.success(done);
   } catch {
     toast.error('לא הצלחתי להעתיק');
   }
@@ -113,6 +114,7 @@ export default function PromotionsCard() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Promotion | 'new' | null>(null);
   const [created, setCreated] = useState<Promotion | null>(null);
+  const [mailFor, setMailFor] = useState<Promotion | null>(null);
   const { data, isLoading } = useQuery<{ defaultUrl: string; promotions: Promotion[] }>({
     queryKey: ['marketing-promotions'],
     queryFn: () => api.get('/marketing/promotions').then((r) => r.data),
@@ -180,6 +182,7 @@ export default function PromotionsCard() {
                   <td className="table-cell">
                     <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 justify-end">
                       <button onClick={() => copy(p.link)} className="btn-ghost text-xs px-2 py-1" title="העתקת הקישור"><Copy className="w-4 h-4" /> קישור</button>
+                      <button onClick={() => setMailFor(p)} className="btn-ghost text-xs px-2 py-1" title="כפתור לקבלת המדריך במייל, למי שאין דפדפן"><MailPlus className="w-4 h-4" /> כפתור מייל</button>
                       <button onClick={() => setEditing(p)} className="btn-ghost p-1.5" title="עריכה"><Pencil className="w-4 h-4" /></button>
                       <button onClick={() => remove(p)} className="btn-ghost p-1.5 text-slate-400 hover:text-red-600" title="מחיקה"><Trash2 className="w-4 h-4" /></button>
                     </div>
@@ -199,6 +202,133 @@ export default function PromotionsCard() {
         />
       )}
       {created && <CreatedModal promo={created} onClose={() => setCreated(null)} />}
+      {mailFor && <MailButtonModal code={mailFor.code} name={mailFor.name} onClose={() => setMailFor(null)} />}
+    </div>
+  );
+}
+
+// ---- Guide by email ----
+
+interface Snippet { mailto: string; html: string; text: string; preview: string }
+
+export function MailButtonModal({ code, name, onClose }: { code: string | null; name: string | null; onClose: () => void }) {
+  const { data, isLoading, error } = useQuery<Snippet>({
+    queryKey: ['guide-mail-snippet', code],
+    queryFn: () => api.get('/marketing/guide-mail/snippet', { params: { code: code || undefined } }).then((r) => r.data),
+  });
+  return createPortal(
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-content max-w-xl">
+        <div className="modal-header">
+          <h2 className="modal-title">כפתור "קבל את המדריך במייל"{name ? ` – ${name}` : ''}</h2>
+          <button type="button" onClick={onClose} className="modal-close"><X className="w-5 h-5" /></button>
+        </div>
+        {isLoading ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>
+          : error || !data ? <p className="text-sm text-red-600">{(error as any)?.response?.data?.error || 'לא הצלחתי להכין את הכפתור'}</p> : (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              למפרסם או לפורום שמוציאים את המייל: שיוסיפו את הכפתור הזה מתחת לקישור. מי שאין לו דפדפן לוחץ, נפתח לו מייל מוכן, הוא שולח, והמערכת שולחת לו את המדריך אוטומטית.
+              {code && ' הבקשות שיגיעו דרכו ייספרו בשורה של הפרסום הזה.'}
+            </p>
+            <div className="rounded-xl border border-slate-200 overflow-hidden">
+              <p className="text-xs text-slate-400 px-3 py-1.5 bg-slate-50 border-b border-slate-200">כך זה ייראה במייל</p>
+              <iframe title="תצוגה" srcDoc={data.preview} className="w-full h-36 bg-white" />
+            </div>
+            <div className="grid gap-2">
+              <button type="button" onClick={() => copy(data.html, 'קוד הכפתור הועתק')} className="btn-primary justify-center"><Copy className="w-4 h-4" /> העתקת קוד הכפתור (HTML)</button>
+              <button type="button" onClick={() => copy(data.mailto)} className="btn-secondary justify-center"><Link2 className="w-4 h-4" /> העתקת הקישור בלבד (לשים על כפתור קיים)</button>
+              <button type="button" onClick={() => copy(data.text, 'הטקסט הועתק')} className="btn-ghost justify-center text-sm">העתקת הסבר בטקסט רגיל (למייל בלי עיצוב)</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+interface GuideMailInfo {
+  address: string; gmailAddress: string | null; ready: boolean; problems: string[]; welcomeActive: boolean;
+  counts: Record<string, number>;
+  recent: { id: string; email: string; name: string | null; status: string; note: string | null; consent: boolean; promotion: string | null; receivedAt: string }[];
+}
+
+const REQ_STATUS: Record<string, { label: string; cls: string }> = {
+  queued: { label: 'נשלח המדריך', cls: 'bg-emerald-100 text-emerald-700' },
+  sent: { label: 'נשלח המדריך', cls: 'bg-emerald-100 text-emerald-700' },
+  duplicate: { label: 'כבר קיבל', cls: 'bg-slate-100 text-slate-600' },
+  ignored: { label: 'לא בקשה', cls: 'bg-slate-100 text-slate-500' },
+  failed: { label: 'נכשל', cls: 'bg-red-100 text-red-700' },
+};
+
+export function GuideMailCard() {
+  const qc = useQueryClient();
+  const [showButton, setShowButton] = useState(false);
+  const [running, setRunning] = useState(false);
+  const { data, isLoading } = useQuery<GuideMailInfo>({
+    queryKey: ['guide-mail'],
+    queryFn: () => api.get('/marketing/guide-mail').then((r) => r.data),
+    refetchInterval: 60_000,
+  });
+  const runNow = async () => {
+    setRunning(true);
+    try {
+      const { data: r } = await api.post('/marketing/guide-mail/run');
+      toast.success(r.handled ? `טופלו ${r.handled} בקשות חדשות` : 'אין בקשות חדשות');
+      qc.invalidateQueries({ queryKey: ['guide-mail'] });
+      qc.invalidateQueries({ queryKey: ['marketing-tracking'] });
+      qc.invalidateQueries({ queryKey: ['marketing-promotions'] });
+    } catch {
+      toast.error('הבדיקה נכשלה');
+    } finally {
+      setRunning(false);
+    }
+  };
+  const sent = (data?.counts.queued || 0) + (data?.counts.sent || 0);
+
+  return (
+    <div className="card p-0 overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-primary-50 text-primary-700 flex items-center justify-center flex-shrink-0"><MailPlus className="w-[18px] h-[18px]" /></div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-slate-900">בקשות למדריך במייל</h3>
+          <p className="text-xs text-slate-500">למי שאין דפדפן: כפתור שפותח מייל מוכן, והמדריך נשלח אליו אוטומטית{data ? ` · עד היום ${sent}` : ''}</p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+          <button onClick={() => setShowButton(true)} className="btn-secondary text-sm" disabled={!data?.address}><Copy className="w-4 h-4" /> הכפתור</button>
+          <button onClick={runNow} className="btn-ghost text-sm" disabled={running} title="בדיקת בקשות חדשות עכשיו">{running ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} בדיקה</button>
+        </div>
+      </div>
+      {isLoading || !data ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div> : (
+        <>
+          {data.ready ? (
+            <p className="px-6 py-3 text-sm text-emerald-700 bg-emerald-50 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> פעיל: הבקשות מגיעות אל <span dir="ltr" className="font-medium">{data.address}</span> ומטופלות כל כמה דקות
+            </p>
+          ) : (
+            <div className="px-6 py-3 bg-amber-50 text-sm text-amber-900 space-y-1">
+              {data.problems.map((p, i) => <p key={i} className="flex items-start gap-2"><AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" /> {p}</p>)}
+            </div>
+          )}
+          {data.recent.length === 0 ? <p className="text-center text-slate-400 py-8 text-sm">עוד לא הגיעו בקשות במייל</p> : (
+            <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+              {data.recent.map((r) => (
+                <div key={r.id} className="px-6 py-2.5 flex items-center gap-3 text-sm">
+                  <span className="text-slate-400 w-20 flex-shrink-0">{format(new Date(r.receivedAt), 'd/M HH:mm')}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-slate-800 truncate">{r.name || r.email}</p>
+                    <p className="text-xs text-slate-400 truncate">
+                      {r.name && <span dir="ltr">{r.email}</span>}{r.promotion && ` · ${r.promotion}`}{r.status !== 'ignored' && !r.consent && ' · בלי רשימת דיוור'}{r.note && ` · ${r.note}`}
+                    </p>
+                  </div>
+                  <span className={clsx('badge flex-shrink-0', REQ_STATUS[r.status]?.cls || 'bg-slate-100 text-slate-600')}>{REQ_STATUS[r.status]?.label || r.status}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      {showButton && <MailButtonModal code={null} name={null} onClose={() => setShowButton(false)} />}
     </div>
   );
 }

@@ -10,7 +10,7 @@ import {
 import api from '../../services/api';
 import { CONTACT_STATUS, ContactStatus, pct } from './shared';
 import { ContactDrawer } from './Contacts';
-import PromotionsCard, { showDay } from './Promotions';
+import PromotionsCard, { showDay, GuideMailCard } from './Promotions';
 
 interface Person {
   id: string; name: string | null; email: string; status: ContactStatus; source: string | null; createdAt: string;
@@ -143,6 +143,8 @@ export default function TrackingPage() {
       </div>
 
       <PromotionsCard />
+
+      <GuideMailCard />
 
       <div className="card p-0 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">

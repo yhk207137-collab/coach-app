@@ -206,6 +206,21 @@ function BlockSettings({ b, onUpdate, onPickImage }: { b: Block; onUpdate: Props
           <Range label="עיגול פינות" value={b.radius ?? 10} min={0} max={30} suffix="px" onChange={(v) => up({ radius: v })} />
         </>
       );
+    case 'guideByMail':
+      return (
+        <>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            לחיצה על הכפתור פותחת מייל מוכן אל הכתובת שלך, עם נושא קבוע ובקשה לקבל את המדריך. השולח רק לוחץ "שלח",
+            והמערכת שולחת לו אוטומטית את המדריך בתשובה. מתאים למי שיש לו מייל בלי דפדפן.
+          </p>
+          <Field label="טקסט הכפתור">
+            <input className="input" value={b.text || ''} onChange={(e) => up({ text: e.target.value })} />
+          </Field>
+          <AlignField value={b.align} onChange={(v) => up({ align: v })} />
+          <ColorField label="צבע הכפתור" value={b.bg} onChange={(v) => up({ bg: v })} allowEmpty="נייבי" />
+          <ColorField label="צבע הטקסט" value={b.color} onChange={(v) => up({ color: v })} allowEmpty="טורקיז" />
+        </>
+      );
     case 'divider':
       return (
         <>

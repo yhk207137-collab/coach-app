@@ -156,7 +156,7 @@ export function buildForSend(
     ? `${base}/unsubscribe/${contact.unsubToken}?s=${sendId}`
     : `${base}/unsubscribe/preview`;
   const design = onEmailAddress(withGuideLink(campaign.design, settings.guideUrl), base);
-  const ctx = { merge, footer: footerFrom(settings), unsubscribeUrl, preheader: campaign.preheader, title: campaign.subject, openPixelUrl: sendId ? `${base}/api/t/o/${sendId}.gif` : undefined };
+  const ctx = { merge, footer: footerFrom(settings), unsubscribeUrl, preheader: campaign.preheader, title: campaign.subject, guideMailTo: settings.replyTo || undefined, openPixelUrl: sendId ? `${base}/api/t/o/${sendId}.gif` : undefined };
   // A link that appears more than once is marked by its place (top / mid / bottom), so the
   // report shows who clicked the top button and who reached the bottom one.
   const counts = new Map<string, number>();

@@ -10,6 +10,7 @@ import { requireAuth, requireCoach, AuthRequest } from '../middleware/auth';
 import { UPLOAD_DIR } from '../lib/uploads';
 import { sendEmail, sendingDomainStatus, EmailError, fromEmailAddress } from '../lib/email';
 import { STARTERS, StarterKey } from '../services/emailStarters';
+import { guideMailStatus, processGuideMailRequests, guideMailto, guideMailButtonHtml, guideMailText, guideMailButtonPreview } from '../services/guideMail';
 import {
   getMarketingSettings, saveMarketingSettings, getBaseUrl, buildForSend, audienceWhere,
   startCampaign, statsByCampaign, emptyStats, getWelcomeCampaign, DAILY_LIMIT, sentInLast24h, processQueue,
@@ -693,6 +694,39 @@ router.delete('/promotions/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- Guide by email: a mailto button for people without a browser; requests are handled from Gmail ----
+
+const snippet = (to: string, code: string | null) => ({
+  mailto: guideMailto(to, code), html: guideMailButtonHtml(to, code), text: guideMailText(to, code), preview: guideMailButtonPreview(to, code),
+});
+
+router.get('/guide-mail', async (_req, res) => {
+  const [status, recent, counts] = await Promise.all([
+    guideMailStatus(),
+    prisma.mailRequest.findMany({ orderBy: { createdAt: 'desc' }, take: 40 }),
+    prisma.mailRequest.groupBy({ by: ['status'], _count: true }),
+  ]);
+  const promoNames = new Map((await prisma.promotion.findMany({ select: { code: true, name: true } })).map((p) => [p.code, p.name]));
+  res.json({
+    ...status,
+    counts: Object.fromEntries(counts.map((c) => [c.status, c._count])),
+    recent: recent.map((r) => ({ ...r, promotion: r.code ? promoNames.get(r.code) || r.code : null })),
+    snippet: status.address ? snippet(status.address, null) : null,
+  });
+});
+
+router.get('/guide-mail/snippet', async (req, res) => {
+  const { address } = await guideMailStatus();
+  if (!address) return res.status(400).json({ error: 'אין כתובת למענה בהגדרות הדיוור' });
+  const code = String(req.query.code || '').toLowerCase();
+  if (code && !(await prisma.promotion.findUnique({ where: { code } }))) return res.status(404).json({ error: 'הפרסום לא נמצא' });
+  res.json(snippet(address, code || null));
+});
+
+router.post('/guide-mail/run', async (_req, res) => {
+  res.json(await processGuideMailRequests());
+});
+
 router.get('/tracking', async (req, res) => {
   const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 0;
   const from = days ? new Date(Date.now() - days * 24 * 3600_000) : new Date(0);
@@ -708,7 +742,7 @@ router.get('/tracking', async (req, res) => {
 
   const [visits, signups, welcomeRows, downloadRows, recent, people] = await Promise.all([
     prisma.pageVisit.findMany({ where: { createdAt: { gte: from }, ...realPages }, select: { visitorId: true, contactId: true, source: true, referrer: true, createdAt: true }, take: 50_000 }),
-    prisma.contact.findMany({ where: { createdAt: { gte: from }, consentMethod: { in: ['checkbox', 'form'] } }, select: { id: true, createdAt: true } }),
+    prisma.contact.findMany({ where: { createdAt: { gte: from }, consentMethod: { in: ['checkbox', 'form', 'email-request', 'email-request-no-list'] } }, select: { id: true, createdAt: true, consentMethod: true, source: true } }),
     prisma.$queryRaw<{ sent: number; opened: number }[]>`
       SELECT count(*) FILTER (WHERE status IN ('SENT','DELIVERED','BOUNCED'))::int AS sent, count("openedAt")::int AS opened
       FROM "CampaignSend" WHERE "campaignId" = ${welcome.id} AND "createdAt" >= ${from}`,
@@ -749,6 +783,14 @@ router.get('/tracking', async (req, res) => {
     row.visitors.add(v.visitorId);
     const signedAt = v.contactId ? signedUpAt.get(v.contactId) : undefined;
     if (signedAt !== undefined && v.createdAt.getTime() <= signedAt) row.signups.add(v.contactId!);
+    bySource.set(label_, row);
+  }
+  // Requests by email never visit the page: they count as sign-ups of their own source.
+  for (const s of signups) {
+    if (!s.consentMethod?.startsWith('email-request')) continue;
+    const label_ = s.source && promoName.get(s.source) ? promoName.get(s.source)! : 'בקשה במייל';
+    const row = bySource.get(label_) || { visitors: new Set(), signups: new Set() };
+    row.signups.add(s.id);
     bySource.set(label_, row);
   }
   const sources = [...bySource.entries()]
