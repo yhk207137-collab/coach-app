@@ -10,6 +10,7 @@ import multer from 'multer';
 import { runNightlyBackup } from './services/backup';
 import { UPLOAD_DIR } from './lib/uploads';
 import { startMarketingWorker } from './services/marketing';
+import { startGuideMailWorker } from './services/guideMail';
 import { alertsTick } from './services/alerts';
 import { chargeDueMeetings } from './services/meetingBilling';
 import { consultTick } from './services/consult';
@@ -210,6 +211,7 @@ async function bootstrap() {
   app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 
   startMarketingWorker();
+  startGuideMailWorker();
   cron.schedule('* * * * *', () => {
     void alertsTick();
     consultTick().catch((e) => console.error('[CONSULT] tick failed:', e?.message || e));

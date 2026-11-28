@@ -1,9 +1,9 @@
 import {
-  Image as ImageIcon, Type, Heading1, RectangleHorizontal, Minus, MoveVertical, Columns2, Quote, Sparkles,
+  Image as ImageIcon, Type, Heading1, RectangleHorizontal, Minus, MoveVertical, Columns2, Quote, Sparkles, MailPlus,
 } from 'lucide-react';
 
 export type Align = 'right' | 'center' | 'left';
-export type BlockType = 'logo' | 'heading' | 'text' | 'quote' | 'image' | 'button' | 'divider' | 'spacer' | 'imageText';
+export type BlockType = 'logo' | 'heading' | 'text' | 'quote' | 'image' | 'button' | 'divider' | 'spacer' | 'imageText' | 'guideByMail';
 
 export interface Block {
   id: string;
@@ -156,7 +156,13 @@ export const BLOCKS: { type: BlockType; label: string; icon: any; create: (brand
   { type: 'logo', label: 'לוגו', icon: Sparkles, create: () => ({ id: newId(), type: 'logo', src: '', width: 30, align: 'center' }) },
 ];
 
-export const blockLabel = (type: BlockType) => BLOCKS.find((b) => b.type === type)?.label ?? type;
+// Offered only in emails that carry the offer and a link to it (see the editor), not in the general list.
+export const GUIDE_MAIL_BLOCK = {
+  type: 'guideByMail' as BlockType, label: 'כפתור קבלה במייל', icon: MailPlus,
+  create: () => ({ id: newId(), type: 'guideByMail' as BlockType, text: 'אין לך דפדפן? קבל את המדריך במייל', align: 'center' }),
+};
+
+export const blockLabel = (type: BlockType) => (type === 'guideByMail' ? GUIDE_MAIL_BLOCK.label : BLOCKS.find((b) => b.type === type)?.label ?? type);
 
 export const RICH_TYPES: BlockType[] = ['heading', 'text', 'quote', 'imageText'];
 

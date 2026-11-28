@@ -1,4 +1,5 @@
 import sanitizeHtml from 'sanitize-html';
+import { guideMailButtonHtml, guideMailText } from './guideMailLink';
 
 export interface MergeData {
   name?: string | null;
@@ -21,6 +22,8 @@ export interface RenderContext {
   openPixelUrl?: string;
   preheader?: string | null;
   title?: string;
+  // Where the "get the guide by email" button sends its ready email (the owner's reply address).
+  guideMailTo?: string;
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -193,6 +196,17 @@ export function renderEmail(design: any, ctx: RenderContext): RenderedEmail {
           `<a href="${esc(link(href))}" target="_blank" style="display:block;padding:14px 30px;font-family:${font};font-size:17px;font-weight:700;line-height:1.2;color:${fg};text-decoration:none;border-radius:${radius}px;">${label}</a>` +
           `</td></tr></table>`, 16, 16, align));
         textParts.push(`${merge(b.text || '')}: ${href}`);
+        break;
+      }
+      case 'guideByMail': {
+        // A mailto button: never wrapped in click tracking, which would need a browser.
+        const to = (ctx.guideMailTo || '').trim();
+        if (!to) break;
+        const code = typeof b.code === 'string' && /^[a-z0-9][a-z0-9-]{1,29}$/.test(b.code) ? b.code : null;
+        rows.push(cell(guideMailButtonHtml(to, code, {
+          bg: color(b.bg, '#0A1E3C'), color: color(b.color, '#5CE1E6'), align, label: merge(b.text || '') || undefined,
+        }), 16, 16, align));
+        textParts.push(guideMailText(to, code));
         break;
       }
       case 'divider': {

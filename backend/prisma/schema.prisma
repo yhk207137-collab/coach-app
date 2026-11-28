@@ -522,6 +522,25 @@ model Promotion {
   createdAt DateTime @default(now())
 }
 
+// A request for the guide that arrived by email (the "קבל את המדריך במייל" button opens a ready
+// email to the owner's address). gmailId keeps each message handled once.
+model MailRequest {
+  id         String   @id @default(cuid())
+  gmailId    String   @unique
+  email      String
+  name       String?
+  code       String?
+  consent    Boolean  @default(false)
+  status     String // queued | sent | duplicate | ignored | failed
+  note       String?
+  contactId  String?
+  receivedAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
+}
+
 // A reminder the owner postponed ("remind me tomorrow"); hidden until then.
 model AlertSnooze {
   key       String   @id

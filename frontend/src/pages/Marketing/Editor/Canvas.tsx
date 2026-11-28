@@ -121,6 +121,21 @@ export default function Canvas(p: Props) {
             {!b.url && <div className="text-xs text-amber-600 mt-2">⚠ חסר קישור לכפתור</div>}
           </div>
         );
+      case 'guideByMail':
+        return (
+          <div style={{ padding: '16px 32px', textAlign: align }}>
+            <span style={{
+              display: 'inline-block', background: b.bg || '#0A1E3C', color: b.color || '#5CE1E6',
+              borderRadius: 10, padding: '14px 26px', fontFamily: font, fontSize: 17, fontWeight: 700, textAlign: 'center',
+            }}>
+              <RichText html={b.text || ''} singleLine onFocus={() => p.onSelect(b.id)}
+                onChange={(v) => p.onUpdate(b.id, { text: v.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ') })}
+                style={{ display: 'inline-block', minWidth: 40 }} />
+            </span>
+            <div style={{ fontFamily: font, fontSize: 13, color: '#64748b', marginTop: 8 }}>לחיצה תפתח מייל מוכן. רק לשלוח, והמדריך יגיע אליך בתשובה.</div>
+            {!p.settings?.replyTo && <div className="text-xs text-amber-600 mt-2">⚠ חסרה "כתובת למענה" בהגדרות הדיוור, ובלעדיה הכפתור לא יופיע במייל</div>}
+          </div>
+        );
       case 'divider':
         return <div style={{ padding: '16px 32px' }}><div style={{ borderTop: `${b.thickness || 1}px solid ${b.color || '#e2e8f0'}` }} /></div>;
       case 'spacer':
