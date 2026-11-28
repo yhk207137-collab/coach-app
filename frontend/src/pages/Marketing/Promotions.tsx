@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -44,7 +45,8 @@ function PromotionModal({ promo, defaultUrl, onClose, onSaved }: { promo: Promot
       setSaving(false);
     }
   };
-  return (
+  // Rendered on <body>: the card around it has a blur, which would otherwise trap this fixed overlay inside the card.
+  return createPortal(
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <form onSubmit={save} className="modal-content">
         <div className="modal-header">
@@ -56,7 +58,7 @@ function PromotionModal({ promo, defaultUrl, onClose, onSaved }: { promo: Promot
             <label className="label">שם הפרסום *</label>
             <input className="input" required autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="למשל: מודעה בעיתון, סטטוס, קבוצת מנהלי עמותות" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div><label className="label">תאריך הפרסום *</label><input className="input" type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div>
             {!promo && (
               <div>
@@ -79,12 +81,13 @@ function PromotionModal({ promo, defaultUrl, onClose, onSaved }: { promo: Promot
           <button type="submit" disabled={saving} className="btn-primary">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : promo ? 'שמירה' : 'יצירת קישור'}</button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
 function CreatedModal({ promo, onClose }: { promo: Promotion; onClose: () => void }) {
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-content">
         <div className="modal-header">
@@ -101,7 +104,8 @@ function CreatedModal({ promo, onClose }: { promo: Promotion; onClose: () => voi
           <button type="button" onClick={() => copy(promo.link)} className="btn-primary"><Copy className="w-4 h-4" /> העתקת הקישור</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
