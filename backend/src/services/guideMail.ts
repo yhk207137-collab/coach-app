@@ -3,7 +3,7 @@
 // in the connected Gmail, adds/updates the contact, and sends the welcome email with the guide attached.
 import { prisma } from '../lib/prisma';
 import { sendEmail, sendingDomainStatus, fromEmailAddress } from '../lib/email';
-import { googleStatus, gmailAddress, listIncomingMail, labelHandled } from '../assistant/google';
+import { gmailState, listIncomingMail, labelHandled } from './gmailInbox';
 import { isQuietTime } from '../assistant/time';
 import { getMarketingSettings, getWelcomeCampaign, buildForSend, guideAttachment, getBaseUrl, processQueue } from './marketing';
 import { GUIDE_MAIL_SUBJECT, GUIDE_MAIL_LABEL, guideMailButtonHtml } from './guideMailLink';
@@ -17,16 +17,17 @@ const CODE_RE = /^[a-z0-9][a-z0-9-]{1,29}$/;
 // ── Status (for the screen) ─────────────────────────────────────────────────
 
 export async function guideMailStatus() {
-  const [settings, welcome, gmail] = await Promise.all([getMarketingSettings(), getWelcomeCampaign(), googleStatus()]);
+  const [settings, welcome, gm] = await Promise.all([getMarketingSettings(), getWelcomeCampaign(), gmailState()]);
+  const connected = gm.address;
   const address = (settings.replyTo || '').trim().toLowerCase();
-  const connected = gmail.gmail ? await gmailAddress() : null;
   const problems: string[] = [];
   if (!address) problems.push('אין כתובת למענה בהגדרות הדיוור. הכפתור צריך כתובת שאליה יישלחו הבקשות.');
-  if (!connected) problems.push('ג\'ימייל לא מחובר למערכת, ולכן היא לא יכולה לקרוא את הבקשות. מחברים דרך העוזר: "קישור לחיבור גוגל".');
+  if (!connected && gm.error) problems.push(`ג'ימייל חובר, אבל גוגל לא מאפשר לקרוא ממנו. ייתכן שצריך להפעיל את Gmail API בפרויקט של גוגל (Google Cloud ← APIs & Services ← Enable APIs ← Gmail API). השגיאה מגוגל: ${gm.error}`);
+  else if (!connected) problems.push('ג\'ימייל לא מחובר למערכת, ולכן היא לא יכולה לקרוא את הבקשות. לחץ "חיבור ג\'ימייל" והתחבר עם החשבון של ' + (address || 'כתובת המענה') + '.');
   else if (address && connected !== address) problems.push(`הבקשות יישלחו אל ${address}, אבל הג'ימייל שמחובר למערכת הוא ${connected}. צריך שזו תהיה אותה כתובת: לשנות את "כתובת למענה" בהגדרות הדיוור, או לחבר את הג'ימייל הנכון.`);
   if (welcome.status !== 'ACTIVE') problems.push('המייל האוטומטי עם המדריך כבוי. בקשות שיגיעו ימתינו עד שיופעל.');
   if (!settings.guideUrl) problems.push('קובץ המדריך עוד לא הועלה.');
-  return { address, gmailAddress: connected, ready: problems.length === 0, problems, welcomeActive: welcome.status === 'ACTIVE' };
+  return { address, gmailAddress: connected, gmailConnected: !!connected, ready: problems.length === 0, problems, welcomeActive: welcome.status === 'ACTIVE' };
 }
 
 // ── Handling requests ───────────────────────────────────────────────────────

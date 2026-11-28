@@ -10,6 +10,7 @@ import { requireAuth, requireCoach, AuthRequest } from '../middleware/auth';
 import { UPLOAD_DIR } from '../lib/uploads';
 import { sendEmail, sendingDomainStatus, EmailError, fromEmailAddress } from '../lib/email';
 import { STARTERS, StarterKey } from '../services/emailStarters';
+import { gmailConnectUrl } from '../services/gmailInbox';
 import { guideMailStatus, processGuideMailRequests, guideMailto, guideMailButtonHtml, guideMailText, guideMailButtonPreview, guideMailSchedule } from '../services/guideMail';
 import {
   getMarketingSettings, saveMarketingSettings, getBaseUrl, buildForSend, audienceWhere,
@@ -723,6 +724,17 @@ router.get('/guide-mail/snippet', async (req, res) => {
   const code = String(req.query.code || '').toLowerCase();
   if (code && !(await prisma.promotion.findUnique({ where: { code } }))) return res.status(404).json({ error: 'הפרסום לא נמצא' });
   res.json(snippet(address, code || null));
+});
+
+// Connect the Gmail the requests arrive in.
+// Returns through the calendar's callback, which is already registered with Google.
+router.get('/guide-mail/connect', async (req, res) => {
+  const redirectUri = `${req.protocol}://${req.get('host')}/api/calendar/callback`;
+  try {
+    res.json({ link: gmailConnectUrl(redirectUri), redirectUri });
+  } catch (err: any) {
+    res.status(400).json({ error: String(err?.message || err), redirectUri });
+  }
 });
 
 router.post('/guide-mail/run', async (_req, res) => {
